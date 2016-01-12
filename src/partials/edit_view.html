@@ -1,5 +1,4 @@
-<div ng-include="httpConfigPartialSrc"></div>
-<br>
+<datasource-http-settings></datasource-http-settings>
 
 <h5>Elasticsearch details</h5>
 
@@ -42,8 +41,8 @@
 	</ul>
 	<div class="clearfix"></div>
 </div>
-</div>
 
+<br>
 <h5>Default query settings</h5>
 
 <div class="tight-form last">
@@ -53,7 +52,7 @@
 		</li>
 		<li>
 			<input type="text" class="input-medium tight-form-input input-xlarge" ng-model="current.jsonData.timeInterval"
-						 spellcheck='false' placeholder="example: >10s">
+			spellcheck='false' placeholder="example: >10s">
 		</li>
 		<li class="tight-form-item">
 			<i class="fa fa-question-circle" bs-tooltip="'Set a low limit by having a greater sign: example: >10s'" data-placement="right"></i>
