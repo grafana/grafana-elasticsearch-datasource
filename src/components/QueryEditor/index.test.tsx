@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { ElasticsearchDataQuery } from '../../dataquery.gen';
 import { ElasticDatasource } from '../../datasource';
+import React from 'react';
 
 import { QueryEditor } from '.';
 

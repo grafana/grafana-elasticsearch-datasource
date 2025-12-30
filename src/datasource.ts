@@ -1,52 +1,52 @@
-import { cloneDeep, first as _first, isNumber, isString, map as _map, isObject } from 'lodash';
-import { from, generate, lastValueFrom, Observable, of } from 'rxjs';
-import { catchError, first, map, mergeMap, skipWhile, throwIfEmpty, tap } from 'rxjs/operators';
+import { map as _map, cloneDeep, isNumber, isObject, isString } from 'lodash';
+import { Observable, from, generate, lastValueFrom, of } from 'rxjs';
+import { catchError, first, map, mergeMap, skipWhile, tap, throwIfEmpty } from 'rxjs/operators';
 import { SemVer } from 'semver';
 
 import {
+  AbstractQuery,
+  AdHocVariableFilter,
+  AdHocVariableModel,
+  AnnotationEvent,
+  CoreApp,
   DataFrame,
   DataLink,
+  DataQueryError,
   DataQueryRequest,
   DataQueryResponse,
+  DataSourceGetTagValuesOptions,
   DataSourceInstanceSettings,
   DataSourceWithLogsContextSupport,
-  DataSourceWithQueryImportSupport,
+  DataSourceWithQueryModificationSupport,
+  DataSourceWithQueryimportSupport,
   DataSourceWithSupplementaryQueriesSupport,
+  DataSourceWithToggleableQueryFiltersSupport,
   DateTime,
-  dateTime,
-  getDefaultTimeRange,
-  AbstractQuery,
   LogLevel,
+  LogRowContextOptions,
+  LogRowContextQueryDirection,
   LogRowModel,
   MetricFindValue,
-  ScopedVars,
-  TimeRange,
-  QueryFixAction,
-  CoreApp,
-  SupplementaryQueryType,
-  DataQueryError,
-  rangeUtil,
-  LogRowContextQueryDirection,
-  LogRowContextOptions,
-  SupplementaryQueryOptions,
-  toUtc,
-  AnnotationEvent,
-  DataSourceWithToggleableQueryFiltersSupport,
   QueryFilterOptions,
+  QueryFixAction,
+  ScopedVars,
+  SupplementaryQueryOptions,
+  SupplementaryQueryType,
+  TimeRange,
   ToggleFilterAction,
-  DataSourceGetTagValuesOptions,
-  AdHocVariableFilter,
-  DataSourceWithQueryModificationSupport,
-  AdHocVariableModel,
   TypedVariableModel,
+  dateTime,
+  getDefaultTimeRange,
+  rangeUtil,
+  toUtc,
 } from '@grafana/data';
 import {
-  DataSourceWithBackend,
-  getDataSourceSrv,
   BackendSrvRequest,
+  DataSourceWithBackend,
   TemplateSrv,
-  getTemplateSrv,
   config,
+  getDataSourceSrv,
+  getTemplateSrv,
 } from '@grafana/runtime';
 
 import { IndexPattern, intervalMap } from './IndexPattern';
@@ -60,7 +60,7 @@ import {
   isPipelineAggregationWithMultipleBucketPaths,
 } from './components/QueryEditor/MetricAggregationsEditor/aggregations';
 import { metricAggregationConfig } from './components/QueryEditor/MetricAggregationsEditor/utils';
-import { ElasticsearchDataQuery, BucketAggregation } from './dataquery.gen';
+import { BucketAggregation, ElasticsearchDataQuery } from './dataquery.gen';
 import { isMetricAggregationWithMeta } from './guards';
 import {
   addAddHocFilter,
@@ -71,17 +71,17 @@ import {
 } from './modifyQuery';
 import { trackAnnotationQuery, trackQuery } from './tracking';
 import {
-  Logs,
   DataLinkConfig,
-  ElasticsearchOptions,
-  TermsQuery,
-  Interval,
   ElasticsearchAnnotationQuery,
+  ElasticsearchHits,
+  ElasticsearchOptions,
+  Interval,
+  Logs,
+  QueryType,
   RangeMap,
+  TermsQuery,
   isElasticsearchResponseWithAggregations,
   isElasticsearchResponseWithHits,
-  ElasticsearchHits,
-  QueryType,
 } from './types';
 import { getScriptValue, isTimeSeriesQuery } from './utils';
 
@@ -105,12 +105,11 @@ const ELASTIC_META_FIELDS = [
 export class ElasticDatasource
   extends DataSourceWithBackend<ElasticsearchDataQuery, ElasticsearchOptions>
   implements
-    DataSourceWithLogsContextSupport,
-    DataSourceWithQueryImportSupport<ElasticsearchDataQuery>,
-    DataSourceWithSupplementaryQueriesSupport<ElasticsearchDataQuery>,
-    DataSourceWithToggleableQueryFiltersSupport<ElasticsearchDataQuery>,
-    DataSourceWithQueryModificationSupport<ElasticsearchDataQuery>
-{
+  DataSourceWithLogsContextSupport,
+  DataSourceWithQueryimportSupport<ElasticsearchDataQuery>,
+  DataSourceWithSupplementaryQueriesSupport<ElasticsearchDataQuery>,
+  DataSourceWithToggleableQueryFiltersSupport<ElasticsearchDataQuery>,
+  DataSourceWithQueryModificationSupport<ElasticsearchDataQuery> {
   basicAuth?: string;
   withCredentials?: boolean;
   url: string;
@@ -180,8 +179,8 @@ export class ElasticDatasource
   }
 
   /**
-   * Implemented as part of DataSourceWithQueryImportSupport.
-   * Imports queries from AbstractQuery objects when switching between different data source types.
+   * Implemented as part of DataSourceWithQueryimportSupport.
+   * imports queries from AbstractQuery objects when switching between different data source types.
    * @returns A Promise that resolves to an array of ES queries.
    */
   async importFromAbstractQueries(abstractQueries: AbstractQuery[]): Promise<ElasticsearchDataQuery[]> {
@@ -266,7 +265,7 @@ export class ElasticDatasource
   // Private method used in the `annotationQuery` to prepare the payload for the Elasticsearch annotation request
   private prepareAnnotationRequest(options: {
     annotation: ElasticsearchAnnotationQuery;
-    // Should be DashboardModel but cannot import that here from the main app. This is a temporary solution as we need to move from deprecated annotations.
+    // Should be DashboardModel but cannot import  that here from the main app. This is a temporary solution as we need to move from deprecated annotations.
     dashboard: { getVariables: () => TypedVariableModel[] };
     range: TimeRange;
   }) {
@@ -275,7 +274,7 @@ export class ElasticDatasource
     const timeEndField = annotation.timeEndField || null;
     const dashboard = options.dashboard;
 
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+
     const adhocVariables = dashboard.getVariables().filter((v) => v.type === 'adhoc') as AdHocVariableModel[];
     const annotationRelatedVariables = adhocVariables.filter((v) => v.datasource?.uid === annotation.datasource.uid);
     const filters = annotationRelatedVariables.map((v) => v.filters).flat();

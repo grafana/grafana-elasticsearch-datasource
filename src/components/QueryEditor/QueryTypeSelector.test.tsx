@@ -7,6 +7,7 @@ import { renderWithESProvider } from '../../test-helpers/render';
 
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
 import { QueryTypeSelector } from './QueryTypeSelector';
+import React from 'react';
 
 jest.mock('../../hooks/useStatelessReducer');
 

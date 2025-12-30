@@ -1,6 +1,6 @@
 import { Action } from 'redux';
 
-import { Filter } from 'app/plugins/datasource/elasticsearch/dataquery.gen';
+import { Filter } from '../../../../../../dataquery.gen';
 
 import { defaultFilter } from '../utils';
 

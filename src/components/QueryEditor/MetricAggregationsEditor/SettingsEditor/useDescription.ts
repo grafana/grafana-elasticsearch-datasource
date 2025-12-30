@@ -1,4 +1,4 @@
-import { MetricAggregation } from 'app/plugins/datasource/elasticsearch/dataquery.gen';
+import { MetricAggregation } from '../../../../dataquery.gen';
 
 import { extendedStats } from '../../../../queryDef';
 

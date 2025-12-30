@@ -1,4 +1,4 @@
-import { toUtc, getLocale, setLocale, dateTime } from '@grafana/data';
+import { dateTime, getLocale, setLocale, toUtc } from '@grafana/data';
 
 import { IndexPattern } from './IndexPattern';
 

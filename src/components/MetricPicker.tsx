@@ -5,6 +5,7 @@ import { Segment } from '@grafana/ui';
 
 import { MetricAggregation } from '../dataquery.gen';
 import { describeMetric } from '../utils';
+import React from 'react';
 
 const noWrap = css({
   whiteSpace: 'nowrap',

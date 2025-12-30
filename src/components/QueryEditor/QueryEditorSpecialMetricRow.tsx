@@ -3,6 +3,7 @@ import { InlineFieldRow, InlineLabel, InlineSegmentGroup } from '@grafana/ui';
 import { MetricAggregation } from '../../dataquery.gen';
 
 import { SettingsEditor } from './MetricAggregationsEditor/SettingsEditor';
+import React from 'react';
 
 type Props = {
   name: string;

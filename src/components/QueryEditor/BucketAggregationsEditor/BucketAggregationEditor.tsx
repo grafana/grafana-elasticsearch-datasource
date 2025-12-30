@@ -10,6 +10,7 @@ import { SettingsEditor } from './SettingsEditor';
 import { isBucketAggregationWithField } from './aggregations';
 import { changeBucketAggregationField, changeBucketAggregationType } from './state/actions';
 import { bucketAggregationConfig } from './utils';
+import React from 'react';
 
 const bucketAggOptions: Array<SelectableValue<BucketAggregationType>> = Object.entries(bucketAggregationConfig).map(
   ([key, { label }]) => ({

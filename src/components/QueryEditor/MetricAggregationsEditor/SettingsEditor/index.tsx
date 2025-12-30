@@ -3,7 +3,7 @@ import { ComponentProps, useId, useRef, useState } from 'react';
 import * as React from 'react';
 
 import { InlineField, Input, InlineSwitch, Select } from '@grafana/ui';
-import { MetricAggregation, ExtendedStat } from 'app/plugins/datasource/elasticsearch/dataquery.gen';
+import { MetricAggregation, ExtendedStat } from '../../../../dataquery.gen';
 
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
 import { extendedStats } from '../../../../queryDef';

@@ -2,7 +2,10 @@ import { DataSourceJsonData } from '@grafana/data';
 import { DataSourceRef } from '@grafana/schema';
 
 import {
+  BucketAggregation,
   BucketAggregationType,
+  ElasticsearchDataQuery,
+  ExtendedStats,
   MetricAggregation,
   MetricAggregationType,
   MovingAverageEWMAModelSettings,
@@ -11,11 +14,8 @@ import {
   MovingAverageLinearModelSettings,
   MovingAverageModel,
   MovingAverageSimpleModelSettings,
-  ExtendedStats,
-  MovingAverage as SchemaMovingAverage,
-  BucketAggregation,
   Logs as SchemaLogs,
-  ElasticsearchDataQuery,
+  MovingAverage as SchemaMovingAverage,
 } from './dataquery.gen';
 
 // We want to extend the settings of the Logs query with additional properties that

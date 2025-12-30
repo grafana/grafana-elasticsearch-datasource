@@ -1,11 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { select } from 'react-select-event';
 
-import { DateHistogram } from 'app/plugins/datasource/elasticsearch/dataquery.gen';
+import { DateHistogram } from '../../../../dataquery.gen';
 
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
 
 import { DateHistogramSettingsEditor } from './DateHistogramSettingsEditor';
+import React from 'react';
 
 jest.mock('../../../../hooks/useStatelessReducer');
 

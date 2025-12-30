@@ -24,7 +24,7 @@ declare module 'replace-in-file-webpack-plugin' {
 
 declare module 'webpack-livereload-plugin' {
   import { ServerOptions } from 'https';
-  import { Compiler, Plugin, Stats, Compilation } from 'webpack';
+  import { Compilation, Compiler, Plugin, Stats } from 'webpack';
 
   interface Options extends Pick<ServerOptions, 'cert' | 'key' | 'pfx'> {
     /**

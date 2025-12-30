@@ -12,7 +12,7 @@ import {
   TimeRange,
   toUtc,
 } from '@grafana/data';
-import { FetchResponse, reportInteraction, getBackendSrv, setBackendSrv, BackendSrv, config } from '@grafana/runtime';
+import { BackendSrv, config, FetchResponse, getBackendSrv, reportInteraction, setBackendSrv } from '@grafana/runtime';
 
 import { ElasticsearchDataQuery, Filters } from './dataquery.gen';
 import { ElasticDatasource } from './datasource';

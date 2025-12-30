@@ -9,6 +9,7 @@ import { QueryEditorSpecialMetricRow } from '../QueryEditorSpecialMetricRow';
 import { MetricEditor } from './MetricEditor';
 import { addMetric, removeMetric, toggleMetricVisibility } from './state/actions';
 import { metricAggregationConfig } from './utils';
+import React from 'react';
 
 interface Props {
   nextId: MetricAggregation['id'];

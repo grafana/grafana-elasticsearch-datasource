@@ -1,12 +1,12 @@
 import {
   BaseMetricAggregation,
+  MetricAggregationType,
   MetricAggregationWithField,
-  PipelineMetricAggregation,
-  PipelineMetricAggregationWithMultipleBucketPaths,
+  MetricAggregationWithInlineScript,
   MetricAggregationWithMissingSupport,
   MetricAggregationWithSettings,
-  MetricAggregationWithInlineScript,
-  MetricAggregationType,
+  PipelineMetricAggregation,
+  PipelineMetricAggregationWithMultipleBucketPaths,
 } from '../../../dataquery.gen';
 import { MetricAggregationWithMeta, MovingAverage } from '../../../types';
 

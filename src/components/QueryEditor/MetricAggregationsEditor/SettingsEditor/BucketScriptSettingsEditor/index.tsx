@@ -1,9 +1,9 @@
 import { css } from '@emotion/css';
 import { uniqueId } from 'lodash';
-import { Fragment, useEffect } from 'react';
+import React, { Fragment, useEffect } from 'react';
 
 import { Input, InlineLabel } from '@grafana/ui';
-import { BucketScript, MetricAggregation } from 'app/plugins/datasource/elasticsearch/dataquery.gen';
+import { BucketScript, MetricAggregation } from '../../../../../dataquery.gen';
 
 import { useStatelessReducer, useDispatch } from '../../../../../hooks/useStatelessReducer';
 import { AddRemove } from '../../../../AddRemove';

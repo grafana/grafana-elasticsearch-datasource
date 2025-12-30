@@ -5,6 +5,7 @@ import { Input, Stack } from '@grafana/ui';
 import { ElasticsearchDataQuery } from '../../dataquery.gen';
 
 import { ElasticQueryEditorProps, ElasticSearchQueryField } from './index';
+import React from 'react';
 
 type Props = ElasticQueryEditorProps & {
   annotation?: AnnotationQuery<ElasticsearchDataQuery>;
