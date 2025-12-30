@@ -9,7 +9,14 @@
       "name": "Grafana Labs",
       "url": "https://grafana.com"
     },
-    "keywords": ["elasticsearch", "datasource", "database", "logs", "nosql", "traces"],
+    "keywords": [
+      "elasticsearch",
+      "datasource",
+      "database",
+      "logs",
+      "nosql",
+      "traces"
+    ],
     "logos": {
       "small": "img/elasticsearch.svg",
       "large": "img/elasticsearch.svg"
@@ -21,7 +28,7 @@
       },
       {
         "name": "Raise issue",
-        "url": "https://github.com/grafana/grafana/issues/new"
+        "url": "https://github.com/grafana/grafana-elasticsearch-datasource/issues/new"
       },
       {
         "name": "Documentation",
