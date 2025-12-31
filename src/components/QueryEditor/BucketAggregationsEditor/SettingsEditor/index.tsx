@@ -1,5 +1,5 @@
 import { uniqueId } from 'lodash';
-import React, { ComponentProps, useRef } from 'react';
+import React, { ComponentProps, useMemo } from 'react';
 
 import { InlineField, Input } from '@grafana/ui';
 import { BucketAggregation } from '../../../../dataquery.gen';
@@ -23,7 +23,7 @@ interface Props {
 }
 
 export const SettingsEditor = ({ bucketAgg }: Props) => {
-  const { current: baseId } = useRef(uniqueId('es-setting-'));
+  const baseId = useMemo(() => uniqueId('es-setting-'), []);
 
   const dispatch = useDispatch();
 

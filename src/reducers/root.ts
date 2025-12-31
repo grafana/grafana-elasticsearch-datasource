@@ -1,5 +1,5 @@
 import { ReducersMapObject } from '@reduxjs/toolkit';
-import { AnyAction, combineReducers } from 'redux';
+import { Action as AnyAction, combineReducers } from 'redux';
 import { cleanUpAction } from './actions/cleanUp';
 
 const addedReducers = {};

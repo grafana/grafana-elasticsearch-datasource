@@ -1,5 +1,5 @@
 import { uniqueId } from 'lodash';
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { GroupBase, OptionsOrGroups } from 'react-select';
 
 import { InternalTimeZones, SelectableValue } from '@grafana/data';
@@ -59,7 +59,7 @@ const getIntervalType = (interval: string | undefined): 'calendar' | 'fixed' => 
 
 export const DateHistogramSettingsEditor = ({ bucketAgg }: Props) => {
   const dispatch = useDispatch();
-  const { current: baseId } = useRef(uniqueId('es-date_histogram-'));
+  const baseId = useMemo(() => uniqueId('es-date_histogram-'), []);
 
   const handleIntervalChange = useCallback(
     ({ value }: SelectableValue<string>) =>

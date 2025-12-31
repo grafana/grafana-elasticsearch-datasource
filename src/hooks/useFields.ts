@@ -2,6 +2,7 @@ import { lastValueFrom } from 'rxjs';
 
 import { MetricFindValue, SelectableValue } from '@grafana/data';
 
+import { useState } from 'react';
 import { isBucketAggregationType } from '../components/QueryEditor/BucketAggregationsEditor/aggregations';
 import { useDatasource, useRange } from '../components/QueryEditor/ElasticsearchQueryContext';
 import { isMetricAggregationType } from '../components/QueryEditor/MetricAggregationsEditor/aggregations';
@@ -57,12 +58,12 @@ export const useFields = (type: AggregationType | string[]) => {
   const datasource = useDatasource();
   const range = useRange();
   const filter = Array.isArray(type) ? type : getFilter(type);
-  let rawFields: MetricFindValue[];
+  const [rawFields, setRawFields] = useState<MetricFindValue[]>([]);
 
   return async (q?: string) => {
     // TODO: use _field_caps to support filtering
     if (!rawFields) {
-      rawFields = await lastValueFrom(datasource.getFields(filter, range));
+      setRawFields(await lastValueFrom(datasource.getFields(filter, range)));
     }
 
     return rawFields.filter(({ text }) => q === undefined || text.includes(q)).map(toSelectableValue);

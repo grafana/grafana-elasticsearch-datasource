@@ -1,9 +1,9 @@
 import { uniqueId } from 'lodash';
-import React, { useRef } from 'react';
+import React, { useMemo } from 'react';
 
 import { SelectableValue } from '@grafana/data';
-import { InlineField, Select, Input } from '@grafana/ui';
-import { Terms, ExtendedStats, ExtendedStatMetaType, Percentiles, MetricAggregation } from '../../../../dataquery.gen';
+import { InlineField, Input, Select } from '@grafana/ui';
+import { ExtendedStatMetaType, ExtendedStats, MetricAggregation, Percentiles, Terms } from '../../../../dataquery.gen';
 
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
 import { describeMetric } from '../../../../utils';
@@ -21,7 +21,7 @@ interface Props {
 export const TermsSettingsEditor = ({ bucketAgg }: Props) => {
   const { metrics } = useQuery();
   const orderBy = createOrderByOptions(metrics);
-  const { current: baseId } = useRef(uniqueId('es-terms-'));
+  const baseId = useMemo(() => uniqueId('es-terms-'), []);
   let size = bucketAgg.settings?.size || bucketAggregationConfig.terms.defaultSettings?.size;
   if (!size || size === '') {
     size = '10';

@@ -1,6 +1,6 @@
 import { css } from '@emotion/css';
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import * as React from 'react';
+import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import { usePrevious } from 'react-use';
 
 import { DataSourceInstanceSettings, VariableSuggestion } from '@grafana/data';
@@ -9,9 +9,9 @@ import {
   Button,
   DataLinkInput,
   InlineField,
-  InlineSwitch,
   InlineFieldRow,
   InlineLabel,
+  InlineSwitch,
   Input,
   useStyles2,
 } from '@grafana/ui';
@@ -143,6 +143,7 @@ function useInternalLink(datasourceUid?: string): [boolean, Dispatch<SetStateAct
   // Force internal link visibility change if uid changed outside of this component.
   useEffect(() => {
     if (!previousUid && datasourceUid && !showInternalLink) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowInternalLink(true);
     }
     if (previousUid && !datasourceUid && showInternalLink) {

@@ -1,4 +1,4 @@
-import { AnyAction } from '@reduxjs/toolkit';
+import { Action as AnyAction } from '@reduxjs/toolkit';
 import { cloneDeep } from 'lodash';
 import { Action } from 'redux';
 

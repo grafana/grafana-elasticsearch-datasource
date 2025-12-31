@@ -1272,7 +1272,7 @@ describe('ElasticDatasource', () => {
       await expect(ds.getFields(undefined, timeRange)).toEmitValuesWith((received) => {
         expect(received.length).toBe(1);
         expect(received[0]).toStrictEqual({ status: 500 });
-        expect(ds.getResource).toBeCalledTimes(1);
+        expect(ds.getResource).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -1290,7 +1290,7 @@ describe('ElasticDatasource', () => {
       await expect(ds.getFields(undefined, timeRange)).toEmitValuesWith((received) => {
         expect(received.length).toBe(1);
         expect(received[0]).toStrictEqual('Could not find an available index for this time range.');
-        expect(ds.getResource).toBeCalledTimes(7);
+        expect(ds.getResource).toHaveBeenCalledTimes(7);
       });
     });
 
@@ -1455,7 +1455,7 @@ describe('ElasticDatasource', () => {
       await expect(ds.getFields(undefined, timeRange)).toEmitValuesWith((received) => {
         expect(received.length).toBe(1);
         expect(received[0]).toStrictEqual({ status: 500 });
-        expect(ds.getResource).toBeCalledTimes(1);
+        expect(ds.getResource).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -1474,7 +1474,7 @@ describe('ElasticDatasource', () => {
       await expect(ds.getFields(undefined, timeRange)).toEmitValuesWith((received) => {
         expect(received.length).toBe(1);
         expect(received[0]).toStrictEqual('Could not find an available index for this time range.');
-        expect(ds.getResource).toBeCalledTimes(7);
+        expect(ds.getResource).toHaveBeenCalledTimes(7);
       });
     });
 

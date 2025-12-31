@@ -1,8 +1,8 @@
 import { uniqueId } from 'lodash';
-import { useRef } from 'react';
 import * as React from 'react';
+import { useMemo } from 'react';
 
-import { Input, InlineField, Select, InlineSwitch } from '@grafana/ui';
+import { InlineField, InlineSwitch, Input, Select } from '@grafana/ui';
 
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
 import { movingAvgModelOptions } from '../../../../queryDef';
@@ -21,7 +21,7 @@ interface Props {
 // as they might be incompatible. We should clear all other options on model change.
 export const MovingAverageSettingsEditor = ({ metric }: Props) => {
   const dispatch = useDispatch();
-  const { current: baseId } = useRef(uniqueId('es-moving-avg-'));
+  const baseId = useMemo(() => uniqueId('es-moving-avg-'), []);
 
   return (
     <>
