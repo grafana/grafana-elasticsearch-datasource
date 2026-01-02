@@ -1,8 +1,10 @@
 import { ReducersMapObject } from '@reduxjs/toolkit';
 import { Action as AnyAction, combineReducers } from 'redux';
-import { cleanUpAction } from './actions/cleanUp';
 
-const addedReducers = {};
+const addedReducers = {
+  defaultReducer: (state = {}) => state,
+  templating: (state = { lastKey: 'key' }) => state,
+};
 
 export const addReducer = (newReducers: ReducersMapObject) => {
   Object.assign(addedReducers, newReducers);
@@ -14,12 +16,6 @@ export const createRootReducer = () => {
   });
 
   return (state: Parameters<typeof appReducer>[0], action: AnyAction) => {
-    if (action.type !== cleanUpAction.type) {
-      return appReducer(state, action);
-    }
-
-    const { cleanupAction } = action.payload;
-    cleanupAction(state);
 
     return appReducer(state, action);
   };
