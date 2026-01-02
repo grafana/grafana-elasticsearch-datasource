@@ -17,8 +17,8 @@ import {
   DataSourceGetTagValuesOptions,
   DataSourceInstanceSettings,
   DataSourceWithLogsContextSupport,
+  DataSourceWithQueryImportSupport,
   DataSourceWithQueryModificationSupport,
-  DataSourceWithQueryimportSupport,
   DataSourceWithSupplementaryQueriesSupport,
   DataSourceWithToggleableQueryFiltersSupport,
   DateTime,
@@ -106,7 +106,7 @@ export class ElasticDatasource
   extends DataSourceWithBackend<ElasticsearchDataQuery, ElasticsearchOptions>
   implements
   DataSourceWithLogsContextSupport,
-  DataSourceWithQueryimportSupport<ElasticsearchDataQuery>,
+  DataSourceWithQueryImportSupport<ElasticsearchDataQuery>,
   DataSourceWithSupplementaryQueriesSupport<ElasticsearchDataQuery>,
   DataSourceWithToggleableQueryFiltersSupport<ElasticsearchDataQuery>,
   DataSourceWithQueryModificationSupport<ElasticsearchDataQuery> {
