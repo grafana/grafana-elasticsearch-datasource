@@ -100,7 +100,8 @@ const QueryEditorForm = ({ value, onRunQuery }: Props & { onRunQuery: () => void
   const isTimeSeries = isTimeSeriesQuery(value);
 
   const isCodeEditor = value.editorType === 'code';
-  const rawDSLFeatureEnabled = config.featureToggles.elasticsearchRawDSLQuery;
+  // Once the runtime package with the toggle has been published the any can be removed
+  const rawDSLFeatureEnabled = (config.featureToggles as any).elasticsearchRawDSLQuery;
 
   const showBucketAggregationsEditor = value.metrics?.every(
     (metric) => metricAggregationConfig[metric.type].impliedQueryType === 'metrics'
