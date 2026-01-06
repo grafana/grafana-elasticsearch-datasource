@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"testing"
 
+	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/experimental/featuretoggles"
-	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -154,8 +154,8 @@ func (*FakeInstanceManager) Do(_ context.Context, _ backend.PluginContext, _ ins
 	return nil
 }
 
-func GetMockService(statusCode int, status string, elasticSearchResponse string, fieldCapsResponse string) *Service {
-	return &Service{
+func GetMockService(statusCode int, status string, elasticSearchResponse string, fieldCapsResponse string) *DataSource {
+	return &DataSource{
 		im:     &FakeInstanceManager{statusCode: statusCode, status: status, elasticSearchResponse: elasticSearchResponse, fieldCapsResponse: fieldCapsResponse},
 		logger: log.New(),
 	}

@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
@@ -32,29 +31,16 @@ const (
 	defaultMaxConcurrentShardRequests = int64(5)
 )
 
-type Service struct {
-	im     instancemgmt.InstanceManager
+type DataSource struct {
+	info   *es.DatasourceInfo
 	logger log.Logger
 }
 
-func ProvideService(httpClientProvider *httpclient.Provider) *Service {
-	return &Service{
-		im:     datasource.NewInstanceManager(newInstanceSettings(httpClientProvider)),
-		logger: backend.NewLoggerWith("logger", "tsdb.elasticsearch"),
-	}
-}
-
-func (s *Service) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	dsInfo, err := s.getDSInfo(ctx, req.PluginContext)
+func (ds *DataSource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
 	_, fromAlert := req.Headers[headerFromAlert]
-	logger := s.logger.FromContext(ctx).With("fromAlert", fromAlert)
+	logger := ds.logger.FromContext(ctx).With("fromAlert", fromAlert)
 
-	if err != nil {
-		logger.Error("Failed to get data source info", "error", err)
-		return &backend.QueryDataResponse{}, err
-	}
-
-	return queryData(ctx, req, dsInfo, logger)
+	return queryData(ctx, req, ds.info, logger)
 }
 
 // separate function to allow testing the whole transformation and query flow
@@ -71,123 +57,110 @@ func queryData(ctx context.Context, req *backend.QueryDataRequest, dsInfo *es.Da
 	return query.execute()
 }
 
-func newInstanceSettings(httpClientProvider *httpclient.Provider) datasource.InstanceFactoryFunc {
-	return func(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
-		jsonData := map[string]any{}
-		err := json.Unmarshal(settings.JSONData, &jsonData)
-		if err != nil {
-			return nil, fmt.Errorf("error reading settings: %w", err)
-		}
-		httpCliOpts, err := settings.HTTPClientOptions(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("error getting http options: %w", err)
-		}
-
-		// Set SigV4 service namespace
-		if httpCliOpts.SigV4 != nil {
-			httpCliOpts.SigV4.Service = "es"
-		}
-
-		httpCli, err := httpClientProvider.New(httpCliOpts)
-		if err != nil {
-			return nil, err
-		}
-
-		// we used to have a field named `esVersion`, please do not use this name in the future.
-
-		timeField, ok := jsonData["timeField"].(string)
-		if !ok {
-			return nil, backend.DownstreamError(errors.New("timeField cannot be cast to string"))
-		}
-
-		if timeField == "" {
-			return nil, backend.DownstreamError(errors.New("elasticsearch time field name is required"))
-		}
-
-		logLevelField, ok := jsonData["logLevelField"].(string)
-		if !ok {
-			logLevelField = ""
-		}
-
-		logMessageField, ok := jsonData["logMessageField"].(string)
-		if !ok {
-			logMessageField = ""
-		}
-
-		interval, ok := jsonData["interval"].(string)
-		if !ok {
-			interval = ""
-		}
-
-		index, ok := jsonData["index"].(string)
-		if !ok {
-			index = ""
-		}
-		if index == "" {
-			index = settings.Database
-		}
-
-		var maxConcurrentShardRequests int64
-
-		switch v := jsonData["maxConcurrentShardRequests"].(type) {
-		// unmarshalling from JSON will return float64 for numbers, so we need to handle that and convert to int64
-		case float64:
-			maxConcurrentShardRequests = int64(v)
-		case string:
-			maxConcurrentShardRequests, err = strconv.ParseInt(v, 10, 64)
-			if err != nil {
-				maxConcurrentShardRequests = defaultMaxConcurrentShardRequests
-			}
-		default:
-			maxConcurrentShardRequests = defaultMaxConcurrentShardRequests
-		}
-
-		if maxConcurrentShardRequests <= 0 {
-			maxConcurrentShardRequests = defaultMaxConcurrentShardRequests
-		}
-
-		includeFrozen, ok := jsonData["includeFrozen"].(bool)
-		if !ok {
-			includeFrozen = false
-		}
-
-		configuredFields := es.ConfiguredFields{
-			TimeField:       timeField,
-			LogLevelField:   logLevelField,
-			LogMessageField: logMessageField,
-		}
-
-		model := es.DatasourceInfo{
-			ID:                         settings.ID,
-			URL:                        settings.URL,
-			HTTPClient:                 httpCli,
-			Database:                   index,
-			MaxConcurrentShardRequests: maxConcurrentShardRequests,
-			ConfiguredFields:           configuredFields,
-			Interval:                   interval,
-			IncludeFrozen:              includeFrozen,
-		}
-		return model, nil
+func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
+	jsonData := map[string]any{}
+	err := json.Unmarshal(settings.JSONData, &jsonData)
+	if err != nil {
+		return nil, fmt.Errorf("error reading settings: %w", err)
 	}
-}
+	httpCliOpts, err := settings.HTTPClientOptions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting http options: %w", err)
+	}
 
-func (s *Service) getDSInfo(ctx context.Context, pluginCtx backend.PluginContext) (*es.DatasourceInfo, error) {
-	i, err := s.im.Get(ctx, pluginCtx)
+	// Set SigV4 service namespace
+	if httpCliOpts.SigV4 != nil {
+		httpCliOpts.SigV4.Service = "es"
+	}
+
+	httpCli, err := httpclient.NewProvider().New(httpCliOpts)
 	if err != nil {
 		return nil, err
 	}
 
-	instance := i.(es.DatasourceInfo)
+	// we used to have a field named `esVersion`, please do not use this name in the future.
 
-	return &instance, nil
+	timeField, ok := jsonData["timeField"].(string)
+	if !ok {
+		return nil, backend.DownstreamError(errors.New("timeField cannot be cast to string"))
+	}
+
+	if timeField == "" {
+		return nil, backend.DownstreamError(errors.New("elasticsearch time field name is required"))
+	}
+
+	logLevelField, ok := jsonData["logLevelField"].(string)
+	if !ok {
+		logLevelField = ""
+	}
+
+	logMessageField, ok := jsonData["logMessageField"].(string)
+	if !ok {
+		logMessageField = ""
+	}
+
+	interval, ok := jsonData["interval"].(string)
+	if !ok {
+		interval = ""
+	}
+
+	index, ok := jsonData["index"].(string)
+	if !ok {
+		index = ""
+	}
+	if index == "" {
+		index = settings.Database
+	}
+
+	var maxConcurrentShardRequests int64
+
+	switch v := jsonData["maxConcurrentShardRequests"].(type) {
+	// unmarshalling from JSON will return float64 for numbers, so we need to handle that and convert to int64
+	case float64:
+		maxConcurrentShardRequests = int64(v)
+	case string:
+		maxConcurrentShardRequests, err = strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			maxConcurrentShardRequests = defaultMaxConcurrentShardRequests
+		}
+	default:
+		maxConcurrentShardRequests = defaultMaxConcurrentShardRequests
+	}
+
+	if maxConcurrentShardRequests <= 0 {
+		maxConcurrentShardRequests = defaultMaxConcurrentShardRequests
+	}
+
+	includeFrozen, ok := jsonData["includeFrozen"].(bool)
+	if !ok {
+		includeFrozen = false
+	}
+
+	configuredFields := es.ConfiguredFields{
+		TimeField:       timeField,
+		LogLevelField:   logLevelField,
+		LogMessageField: logMessageField,
+	}
+
+	model := es.DatasourceInfo{
+		ID:                         settings.ID,
+		URL:                        settings.URL,
+		HTTPClient:                 httpCli,
+		Database:                   index,
+		MaxConcurrentShardRequests: maxConcurrentShardRequests,
+		ConfiguredFields:           configuredFields,
+		Interval:                   interval,
+		IncludeFrozen:              includeFrozen,
+	}
+	return model, nil
 }
 
 func isFieldCaps(url string) bool {
 	return strings.HasSuffix(url, "/_field_caps") || url == "_field_caps"
 }
 
-func (s *Service) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
-	logger := s.logger.FromContext(ctx)
+func (ds *DataSource) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
+	logger := ds.logger.FromContext(ctx)
 	// allowed paths for resource calls:
 	// - empty string for fetching db version
 	// - /_mapping for fetching index mapping, e.g. requests going to `index/_mapping`
@@ -198,18 +171,12 @@ func (s *Service) CallResource(ctx context.Context, req *backend.CallResourceReq
 	if req.Path != "" && !isFieldCaps(req.Path) && req.Path != "_msearch" &&
 		!strings.HasSuffix(req.Path, "/_mapping") && req.Path != "_mapping" {
 		logger.Error("Invalid resource path", "path", req.Path)
-		return fmt.Errorf("invalid resource URL: %s", req.Path)
+		return fmt.Errorf("invalid resource URL: %ds", req.Path)
 	}
 
-	ds, err := s.getDSInfo(ctx, req.PluginContext)
+	esUrl, err := createElasticsearchURL(req, ds.info)
 	if err != nil {
-		logger.Error("Failed to get data source info", "error", err)
-		return err
-	}
-
-	esUrl, err := createElasticsearchURL(req, ds)
-	if err != nil {
-		logger.Error("Failed to create request url", "error", err, "url", ds.URL, "path", req.Path)
+		logger.Error("Failed to create request url", "error", err, "url", ds.info.URL, "path", req.Path)
 	}
 
 	request, err := http.NewRequestWithContext(ctx, req.Method, esUrl, bytes.NewBuffer(req.Body))
@@ -220,7 +187,7 @@ func (s *Service) CallResource(ctx context.Context, req *backend.CallResourceReq
 
 	logger.Debug("Sending request to Elasticsearch", "resourcePath", req.Path)
 	start := time.Now()
-	response, err := ds.HTTPClient.Do(request)
+	response, err := ds.info.HTTPClient.Do(request)
 	if err != nil {
 		status := "error"
 		if errors.Is(err, context.Canceled) {
