@@ -152,7 +152,10 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		Interval:                   interval,
 		IncludeFrozen:              includeFrozen,
 	}
-	return model, nil
+	return &DataSource{
+		info:   &model,
+		logger: log.New().FromContext(ctx),
+	}, nil
 }
 
 func isFieldCaps(url string) bool {

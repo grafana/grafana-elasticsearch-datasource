@@ -84,7 +84,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
+			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(*DataSource).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -101,7 +101,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, int64(10), instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
+			require.Equal(t, int64(10), instance.(*DataSource).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -118,7 +118,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, int64(10), instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
+			require.Equal(t, int64(10), instance.(*DataSource).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -135,7 +135,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
+			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(*DataSource).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -152,7 +152,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
+			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(*DataSource).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -169,7 +169,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, int64(10), instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
+			require.Equal(t, int64(10), instance.(*DataSource).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -186,7 +186,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
+			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(*DataSource).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 	})
