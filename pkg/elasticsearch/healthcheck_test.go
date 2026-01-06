@@ -10,7 +10,6 @@ import (
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/experimental/featuretoggles"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +18,7 @@ import (
 var mockedCfg = backend.WithGrafanaConfig(context.Background(), backend.NewGrafanaCfg(map[string]string{featuretoggles.EnabledFeatures: "elasticsearchCrossClusterSearch"}))
 
 func Test_Healthcheck_OK(t *testing.T) {
-	service := GetMockService(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
+	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
 	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
@@ -29,7 +28,7 @@ func Test_Healthcheck_OK(t *testing.T) {
 }
 
 func Test_Healthcheck_Timeout(t *testing.T) {
-	service := GetMockService(http.StatusRequestTimeout, "408 Request Timeout", `{"status":"red"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
+	service := GetMockDatasource(http.StatusRequestTimeout, "408 Request Timeout", `{"status":"red"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
 	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
@@ -39,7 +38,7 @@ func Test_Healthcheck_Timeout(t *testing.T) {
 }
 
 func Test_Healthcheck_Error(t *testing.T) {
-	service := GetMockService(http.StatusBadGateway, "502 Bad Gateway", `{"status":"red"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
+	service := GetMockDatasource(http.StatusBadGateway, "502 Bad Gateway", `{"status":"red"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
 	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
@@ -49,7 +48,7 @@ func Test_Healthcheck_Error(t *testing.T) {
 }
 
 func Test_validateIndex_Warning_ErrorValidatingIndex(t *testing.T) {
-	service := GetMockService(http.StatusOK, "200 OK", `{"status":"green"}`, `{"error":{"reason":"index_not_found"}}`)
+	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"error":{"reason":"index_not_found"}}`)
 	res, _ := service.CheckHealth(mockedCfg, &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
@@ -59,7 +58,7 @@ func Test_validateIndex_Warning_ErrorValidatingIndex(t *testing.T) {
 }
 
 func Test_validateIndex_Warning_ErrorValidatingIndex2(t *testing.T) {
-	service := GetMockService(http.StatusOK, "200 OK", `{"status":"green"}`, `{"error":"not a map"}`)
+	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"error":"not a map"}`)
 	res, _ := service.CheckHealth(mockedCfg, &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
@@ -69,7 +68,7 @@ func Test_validateIndex_Warning_ErrorValidatingIndex2(t *testing.T) {
 }
 
 func Test_validateIndex_Warning_WrongTimestampType(t *testing.T) {
-	service := GetMockService(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"float":{"metadata_field":true}}}}`)
+	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"float":{"metadata_field":true}}}}`)
 	res, _ := service.CheckHealth(mockedCfg, &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
@@ -78,7 +77,7 @@ func Test_validateIndex_Warning_WrongTimestampType(t *testing.T) {
 	assert.Equal(t, "Elasticsearch data source is healthy. Warning: Could not find time field 'timestamp' with type date in index", res.Message)
 }
 func Test_validateIndex_Error_FailedToUnmarshalValidateResponse(t *testing.T) {
-	service := GetMockService(http.StatusOK, "200 OK", `{"status":"green"}`, `\\\///{"fields":null}"`)
+	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `\\\///{"fields":null}"`)
 	res, _ := service.CheckHealth(mockedCfg, &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
@@ -87,7 +86,7 @@ func Test_validateIndex_Error_FailedToUnmarshalValidateResponse(t *testing.T) {
 	assert.Equal(t, "Failed to unmarshal field capabilities response", res.Message)
 }
 func Test_validateIndex_Success_SuccessValidatingIndex(t *testing.T) {
-	service := GetMockService(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
+	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
 	res, _ := service.CheckHealth(mockedCfg, &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
@@ -131,32 +130,19 @@ func (fakeRoundTripper *FakeRoundTripper) RoundTrip(req *http.Request) (*http.Re
 	return res, nil
 }
 
-type FakeInstanceManager struct {
-	statusCode            int
-	status                string
-	elasticSearchResponse string
-	fieldCapsResponse     string
-}
-
-func (fakeInstanceManager *FakeInstanceManager) Get(tx context.Context, pluginContext backend.PluginContext) (instancemgmt.Instance, error) {
+func GetMockDatasource(statusCode int, status string, elasticSearchResponse string, fieldCapsResponse string) *DataSource {
 	httpClient, _ := httpclient.New(httpclient.Options{})
-	httpClient.Transport = &FakeRoundTripper{statusCode: fakeInstanceManager.statusCode, status: fakeInstanceManager.status, elasticSearchResponse: fakeInstanceManager.elasticSearchResponse, fieldCapsResponse: fakeInstanceManager.fieldCapsResponse, index: 0}
+	httpClient.Transport = &FakeRoundTripper{statusCode: statusCode, status: status, elasticSearchResponse: elasticSearchResponse, fieldCapsResponse: fieldCapsResponse, index: 0}
 
-	return es.DatasourceInfo{
+	dsInfo := es.DatasourceInfo{
 		HTTPClient: httpClient,
 		ConfiguredFields: es.ConfiguredFields{
 			TimeField: "timestamp",
 		},
-	}, nil
-}
+	}
 
-func (*FakeInstanceManager) Do(_ context.Context, _ backend.PluginContext, _ instancemgmt.InstanceCallbackFunc) error {
-	return nil
-}
-
-func GetMockService(statusCode int, status string, elasticSearchResponse string, fieldCapsResponse string) *DataSource {
 	return &DataSource{
-		im:     &FakeInstanceManager{statusCode: statusCode, status: status, elasticSearchResponse: elasticSearchResponse, fieldCapsResponse: fieldCapsResponse},
+		info:   &dsInfo,
 		logger: log.New(),
 	}
 }

@@ -171,7 +171,7 @@ func (ds *DataSource) CallResource(ctx context.Context, req *backend.CallResourc
 	if req.Path != "" && !isFieldCaps(req.Path) && req.Path != "_msearch" &&
 		!strings.HasSuffix(req.Path, "/_mapping") && req.Path != "_mapping" {
 		logger.Error("Invalid resource path", "path", req.Path)
-		return fmt.Errorf("invalid resource URL: %ds", req.Path)
+		return fmt.Errorf("invalid resource URL: %s", req.Path)
 	}
 
 	esUrl, err := createElasticsearchURL(req, ds.info)

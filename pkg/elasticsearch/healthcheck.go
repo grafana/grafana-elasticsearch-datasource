@@ -64,7 +64,7 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 	if response.StatusCode >= 400 {
 		return &backend.CheckHealthResult{
 			Status:  backend.HealthStatusError,
-			Message: fmt.Sprintf("Health check failed: Elasticsearch data source is not healthy. Status: %ds", response.Status),
+			Message: fmt.Sprintf("Health check failed: Elasticsearch data source is not healthy. Status: %s", response.Status),
 		}, nil
 	}
 
@@ -95,7 +95,7 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 		}
 		return &backend.CheckHealthResult{
 			Status:  backend.HealthStatusUnknown,
-			Message: fmt.Sprintf("Health check failed: Failed to parse response from Elasticsearch. Response received: %ds", truncatedBody),
+			Message: fmt.Sprintf("Health check failed: Failed to parse response from Elasticsearch. Response received: %s", truncatedBody),
 		}, nil
 	}
 
@@ -127,7 +127,7 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 	}
 
 	if indexWarningMessage != "" {
-		successMessage = fmt.Sprintf("%ds Warning: %ds", successMessage, indexWarningMessage)
+		successMessage = fmt.Sprintf("%s Warning: %s", successMessage, indexWarningMessage)
 	}
 
 	return &backend.CheckHealthResult{

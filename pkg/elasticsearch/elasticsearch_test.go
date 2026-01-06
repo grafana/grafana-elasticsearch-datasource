@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/stretchr/testify/require"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
@@ -18,7 +17,7 @@ type datasourceInfo struct {
 	Interval                   string `json:"interval"`
 }
 
-func TestNewInstanceSettings(t *testing.T) {
+func TestNewDatasource(t *testing.T) {
 	t.Run("fields exist", func(t *testing.T) {
 		dsInfo := datasourceInfo{
 			TimeField:                  "@timestamp",
@@ -31,7 +30,7 @@ func TestNewInstanceSettings(t *testing.T) {
 			JSONData: json.RawMessage(settingsJSON),
 		}
 
-		_, err = newInstanceSettings(httpclient.NewProvider())(context.Background(), dsSettings)
+		_, err = NewDatasource(context.Background(), dsSettings)
 		require.NoError(t, err)
 	})
 
@@ -49,7 +48,7 @@ func TestNewInstanceSettings(t *testing.T) {
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
-			_, err = newInstanceSettings(httpclient.NewProvider())(context.Background(), dsSettings)
+			_, err = NewDatasource(context.Background(), dsSettings)
 			require.EqualError(t, err, "timeField cannot be cast to string")
 		})
 
@@ -67,7 +66,7 @@ func TestNewInstanceSettings(t *testing.T) {
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
-			_, err = newInstanceSettings(httpclient.NewProvider())(context.Background(), dsSettings)
+			_, err = NewDatasource(context.Background(), dsSettings)
 			require.EqualError(t, err, "elasticsearch time field name is required")
 		})
 	})
@@ -84,7 +83,7 @@ func TestNewInstanceSettings(t *testing.T) {
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
-			instance, err := newInstanceSettings(httpclient.NewProvider())(context.Background(), dsSettings)
+			instance, err := NewDatasource(context.Background(), dsSettings)
 			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
@@ -101,7 +100,7 @@ func TestNewInstanceSettings(t *testing.T) {
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
-			instance, err := newInstanceSettings(httpclient.NewProvider())(context.Background(), dsSettings)
+			instance, err := NewDatasource(context.Background(), dsSettings)
 			require.Equal(t, int64(10), instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
@@ -118,7 +117,7 @@ func TestNewInstanceSettings(t *testing.T) {
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
-			instance, err := newInstanceSettings(httpclient.NewProvider())(context.Background(), dsSettings)
+			instance, err := NewDatasource(context.Background(), dsSettings)
 			require.Equal(t, int64(10), instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
@@ -135,7 +134,7 @@ func TestNewInstanceSettings(t *testing.T) {
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
-			instance, err := newInstanceSettings(httpclient.NewProvider())(context.Background(), dsSettings)
+			instance, err := NewDatasource(context.Background(), dsSettings)
 			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
@@ -152,7 +151,7 @@ func TestNewInstanceSettings(t *testing.T) {
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
-			instance, err := newInstanceSettings(httpclient.NewProvider())(context.Background(), dsSettings)
+			instance, err := NewDatasource(context.Background(), dsSettings)
 			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
@@ -169,7 +168,7 @@ func TestNewInstanceSettings(t *testing.T) {
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
-			instance, err := newInstanceSettings(httpclient.NewProvider())(context.Background(), dsSettings)
+			instance, err := NewDatasource(context.Background(), dsSettings)
 			require.Equal(t, int64(10), instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
@@ -186,7 +185,7 @@ func TestNewInstanceSettings(t *testing.T) {
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
-			instance, err := newInstanceSettings(httpclient.NewProvider())(context.Background(), dsSettings)
+			instance, err := NewDatasource(context.Background(), dsSettings)
 			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(es.DatasourceInfo).MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
