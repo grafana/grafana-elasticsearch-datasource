@@ -9,7 +9,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/stretchr/testify/require"
 
-	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/client"
+	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
 
 type datasourceInfo struct {

@@ -9,7 +9,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 
-	"github.com/grafana/grafana-elasticsearch-datasource/pkg/simplejson"
+	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/simplejson"
 )
 
 // metricsResponseProcessor handles processing of metrics query responses

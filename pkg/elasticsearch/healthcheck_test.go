@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/experimental/featuretoggles"
-	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/client"
+	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -20,7 +20,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 
-	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/client"
+	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
 
 const (

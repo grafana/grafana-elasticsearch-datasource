@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/client"
+	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
 
 var update = flag.Bool("update", true, "update golden files")

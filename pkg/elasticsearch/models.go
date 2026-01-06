@@ -3,7 +3,7 @@ package elasticsearch
 import (
 	"time"
 
-	"github.com/grafana/grafana-elasticsearch-datasource/pkg/simplejson"
+	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/simplejson"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
 
