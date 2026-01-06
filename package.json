@@ -1,6 +1,7 @@
 {
-  "name": "elasticsearch",
-  "version": "1.0.0",
+  "name": "@grafana-plugins/elasticsearch",
+  "version": "12.4.0-pre",
+  "description": "Elasticsearch datasource for Grafana",
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
     "dev": "webpack -w -c ./.config/webpack/webpack.config.ts --env development",
@@ -14,7 +15,7 @@
     "sign": "npx --yes @grafana/sign-plugin@latest"
   },
   "author": "Grafana",
-  "license": "Apache-2.0",
+  "license": "AGPL-3.0",
   "devDependencies": {
     "@grafana/eslint-config": "^9.0.0",
     "@grafana/plugin-e2e": "^3.1.0",

@@ -2,6 +2,7 @@
   "type": "datasource",
   "name": "Elasticsearch",
   "id": "elasticsearch",
+  "executable": "gpx_grafana_elasticsearch_datasource",
   "category": "logging",
   "info": {
     "description": "Open source logging & analytics database",
