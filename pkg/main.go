@@ -4,13 +4,11 @@ import (
 	"os"
 
 	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch"
-	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 )
 
 func main() {
-	backend.SetupPluginEnvironment("grafana-elasticsearch-datasource")
 	// Start listening to requests sent from Grafana. This call is blocking so
 	// it won't finish until Grafana shuts down the process or the plugin choose
 	// to exit by itself using os.Exit. Manage automatically manages life cycle
