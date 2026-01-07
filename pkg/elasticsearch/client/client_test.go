@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/grafana-elasticsearch-datasource/pkg/simplejson"
+	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/simplejson"
 )
 
 func TestClient_ExecuteMultisearch(t *testing.T) {

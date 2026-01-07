@@ -62,7 +62,7 @@ export const useFields = (type: AggregationType | string[]) => {
 
   return async (q?: string) => {
     // TODO: use _field_caps to support filtering
-    if (!rawFields) {
+    if (!rawFields || rawFields.length === 0) {
       setRawFields(await lastValueFrom(datasource.getFields(filter, range)));
     }
 

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/client"
-	"github.com/grafana/grafana-elasticsearch-datasource/pkg/simplejson"
+	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
+	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/simplejson"
 )
 
 // flatten flattens multi-level objects to single level objects. It uses dot notation to join keys.
