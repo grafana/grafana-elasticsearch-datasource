@@ -1,9 +1,9 @@
 import { css } from '@emotion/css';
 import { uniqueId } from 'lodash';
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo } from 'react';
 
 import { InlineField, Input, QueryField } from '@grafana/ui';
-import { Filters } from 'app/plugins/datasource/elasticsearch/dataquery.gen';
+import { Filters } from '../../../../../dataquery.gen';
 
 import { useDispatch, useStatelessReducer } from '../../../../../hooks/useStatelessReducer';
 import { AddRemove } from '../../../../AddRemove';
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export const FiltersSettingsEditor = ({ bucketAgg }: Props) => {
-  const { current: baseId } = useRef(uniqueId('es-filters-'));
+  const baseId = useMemo(() => uniqueId('es-filters-'), []);
 
   const upperStateDispatch = useDispatch();
 

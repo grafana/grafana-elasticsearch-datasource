@@ -7,6 +7,7 @@ import { QueryEditorRow } from '../QueryEditorRow';
 
 import { BucketAggregationEditor } from './BucketAggregationEditor';
 import { addBucketAggregation, removeBucketAggregation } from './state/actions';
+import React from 'react';
 
 interface Props {
   nextId: BucketAggregation['id'];

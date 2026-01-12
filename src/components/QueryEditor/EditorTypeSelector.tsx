@@ -6,6 +6,7 @@ import { EditorType } from '../../types';
 
 import { useQuery } from './ElasticsearchQueryContext';
 import { changeEditorTypeAndResetQuery } from './state';
+import React from 'react';
 
 const BASE_OPTIONS: Array<SelectableValue<EditorType>> = [
   { value: 'builder', label: 'Builder' },

@@ -1,4 +1,4 @@
-package es
+package client
 
 const (
 	// DefaultGeoHashPrecision is the default precision for geohash grid aggregations

@@ -1,4 +1,4 @@
-import { AbstractLabelOperator, AbstractLabelMatcher, LanguageProvider, AbstractQuery } from '@grafana/data';
+import { AbstractLabelMatcher, AbstractLabelOperator, AbstractQuery, LanguageProvider } from '@grafana/data';
 
 import { ElasticsearchDataQuery } from './dataquery.gen';
 import { ElasticDatasource } from './datasource';

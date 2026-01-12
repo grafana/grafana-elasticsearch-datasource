@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react';
-import { ComponentProps, ReactNode } from 'react';
+import React, { ComponentProps, ReactNode } from 'react';
 
 import { getDefaultTimeRange } from '@grafana/data';
 

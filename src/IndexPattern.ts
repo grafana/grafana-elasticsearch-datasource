@@ -1,4 +1,4 @@
-import { toUtc, dateTime, DateTime, DurationUnit } from '@grafana/data';
+import { dateTime, DateTime, DurationUnit, toUtc } from '@grafana/data';
 
 import { Interval } from './types';
 
@@ -24,7 +24,7 @@ export class IndexPattern {
   constructor(
     private pattern: string,
     private interval?: keyof typeof intervalMap
-  ) {}
+  ) { }
 
   getIndexForToday() {
     if (this.interval) {

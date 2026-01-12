@@ -18,9 +18,9 @@ import {
 } from './dataquery.gen';
 import {
   defaultBucketAgg,
+  defaultGeoHashPrecisionString,
   findMetricById,
   highlightTags,
-  defaultGeoHashPrecisionString,
   queryTypeToMetricType,
 } from './queryDef';
 import { QueryType, TermsQuery } from './types';

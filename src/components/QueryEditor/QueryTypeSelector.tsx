@@ -8,6 +8,7 @@ import { QueryType } from '../../types';
 import { useQuery } from './ElasticsearchQueryContext';
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
 import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
+import React from 'react';
 
 export const QueryTypeSelector = () => {
   const query = useQuery();

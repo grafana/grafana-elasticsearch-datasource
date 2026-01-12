@@ -1,9 +1,9 @@
 import { uniqueId } from 'lodash';
-import { ComponentProps, useId, useRef, useState } from 'react';
 import * as React from 'react';
+import { ComponentProps, useId, useMemo, useState } from 'react';
 
-import { InlineField, Input, InlineSwitch, Select } from '@grafana/ui';
-import { MetricAggregation, ExtendedStat } from 'app/plugins/datasource/elasticsearch/dataquery.gen';
+import { InlineField, InlineSwitch, Input, Select } from '@grafana/ui';
+import { ExtendedStat, MetricAggregation } from '../../../../dataquery.gen';
 
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
 import { extendedStats } from '../../../../queryDef';
@@ -29,7 +29,7 @@ interface Props {
 }
 
 export const SettingsEditor = ({ metric, previousMetrics }: Props) => {
-  const { current: baseId } = useRef(uniqueId('es-setting-'));
+  const baseId = useMemo(() => uniqueId('es-setting-'), []);
 
   const dispatch = useDispatch();
   const description = useDescription(metric);

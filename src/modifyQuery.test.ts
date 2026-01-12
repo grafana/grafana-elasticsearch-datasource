@@ -1,4 +1,4 @@
-import { queryHasFilter, removeFilterFromQuery, addFilterToQuery, addStringFilterToQuery } from './modifyQuery';
+import { addFilterToQuery, addStringFilterToQuery, queryHasFilter, removeFilterFromQuery } from './modifyQuery';
 
 describe('queryHasFilter', () => {
   it('should return true if the query contains the positive filter', () => {

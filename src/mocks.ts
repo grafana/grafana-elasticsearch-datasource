@@ -58,7 +58,7 @@ export function createElasticDatasource(
       }
     },
     containsTemplate: (text?: string) => text?.includes('$') ?? false,
-    updateTimeRange: () => {},
+    updateTimeRange: () => { },
   };
 
   return new ElasticDatasource(instanceSettings, templateSrv);

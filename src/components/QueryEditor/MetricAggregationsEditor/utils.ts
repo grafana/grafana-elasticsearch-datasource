@@ -1,4 +1,4 @@
-import { PipelineMetricAggregationType, MetricAggregation } from '../../../dataquery.gen';
+import { MetricAggregation, PipelineMetricAggregationType } from '../../../dataquery.gen';
 import { MetricsConfiguration } from '../../../types';
 
 import {

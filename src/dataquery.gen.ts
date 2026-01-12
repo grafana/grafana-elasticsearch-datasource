@@ -86,7 +86,7 @@ export interface TermsSettings {
 
 export interface Filters extends BaseBucketAggregation {
   settings?: {
-    filters?: Array<Filter>;
+    filters?: Filter[];
   };
   type: 'filters';
 }
@@ -97,7 +97,7 @@ export type Filter = {
 };
 
 export interface FiltersSettings {
-  filters?: Array<Filter>;
+  filters?: Filter[];
 }
 
 export const defaultFiltersSettings: Partial<FiltersSettings> = {
@@ -141,8 +141,8 @@ export interface MetricAggregationWithMissingSupport extends BaseMetricAggregati
 }
 
 export type InlineScript = (string | {
-    inline?: string
-  });
+  inline?: string
+});
 
 export interface MetricAggregationWithInlineScript extends BaseMetricAggregation {
   settings?: {
@@ -213,7 +213,7 @@ export interface Percentiles extends MetricAggregationWithField, MetricAggregati
   settings?: {
     script?: InlineScript;
     missing?: string;
-    percents?: Array<string>;
+    percents?: string[];
   };
   type: 'percentiles';
 }
@@ -261,7 +261,7 @@ export interface BasePipelineMetricAggregation extends MetricAggregationWithFiel
 }
 
 export interface PipelineMetricAggregationWithMultipleBucketPaths extends BaseMetricAggregation {
-  pipelineVariables?: Array<PipelineVariable>;
+  pipelineVariables?: PipelineVariable[];
 }
 
 export const defaultPipelineMetricAggregationWithMultipleBucketPaths: Partial<PipelineMetricAggregationWithMultipleBucketPaths> = {
@@ -367,7 +367,7 @@ export interface TopMetrics extends BaseMetricAggregation {
   settings?: {
     order?: string;
     orderBy?: string;
-    metrics?: Array<string>;
+    metrics?: string[];
   };
   type: 'top_metrics';
 }
@@ -384,7 +384,7 @@ export interface ElasticsearchDataQuery extends common.DataQuery {
   /**
    * List of bucket aggregations
    */
-  bucketAggs?: Array<BucketAggregation>;
+  bucketAggs?: BucketAggregation[];
   /**
    * Editor type
    */
@@ -392,7 +392,7 @@ export interface ElasticsearchDataQuery extends common.DataQuery {
   /**
    * List of metric aggregations
    */
-  metrics?: Array<MetricAggregation>;
+  metrics?: MetricAggregation[];
   /**
    * Lucene query
    */

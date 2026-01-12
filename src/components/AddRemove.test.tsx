@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 
 import { AddRemove } from './AddRemove';
+import React from 'react';
 
 const noop = () => {};
 

@@ -11,25 +11,16 @@ import (
 	"strings"
 	"time"
 
+	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	es "github.com/grafana/grafana/pkg/tsdb/elasticsearch/client"
 )
 
 const ErrorBodyMaxSize = 200
 
-func (s *Service) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
-	logger := s.logger.FromContext(ctx)
+func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
+	logger := ds.logger.FromContext(ctx)
 
-	ds, err := s.getDSInfo(ctx, req.PluginContext)
-	if err != nil {
-		logger.Error("Failed to get data source info", "error", err)
-		return &backend.CheckHealthResult{
-			Status:  backend.HealthStatusUnknown,
-			Message: "Health check failed: Failed to get data source info",
-		}, nil
-	}
-
-	healthStatusUrl, err := url.Parse(ds.URL)
+	healthStatusUrl, err := url.Parse(ds.info.URL)
 	if err != nil {
 		logger.Error("Failed to parse data source URL", "error", err)
 		return &backend.CheckHealthResult{
@@ -53,7 +44,7 @@ func (s *Service) CheckHealth(ctx context.Context, req *backend.CheckHealthReque
 
 	start := time.Now()
 	logger.Debug("Sending healthcheck request to Elasticsearch", "url", healthStatusUrl.String())
-	response, err := ds.HTTPClient.Do(request)
+	response, err := ds.info.HTTPClient.Do(request)
 
 	if err != nil {
 		logger.Error("Failed to connect to Elasticsearch", "error", err, "url", healthStatusUrl.String())
@@ -123,7 +114,7 @@ func (s *Service) CheckHealth(ctx context.Context, req *backend.CheckHealthReque
 	crossClusterSearchEnabled := cfg.FeatureToggles().IsEnabled("elasticsearchCrossClusterSearch")
 
 	if crossClusterSearchEnabled {
-		message, level := validateIndex(ctx, ds)
+		message, level := validateIndex(ctx, ds.info)
 		if level == "warning" {
 			indexWarningMessage = message
 		}

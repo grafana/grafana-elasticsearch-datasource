@@ -7,6 +7,7 @@ import { Button, useStyles2 } from '@grafana/ui';
 import { DataLinkConfig } from '../types';
 
 import { DataLink } from './DataLink';
+import React from 'react';
 
 const getStyles = (theme: GrafanaTheme2) => {
   return {

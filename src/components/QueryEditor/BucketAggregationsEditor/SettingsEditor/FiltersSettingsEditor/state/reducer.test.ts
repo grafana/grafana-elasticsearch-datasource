@@ -1,6 +1,6 @@
-import { reducerTester } from 'test/core/redux/reducerTester';
+import { reducerTester } from 'test-helpers/redux/reducerTester';
 
-import { Filter } from 'app/plugins/datasource/elasticsearch/dataquery.gen';
+import { Filter } from '../../../../../../dataquery.gen';
 
 import { addFilter, changeFilter, removeFilter } from './actions';
 import { reducer } from './reducer';
