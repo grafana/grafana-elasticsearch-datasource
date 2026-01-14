@@ -3,6 +3,8 @@ package elasticsearch
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -17,8 +19,26 @@ type datasourceInfo struct {
 	Interval                   string `json:"interval"`
 }
 
+// mockElasticsearchServer creates a test HTTP server that mocks Elasticsearch cluster info endpoint
+func mockElasticsearchServer() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		// Return a mock Elasticsearch cluster info response
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"version": map[string]interface{}{
+				"build_flavor": "serverless",
+				"number":       "8.0.0",
+			},
+		})
+	}))
+}
+
 func TestNewDatasource(t *testing.T) {
 	t.Run("fields exist", func(t *testing.T) {
+		server := mockElasticsearchServer()
+		defer server.Close()
+
 		dsInfo := datasourceInfo{
 			TimeField:                  "@timestamp",
 			MaxConcurrentShardRequests: 5,
@@ -27,6 +47,7 @@ func TestNewDatasource(t *testing.T) {
 		require.NoError(t, err)
 
 		dsSettings := backend.DataSourceInstanceSettings{
+			URL:      server.URL,
 			JSONData: json.RawMessage(settingsJSON),
 		}
 
@@ -36,6 +57,9 @@ func TestNewDatasource(t *testing.T) {
 
 	t.Run("timeField", func(t *testing.T) {
 		t.Run("is nil", func(t *testing.T) {
+			server := mockElasticsearchServer()
+			defer server.Close()
+
 			dsInfo := datasourceInfo{
 				MaxConcurrentShardRequests: 5,
 				Interval:                   "Daily",
@@ -45,6 +69,7 @@ func TestNewDatasource(t *testing.T) {
 			require.NoError(t, err)
 
 			dsSettings := backend.DataSourceInstanceSettings{
+				URL:      server.URL,
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
@@ -53,6 +78,9 @@ func TestNewDatasource(t *testing.T) {
 		})
 
 		t.Run("is empty", func(t *testing.T) {
+			server := mockElasticsearchServer()
+			defer server.Close()
+
 			dsInfo := datasourceInfo{
 				MaxConcurrentShardRequests: 5,
 				Interval:                   "Daily",
@@ -63,6 +91,7 @@ func TestNewDatasource(t *testing.T) {
 			require.NoError(t, err)
 
 			dsSettings := backend.DataSourceInstanceSettings{
+				URL:      server.URL,
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
@@ -73,6 +102,9 @@ func TestNewDatasource(t *testing.T) {
 
 	t.Run("maxConcurrentShardRequests", func(t *testing.T) {
 		t.Run("no maxConcurrentShardRequests", func(t *testing.T) {
+			server := mockElasticsearchServer()
+			defer server.Close()
+
 			dsInfo := datasourceInfo{
 				TimeField: "@timestamp",
 			}
@@ -80,6 +112,7 @@ func TestNewDatasource(t *testing.T) {
 			require.NoError(t, err)
 
 			dsSettings := backend.DataSourceInstanceSettings{
+				URL:      server.URL,
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
@@ -89,6 +122,9 @@ func TestNewDatasource(t *testing.T) {
 		})
 
 		t.Run("string maxConcurrentShardRequests", func(t *testing.T) {
+			server := mockElasticsearchServer()
+			defer server.Close()
+
 			dsInfo := datasourceInfo{
 				TimeField:                  "@timestamp",
 				MaxConcurrentShardRequests: "10",
@@ -97,6 +133,7 @@ func TestNewDatasource(t *testing.T) {
 			require.NoError(t, err)
 
 			dsSettings := backend.DataSourceInstanceSettings{
+				URL:      server.URL,
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
@@ -106,6 +143,9 @@ func TestNewDatasource(t *testing.T) {
 		})
 
 		t.Run("number maxConcurrentShardRequests", func(t *testing.T) {
+			server := mockElasticsearchServer()
+			defer server.Close()
+
 			dsInfo := datasourceInfo{
 				TimeField:                  "@timestamp",
 				MaxConcurrentShardRequests: 10,
@@ -114,6 +154,7 @@ func TestNewDatasource(t *testing.T) {
 			require.NoError(t, err)
 
 			dsSettings := backend.DataSourceInstanceSettings{
+				URL:      server.URL,
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
@@ -123,6 +164,9 @@ func TestNewDatasource(t *testing.T) {
 		})
 
 		t.Run("zero maxConcurrentShardRequests", func(t *testing.T) {
+			server := mockElasticsearchServer()
+			defer server.Close()
+
 			dsInfo := datasourceInfo{
 				TimeField:                  "@timestamp",
 				MaxConcurrentShardRequests: 0,
@@ -131,6 +175,7 @@ func TestNewDatasource(t *testing.T) {
 			require.NoError(t, err)
 
 			dsSettings := backend.DataSourceInstanceSettings{
+				URL:      server.URL,
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
@@ -140,6 +185,9 @@ func TestNewDatasource(t *testing.T) {
 		})
 
 		t.Run("negative maxConcurrentShardRequests", func(t *testing.T) {
+			server := mockElasticsearchServer()
+			defer server.Close()
+
 			dsInfo := datasourceInfo{
 				TimeField:                  "@timestamp",
 				MaxConcurrentShardRequests: -10,
@@ -148,6 +196,7 @@ func TestNewDatasource(t *testing.T) {
 			require.NoError(t, err)
 
 			dsSettings := backend.DataSourceInstanceSettings{
+				URL:      server.URL,
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
@@ -157,6 +206,9 @@ func TestNewDatasource(t *testing.T) {
 		})
 
 		t.Run("float maxConcurrentShardRequests", func(t *testing.T) {
+			server := mockElasticsearchServer()
+			defer server.Close()
+
 			dsInfo := datasourceInfo{
 				TimeField:                  "@timestamp",
 				MaxConcurrentShardRequests: 10.5,
@@ -165,6 +217,7 @@ func TestNewDatasource(t *testing.T) {
 			require.NoError(t, err)
 
 			dsSettings := backend.DataSourceInstanceSettings{
+				URL:      server.URL,
 				JSONData: json.RawMessage(settingsJSON),
 			}
 
@@ -174,6 +227,9 @@ func TestNewDatasource(t *testing.T) {
 		})
 
 		t.Run("invalid maxConcurrentShardRequests", func(t *testing.T) {
+			server := mockElasticsearchServer()
+			defer server.Close()
+
 			dsInfo := datasourceInfo{
 				TimeField:                  "@timestamp",
 				MaxConcurrentShardRequests: "invalid",
@@ -182,6 +238,7 @@ func TestNewDatasource(t *testing.T) {
 			require.NoError(t, err)
 
 			dsSettings := backend.DataSourceInstanceSettings{
+				URL:      server.URL,
 				JSONData: json.RawMessage(settingsJSON),
 			}
 

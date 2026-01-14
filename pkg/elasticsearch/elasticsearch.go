@@ -73,6 +73,14 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		httpCliOpts.SigV4.Service = "es"
 	}
 
+	apiKeyAuth, ok := jsonData["apiKeyAuth"].(bool)
+	if ok && apiKeyAuth {
+		apiKey := settings.DecryptedSecureJSONData["apiKey"]
+		if apiKey != "" {
+			httpCliOpts.Header.Add("Authorization", "ApiKey "+apiKey)
+		}
+	}
+
 	httpCli, err := httpclient.NewProvider().New(httpCliOpts)
 	if err != nil {
 		return nil, err
@@ -136,6 +144,11 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		includeFrozen = false
 	}
 
+	clusterInfo, err := es.GetClusterInfo(httpCli, settings.URL)
+	if err != nil {
+		return nil, err
+	}
+
 	configuredFields := es.ConfiguredFields{
 		TimeField:       timeField,
 		LogLevelField:   logLevelField,
@@ -151,6 +164,7 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		ConfiguredFields:           configuredFields,
 		Interval:                   interval,
 		IncludeFrozen:              includeFrozen,
+		ClusterInfo:                clusterInfo,
 	}
 	return &DataSource{
 		info:   &model,
