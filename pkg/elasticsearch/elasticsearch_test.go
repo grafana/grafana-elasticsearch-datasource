@@ -55,6 +55,35 @@ func TestNewDatasource(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("cluster info fails with 403 - should continue with non-serverless defaults", func(t *testing.T) {
+		// Create a server that returns 403 Forbidden (simulating restricted permissions)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+		}))
+		defer server.Close()
+
+		dsInfo := datasourceInfo{
+			TimeField:                  "@timestamp",
+			MaxConcurrentShardRequests: 5,
+		}
+		settingsJSON, err := json.Marshal(dsInfo)
+		require.NoError(t, err)
+
+		dsSettings := backend.DataSourceInstanceSettings{
+			URL:      server.URL,
+			JSONData: json.RawMessage(settingsJSON),
+		}
+
+		instance, err := NewDatasource(context.Background(), dsSettings)
+		require.NoError(t, err)
+		require.NotNil(t, instance)
+
+		// Verify that the datasource was created with empty (non-serverless) cluster info
+		dsInstance := instance.(*DataSource)
+		require.False(t, dsInstance.info.ClusterInfo.IsServerless())
+		require.Equal(t, "", dsInstance.info.ClusterInfo.Version.BuildFlavor)
+	})
+
 	t.Run("timeField", func(t *testing.T) {
 		t.Run("is nil", func(t *testing.T) {
 			server := mockElasticsearchServer()
