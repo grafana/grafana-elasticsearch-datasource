@@ -1,5 +1,5 @@
 {
-  "name": "@grafana-plugins/elasticsearch",
+  "name": "elasticsearch",
   "version": "12.4.0-pre",
   "description": "Elasticsearch datasource for Grafana",
   "scripts": {
