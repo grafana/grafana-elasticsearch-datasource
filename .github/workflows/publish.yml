@@ -30,7 +30,7 @@ jobs:
         # We only publish to dev until the externalised data source is confirmed to be fully working
         environment: [dev]
     name: CD
-    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v5.1.0
+    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v6.1.0
     permissions:
       contents: write
       id-token: write
