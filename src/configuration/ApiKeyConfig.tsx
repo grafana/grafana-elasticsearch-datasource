@@ -1,5 +1,6 @@
 import { onUpdateDatasourceSecureJsonDataOption, updateDatasourcePluginResetOption } from '@grafana/data';
 import { InlineField, SecretInput } from '@grafana/ui';
+import React from 'react';
 
 import { Props } from './ConfigEditor';
 

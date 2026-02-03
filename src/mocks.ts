@@ -11,6 +11,7 @@ export function createElasticDatasource(
   const { jsonData, ...rest } = settings;
 
   const instanceSettings: DataSourceInstanceSettings<ElasticsearchOptions> = {
+    id: 1,
     meta: {
       id: 'id',
       name: 'name',
