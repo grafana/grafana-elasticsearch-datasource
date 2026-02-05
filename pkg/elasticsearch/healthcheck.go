@@ -29,6 +29,14 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 		}, nil
 	}
 
+	// If the cluster is serverless, return a healthy result
+	if ds.info.ClusterInfo.IsServerless() {
+		return &backend.CheckHealthResult{
+			Status:  backend.HealthStatusOk,
+			Message: "Elasticsearch Serverless data source is healthy.",
+		}, nil
+	}
+
 	// check that ES is healthy
 	healthStatusUrl.Path = path.Join(healthStatusUrl.Path, "_cluster/health")
 	healthStatusUrl.RawQuery = "wait_for_status=yellow"
