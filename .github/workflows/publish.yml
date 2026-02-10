@@ -27,8 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # We only publish to dev until the externalised data source is confirmed to be fully working
-        environment: [dev]
+        environment: [dev, ops]
     name: CD
     uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v5.1.0
     permissions:
