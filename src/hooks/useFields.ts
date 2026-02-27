@@ -62,10 +62,12 @@ export const useFields = (type: AggregationType | string[]) => {
 
   return async (q?: string) => {
     // TODO: use _field_caps to support filtering
-    if (!rawFields || rawFields.length === 0) {
-      setRawFields(await lastValueFrom(datasource.getFields(filter, range)));
+    let latestRawFields = rawFields;
+    if (!latestRawFields || latestRawFields.length === 0) {
+      latestRawFields = await lastValueFrom(datasource.getFields(filter, range));
+      setRawFields(latestRawFields);
     }
 
-    return rawFields.filter(({ text }) => q === undefined || text.includes(q)).map(toSelectableValue);
+    return latestRawFields.filter(({ text }) => q === undefined || text.includes(q)).map(toSelectableValue);
   };
 };
