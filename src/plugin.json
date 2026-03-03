@@ -36,7 +36,8 @@
         "url": "https://grafana.com/docs/grafana/latest/datasources/elasticsearch/"
       }
     ],
-    "version": "%VERSION%"
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
   },
   "alerting": true,
   "annotations": true,
