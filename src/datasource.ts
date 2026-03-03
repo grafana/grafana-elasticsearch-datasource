@@ -105,11 +105,12 @@ const ELASTIC_META_FIELDS = [
 export class ElasticDatasource
   extends DataSourceWithBackend<ElasticsearchDataQuery, ElasticsearchOptions>
   implements
-  DataSourceWithLogsContextSupport,
-  DataSourceWithQueryImportSupport<ElasticsearchDataQuery>,
-  DataSourceWithSupplementaryQueriesSupport<ElasticsearchDataQuery>,
-  DataSourceWithToggleableQueryFiltersSupport<ElasticsearchDataQuery>,
-  DataSourceWithQueryModificationSupport<ElasticsearchDataQuery> {
+    DataSourceWithLogsContextSupport,
+    DataSourceWithQueryImportSupport<ElasticsearchDataQuery>,
+    DataSourceWithSupplementaryQueriesSupport<ElasticsearchDataQuery>,
+    DataSourceWithToggleableQueryFiltersSupport<ElasticsearchDataQuery>,
+    DataSourceWithQueryModificationSupport<ElasticsearchDataQuery>
+{
   basicAuth?: string;
   withCredentials?: boolean;
   url: string;
@@ -273,7 +274,6 @@ export class ElasticDatasource
     const timeField = annotation.timeField || '@timestamp';
     const timeEndField = annotation.timeEndField || null;
     const dashboard = options.dashboard;
-
 
     const adhocVariables = dashboard.getVariables().filter((v) => v.type === 'adhoc') as AdHocVariableModel[];
     const annotationRelatedVariables = adhocVariables.filter((v) => v.datasource?.uid === annotation.datasource.uid);
