@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { DataQueryRequest, dateTime, Field } from '@grafana/data';
 import { EditorRows, EditorRow, EditorField } from '@grafana/plugin-ui';
