@@ -1,4 +1,4 @@
-import { Alert, Button } from '@grafana/ui';
+import { Button } from '@grafana/ui';
 
 import { MetricAggregation } from '../../../dataquery.gen';
 import { useDispatch } from '../../../hooks/useStatelessReducer';
@@ -22,37 +22,31 @@ export const MetricAggregationsEditor = ({ nextId }: Props) => {
   return (
     <>
       {metrics?.map((metric, index) => {
-        switch (metric.type) {
-          case 'logs':
-            return;
-          case 'raw_data':
-            return;
-          case 'raw_document':
-            return <Alert severity="warning" title="The 'Raw Document' query type is deprecated." />;
-          default:
-            return (
-              <QueryEditorRow
-                key={`${metric.type}-${metric.id}`}
-                label={`Metric (${metric.id})`}
-                hidden={metric.hide}
-                onHideClick={() => dispatch(toggleMetricVisibility(metric.id))}
-                onRemoveClick={totalMetrics > 1 && (() => dispatch(removeMetric(metric.id)))}
-              >
-                <MetricEditor value={metric} />
+        if (metric.type !== 'logs' && metric.type !== 'raw_data' && metric.type !== 'raw_document') {
+          return (
+            <QueryEditorRow
+              key={`${metric.type}-${metric.id}`}
+              label={`Metric (${metric.id})`}
+              hidden={metric.hide}
+              onHideClick={() => dispatch(toggleMetricVisibility(metric.id))}
+              onRemoveClick={totalMetrics > 1 && (() => dispatch(removeMetric(metric.id)))}
+            >
+              <MetricEditor value={metric} />
 
-                {metricAggregationConfig[metric.type].impliedQueryType === 'metrics' && index === 0 && (
-                  <Button
-                    variant="secondary"
-                    fill="text"
-                    icon="plus"
-                    onClick={() => dispatch(addMetric(nextId))}
-                    tooltip="Add metric"
-                    aria-label="Add metric"
-                  />
-                )}
-              </QueryEditorRow>
-            );
+              {metricAggregationConfig[metric.type].impliedQueryType === 'metrics' && index === 0 && (
+                <Button
+                  variant="secondary"
+                  fill="text"
+                  icon="plus"
+                  onClick={() => dispatch(addMetric(nextId))}
+                  tooltip="Add metric"
+                  aria-label="Add metric"
+                />
+              )}
+            </QueryEditorRow>
+          );
         }
+        return null;
       })}
     </>
   );

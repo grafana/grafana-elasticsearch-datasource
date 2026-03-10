@@ -122,6 +122,10 @@ const QueryEditorForm = ({ value, onRunQuery }: Props & { onRunQuery: () => void
     (metric) => metricAggregationConfig[metric.type].impliedQueryType === 'metrics'
   );
 
+  const isRawDocumentEditor = value.metrics?.every(
+    (metric) => metricAggregationConfig[metric.type].impliedQueryType === 'raw_document'
+  );
+
   const onEditorTypeChange = useCallback((newEditorType: EditorType) => {
     // Show warning modal when switching modes
     setPendingEditorType(newEditorType);
@@ -200,6 +204,7 @@ const QueryEditorForm = ({ value, onRunQuery }: Props & { onRunQuery: () => void
         </>
       )}
       <ElasticsearchQueryOptions onFormat={isCodeEditor && rawDSLFeatureEnabled ? handleFormat : undefined} />
+      {isRawDocumentEditor && <Alert severity="warning" title="The 'Raw Document' query type is deprecated." />}
     </>
   );
 };
