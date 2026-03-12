@@ -1,6 +1,6 @@
 {
   "name": "elasticsearch",
-  "version": "12.4.2",
+  "version": "12.4.3",
   "description": "Elasticsearch datasource for Grafana",
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
