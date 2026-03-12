@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/grafana-aws-sdk/pkg/awsauth"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
@@ -71,6 +72,7 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	// Set SigV4 service namespace
 	if httpCliOpts.SigV4 != nil {
 		httpCliOpts.SigV4.Service = "es"
+		httpCliOpts.Middlewares = append(httpCliOpts.Middlewares, awsauth.NewSigV4Middleware())
 	}
 
 	apiKeyAuth, ok := jsonData["apiKeyAuth"].(bool)
