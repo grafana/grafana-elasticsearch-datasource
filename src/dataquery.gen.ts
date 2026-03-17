@@ -10,7 +10,7 @@
 
 import * as common from '@grafana/schema';
 
-export type QueryType = ('lucene' | 'dsl');
+export type QueryType = ('lucene' | 'dsl' | 'esql');
 
 export type BucketAggregation = (DateHistogram | Histogram | Terms | Filters | GeoHashGrid | Nested);
 
