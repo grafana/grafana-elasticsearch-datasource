@@ -3,3 +3,55 @@ services:
     extends:
       file: .config/docker-compose-base.yaml
       service: grafana
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      es-loader:
+        condition: service_completed_successfully
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION:-9.3.1}
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' || exit 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  es-loader:
+    image: curlimages/curl:latest
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./tests/e2e/fixtures:/data:ro
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        for file in /data/*.ndjson; do
+          index=$$(basename "$$file" .ndjson)
+          curl -sf --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors \
+            -X POST "http://elasticsearch:9200/$${index}/_bulk" \
+            -H "Content-Type: application/x-ndjson" \
+            --data-binary "@$${file}" > /dev/null
+        done
+    restart: no
