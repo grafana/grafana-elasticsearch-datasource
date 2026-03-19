@@ -208,6 +208,10 @@ func (ds *DataSource) CallResource(ctx context.Context, req *backend.CallResourc
 		return err
 	}
 
+	if ct := req.GetHTTPHeader("Content-Type"); ct != "" {
+		request.Header.Set("Content-Type", ct)
+	}
+
 	logger.Debug("Sending request to Elasticsearch", "resourcePath", req.Path)
 	start := time.Now()
 	response, err := ds.info.HTTPClient.Do(request)
