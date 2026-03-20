@@ -49,9 +49,14 @@ services:
         set -e
         for file in /data/*.ndjson; do
           index=$$(basename "$$file" .ndjson)
-          curl -sf --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors \
+          response=$$(curl -sf --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors \
             -X POST "http://elasticsearch:9200/$${index}/_bulk" \
             -H "Content-Type: application/x-ndjson" \
-            --data-binary "@$${file}" > /dev/null
+            --data-binary "@$${file}")
+          if echo "$$response" | grep -q '"errors":true'; then
+            echo "Bulk indexing errors for index '$${index}'" >&2
+            echo "$$response" >&2
+            exit 1
+          fi
         done
     restart: no
