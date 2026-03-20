@@ -1,0 +1,401 @@
+{"index":{}}
+{"@timestamp":"2026-03-17T21:25:47.240252Z","remoteAddr":"10.0.202.165","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":38,"latencyMs":1.96,"userAgent":"k6/0.49.0","referer":"-","traceId":"88dba176dac07df89c2df02fc92fa5e8","spanId":"39d3803597daf080","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:26:47.240252Z","remoteAddr":"10.2.140.66","method":"POST","path":"/api/v1/auth/token","protocol":"HTTP/1.1","statusCode":422,"bytesSent":292,"latencyMs":39.08,"userAgent":"k6/0.49.0","referer":"-","traceId":"a011037473466fba9edd0c936dc62373","spanId":"9e896db683f3a392","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:27:47.240252Z","remoteAddr":"10.0.125.81","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1013,"latencyMs":11.22,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"b040212b9cbd9b9fd36d22a90064ea57","spanId":"7edc9c040bc0df80","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:28:47.240252Z","remoteAddr":"10.2.45.109","method":"POST","path":"/api/v1/auth/token","protocol":"HTTP/1.1","statusCode":201,"bytesSent":327,"latencyMs":35.09,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"ccbf3a55ece4ef5065835a3ee38b5730","spanId":"70bf301e7de6bc38","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:29:47.240252Z","remoteAddr":"10.1.217.182","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4567,"latencyMs":65.29,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"bb3b64bd627d685e1e1b3b60d2310cc7","spanId":"92fda54c8fa13c54","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:30:47.240252Z","remoteAddr":"10.0.108.120","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4820,"latencyMs":60.33,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"0418c44c27f3b1a75a106ca5314220a6","spanId":"ae71a93eff8c3580","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:31:47.240252Z","remoteAddr":"10.1.106.240","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":33,"latencyMs":2.21,"userAgent":"k6/0.49.0","referer":"-","traceId":"c1b861b8e23b7ee93005b15894fbc9e9","spanId":"e91230b51db27117","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:32:47.240252Z","remoteAddr":"10.3.4.200","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4538,"latencyMs":65.58,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"c27b99e6a47884f281042acb0a3712fc","spanId":"23b8068020e62251","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:33:47.240252Z","remoteAddr":"10.0.13.234","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":647,"latencyMs":11.88,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"123c54e60325fb7042e3f5f8f74b1e18","spanId":"1025ab702b88eb89","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:34:47.240252Z","remoteAddr":"10.2.205.204","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4050,"latencyMs":120.42,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"6f10d5d6a2283d037349f4436ccb5be4","spanId":"a37d193ae58f7dbe","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:35:47.240252Z","remoteAddr":"10.1.92.66","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":200,"bytesSent":3809,"latencyMs":151.02,"userAgent":"k6/0.49.0","referer":"-","traceId":"a1f9a2f419059a0bb3006aed6ddbddec","spanId":"8a910daf99849a62","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:36:47.240252Z","remoteAddr":"10.0.137.212","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":755,"latencyMs":18.56,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"4ee884c288fb29d3b289bee8e7c324ae","spanId":"e2ccbecf2dabab84","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:37:47.240252Z","remoteAddr":"10.3.123.44","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4255,"latencyMs":59.52,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"8631236b422b41890ea8acff3bb88c7b","spanId":"a433c216389aa451","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:38:47.240252Z","remoteAddr":"10.1.52.61","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":34,"latencyMs":2.07,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"a302b5e7e650d134af681ca440892fd8","spanId":"7c7ec7e765bec38c","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:39:47.240252Z","remoteAddr":"10.2.199.22","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":658,"latencyMs":18.29,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"97d5d8894934c0ad3747ed88c56825ba","spanId":"1a7c97537508e5a6","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:40:47.240252Z","remoteAddr":"10.3.15.118","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":400,"bytesSent":318,"latencyMs":31.37,"userAgent":"k6/0.49.0","referer":"-","traceId":"bc396ff6d2e0820881d482cfe05931b6","spanId":"8c512de8f67ae399","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:41:47.240252Z","remoteAddr":"10.0.171.183","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4788,"latencyMs":56.69,"userAgent":"k6/0.49.0","referer":"-","traceId":"e6741c1e01adeda410f408e28b222ee6","spanId":"f5cb04e19e4b74c3","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:42:47.240252Z","remoteAddr":"10.3.203.102","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":201,"bytesSent":247,"latencyMs":55.2,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"b931d1536d0d38411cc23e6535a96e43","spanId":"a31f06c765acdfb8","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:43:47.240252Z","remoteAddr":"10.2.148.192","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":937,"latencyMs":13.79,"userAgent":"k6/0.49.0","referer":"-","traceId":"9b07ac4218d1bf536bc80979dc275d07","spanId":"1a1b0cf2d303bbfc","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:44:47.240252Z","remoteAddr":"10.3.152.8","method":"DELETE","path":"/api/v1/sessions/{id}","protocol":"HTTP/1.1","statusCode":204,"bytesSent":0,"latencyMs":12.02,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"27165f2606641020f160d8f2bc1efe4e","spanId":"94e374c05339f976","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:45:47.240252Z","remoteAddr":"10.0.105.254","method":"POST","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":201,"bytesSent":442,"latencyMs":105.42,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"aa22111612634efbb5dc521fcebfbed7","spanId":"d416ee105e1fc734","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:46:47.240252Z","remoteAddr":"10.1.148.20","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":500,"bytesSent":230,"latencyMs":110.02,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"8709eb70ee7647c22b90c5b7959e0b50","spanId":"c156fffe26e11988","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:47:47.240252Z","remoteAddr":"10.2.36.194","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":12309,"latencyMs":41.69,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"cabfc089efb1f9e3740d50c529487703","spanId":"30e43ae167555a31","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:48:47.240252Z","remoteAddr":"10.3.200.91","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":979,"latencyMs":16.72,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"0b1ba8360d32fe483cbbe7f664808648","spanId":"4ddb7c9aabfda7c7","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:49:47.240252Z","remoteAddr":"10.1.163.71","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4556,"latencyMs":76.87,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"213025e9345176873ce46ff88e44c3b1","spanId":"e226ac7c5bd5326a","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:50:47.240252Z","remoteAddr":"10.1.241.113","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":2093,"latencyMs":39.96,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"22e0a58fda15711a78779e795d602ec3","spanId":"68bf9609a37652eb","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:51:47.240252Z","remoteAddr":"10.0.131.170","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":933,"latencyMs":15.5,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"c2d1dfc7636c6f49f27ce27649eaa517","spanId":"44a1ace2b285cd3f","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:52:47.240252Z","remoteAddr":"10.1.158.91","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":966,"latencyMs":18.6,"userAgent":"k6/0.49.0","referer":"-","traceId":"5a66461b540b8948e42d933667865df4","spanId":"06a5a2aad3473694","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:53:47.240252Z","remoteAddr":"10.3.195.14","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":35,"latencyMs":2.72,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"a2c0a94e1511b950d6a3d7a6ec15ba00","spanId":"e424577660e4d3b3","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:54:47.240252Z","remoteAddr":"10.0.246.229","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1052,"latencyMs":18.82,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"6193df41aa3b9204525d53d00fbd49ab","spanId":"97cc3e040b0d6a80","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:55:47.240252Z","remoteAddr":"10.3.196.4","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":201,"bytesSent":221,"latencyMs":64.67,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"27166f2728104fa572be97c622afec41","spanId":"c542d4e1d923990f","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:56:47.240252Z","remoteAddr":"10.0.174.182","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":680,"latencyMs":22.11,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"9719838ff02d135534d4ad3a310effac","spanId":"f0877b3cd494cee7","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:57:47.240252Z","remoteAddr":"10.3.203.163","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":200,"bytesSent":3866,"latencyMs":171.47,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"ccf60b5ff717c31edca7a186f781847b","spanId":"c1f6bea06bb8d2b3","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:58:47.240252Z","remoteAddr":"10.2.226.167","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":37,"latencyMs":2.91,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"f0d1c89f9c4a480f2e4238c70a01d5e1","spanId":"bec0fc42f73416a6","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:59:47.240252Z","remoteAddr":"10.1.117.66","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13740,"latencyMs":58.88,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"727bca64d79c4d4dd399fc3f423ea879","spanId":"528dbe3bc17eaa1a","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:00:47.240252Z","remoteAddr":"10.2.80.49","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":675,"latencyMs":21.27,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"39b18c56c31b05c41e68d479f7514059","spanId":"46570a59f8000536","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:01:47.240252Z","remoteAddr":"10.2.203.187","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13274,"latencyMs":49.35,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"5b3d6cf76c90cb09383be6abd7509758","spanId":"1863e05896bf27e2","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:02:47.240252Z","remoteAddr":"10.0.74.232","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":971,"latencyMs":22.85,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"f846fc71cf382cf7cd524c75e6dd1114","spanId":"906494920c5bc1ad","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:03:47.240252Z","remoteAddr":"10.3.173.1","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13609,"latencyMs":60.92,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"9f7156cec66967321e9f5c11a63b27e7","spanId":"380d367a68913fce","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:04:47.240252Z","remoteAddr":"10.1.172.43","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":201,"bytesSent":253,"latencyMs":67.75,"userAgent":"k6/0.49.0","referer":"-","traceId":"bf7db1d15b5c700a621992b8a9105e8e","spanId":"753fab03a2d194e1","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:05:47.240252Z","remoteAddr":"10.2.134.173","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":34,"latencyMs":3.95,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"0afc1931193b32a577fe5e71bcdf5390","spanId":"49eacaf45ec1af64","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:06:47.240252Z","remoteAddr":"10.3.32.81","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":32,"latencyMs":3.06,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"7e78aab5cea2ef2794e61108363cf086","spanId":"2204946ab34bc3cc","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:07:47.240252Z","remoteAddr":"10.2.44.71","method":"POST","path":"/api/v1/auth/token","protocol":"HTTP/1.1","statusCode":400,"bytesSent":196,"latencyMs":53.68,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"53f0254c3f6ce1fc613d383daf9155f0","spanId":"16549e836636243a","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:08:47.240252Z","remoteAddr":"10.2.182.154","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":404,"bytesSent":149,"latencyMs":23.08,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"a2e72965ab2a8dbe6f0b426e6df31645","spanId":"ecf37c1d38c0fcd5","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:09:47.240252Z","remoteAddr":"10.0.84.177","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":682,"latencyMs":19.38,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"d7320788551689402db97f9b0dff22c8","spanId":"51fbc1de53cb44c6","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:10:47.240252Z","remoteAddr":"10.2.159.206","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1977,"latencyMs":33.92,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"d43ab3e059d3212f66b4567dd8934b79","spanId":"779de1b52e2c0567","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:11:47.240252Z","remoteAddr":"10.1.194.77","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":32,"latencyMs":3.22,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"a1bc798b2d0fa6b72b7c45918d6d2521","spanId":"5e5061dd3feb7103","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:12:47.240252Z","remoteAddr":"10.2.234.219","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":404,"bytesSent":368,"latencyMs":56.85,"userAgent":"k6/0.49.0","referer":"-","traceId":"4de68e73de30ece536aac513d977f50a","spanId":"754753c0470e997c","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:13:47.240252Z","remoteAddr":"10.0.61.133","method":"GET","path":"/metrics","protocol":"HTTP/1.1","statusCode":200,"bytesSent":6245,"latencyMs":6.68,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"e5956a4070e49240e7350058054eae3d","spanId":"3a8e58531080a693","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:14:47.240252Z","remoteAddr":"10.0.10.61","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4076,"latencyMs":173.82,"userAgent":"k6/0.49.0","referer":"-","traceId":"20f1a392d42b5903cfc6c974492f0608","spanId":"6fd1c8641de0a756","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:15:47.240252Z","remoteAddr":"10.3.131.239","method":"DELETE","path":"/api/v1/sessions/{id}","protocol":"HTTP/1.1","statusCode":500,"bytesSent":235,"latencyMs":11.99,"userAgent":"k6/0.49.0","referer":"-","traceId":"4ae49dea308a0ac695eb1a855459df90","spanId":"41e076ecc7f0caad","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:16:47.240252Z","remoteAddr":"10.1.83.250","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13661,"latencyMs":51.49,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"a54a7840b7bae9d8ef15ccb2c49ad506","spanId":"008e0ecffd369fc0","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:17:47.240252Z","remoteAddr":"10.1.235.242","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":36,"latencyMs":2.96,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"fff49c2760372db0ae9a4be32310fe2c","spanId":"24cfa814894c7a27","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:18:47.240252Z","remoteAddr":"10.3.166.181","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4251,"latencyMs":87.96,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"ab66432485cb4d9fb87c1fe1398f4e29","spanId":"0579a6e665608af7","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:19:47.240252Z","remoteAddr":"10.0.55.245","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":200,"bytesSent":3504,"latencyMs":155.57,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"63f7724458556e1e0cd5de9aa9e7ece8","spanId":"8b83a31ed2f9ae84","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:20:47.240252Z","remoteAddr":"10.3.132.74","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":12773,"latencyMs":67.76,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"325ac9c3c3d5a0d65f0f4c3909fab868","spanId":"4fca4a5b569cf23d","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:21:47.240252Z","remoteAddr":"10.1.78.138","method":"POST","path":"/api/v1/auth/token","protocol":"HTTP/1.1","statusCode":201,"bytesSent":314,"latencyMs":58.75,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"9abd6ce054abffe4aa100c93d5428d6d","spanId":"2caadca824f3a87c","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:22:47.240252Z","remoteAddr":"10.2.170.58","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":200,"bytesSent":3663,"latencyMs":193.54,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"aff4a75052c18b525cdc2571abc49183","spanId":"6ac0e7fa7c324504","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:23:47.240252Z","remoteAddr":"10.3.22.57","method":"POST","path":"/api/v1/auth/token","protocol":"HTTP/1.1","statusCode":422,"bytesSent":237,"latencyMs":48.48,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"ef8c637a7a546f24a34437af3086206c","spanId":"fb4a69c0ad7c4a65","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:24:47.240252Z","remoteAddr":"10.1.44.121","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":400,"bytesSent":350,"latencyMs":16.93,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"71efbeb6feef5a87ea2624749962956d","spanId":"67f52b0f7b6a8ea1","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:25:47.240252Z","remoteAddr":"10.3.11.216","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":201,"bytesSent":255,"latencyMs":69.46,"userAgent":"k6/0.49.0","referer":"-","traceId":"c39b00f14e2b801445893f1e20ca7d71","spanId":"a0a96895bf7dea67","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:26:47.240252Z","remoteAddr":"10.2.234.68","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":38,"latencyMs":2.91,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"339e571721afd53fd52a870175756f40","spanId":"24dcb9cf472005bb","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:27:47.240252Z","remoteAddr":"10.2.4.134","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":12665,"latencyMs":59.86,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"0c582b1379c53f6f2ac82802019838d8","spanId":"e24a1ccd9154fbc3","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:28:47.240252Z","remoteAddr":"10.3.27.220","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":2045,"latencyMs":33.48,"userAgent":"k6/0.49.0","referer":"-","traceId":"e55797902cfe93c923b58beb1fe50ced","spanId":"aacc903e6e1d0f00","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:29:47.240252Z","remoteAddr":"10.2.207.13","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":400,"bytesSent":377,"latencyMs":182.86,"userAgent":"k6/0.49.0","referer":"-","traceId":"1f91a1d241e0365d67c7a3278f8ebf5b","spanId":"2da76ec3345902ee","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:30:47.240252Z","remoteAddr":"10.3.215.9","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":33,"latencyMs":2.53,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"865ea7edb70ef7d344cde32c62dad42f","spanId":"7b424ff469b908b9","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:31:47.240252Z","remoteAddr":"10.3.135.36","method":"POST","path":"/api/v1/auth/token","protocol":"HTTP/1.1","statusCode":201,"bytesSent":304,"latencyMs":54.62,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"7768cdcc5cc87e0f28a86e42a1f56846","spanId":"e200143aeb2e3b7c","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:32:47.240252Z","remoteAddr":"10.0.251.29","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":201,"bytesSent":258,"latencyMs":48.22,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"291ddc864578295d89a92eb99afa5375","spanId":"79a7a807505c2be6","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:33:47.240252Z","remoteAddr":"10.1.87.140","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":500,"bytesSent":320,"latencyMs":2.64,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"31609ec26d1bfd7e3318f67341a8b820","spanId":"aadb1cae76d4e16c","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:34:47.240252Z","remoteAddr":"10.1.173.154","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":200,"bytesSent":3724,"latencyMs":163.04,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"1fe96f857969a630c0588fed72a2211d","spanId":"8b95947f9e52a12d","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:35:47.240252Z","remoteAddr":"10.3.146.245","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":982,"latencyMs":12.47,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"c6a4de1052ed3fe38796e533f4ae7ff3","spanId":"9ce704e307d3acc5","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:36:47.240252Z","remoteAddr":"10.1.203.215","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":648,"latencyMs":18.21,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"0ad42c546a05bbd1be9182d599b6272b","spanId":"e3283a5a7742e891","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:37:47.240252Z","remoteAddr":"10.0.117.129","method":"DELETE","path":"/api/v1/sessions/{id}","protocol":"HTTP/1.1","statusCode":204,"bytesSent":0,"latencyMs":11.17,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"3879f7094eee9d05a25469881fa459a0","spanId":"2fc273bc6b036e05","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:38:47.240252Z","remoteAddr":"10.2.221.99","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":500,"bytesSent":242,"latencyMs":116.28,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"2743bd967c817d521acb3857a5f1819e","spanId":"e9e22498ce74f84c","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:39:47.240252Z","remoteAddr":"10.1.42.72","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":404,"bytesSent":185,"latencyMs":57.29,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"17e667e1665f63c95cfb22a8552d9c2e","spanId":"fdc825cd8195b600","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:40:47.240252Z","remoteAddr":"10.3.133.19","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":200,"bytesSent":3707,"latencyMs":141.75,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"00478825ec9c73d420231d19a1cf190f","spanId":"6ccda20c1a2760c6","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:41:47.240252Z","remoteAddr":"10.3.94.15","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":12061,"latencyMs":45.68,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"329ef8906ba35e01eca79e239d155aa0","spanId":"58e0471529631e26","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:42:47.240252Z","remoteAddr":"10.1.27.18","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":38,"latencyMs":1.88,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"9407e3c55b63c3ca04a1d25e10a5d611","spanId":"5da05475d883ee91","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:43:47.240252Z","remoteAddr":"10.2.76.176","method":"GET","path":"/metrics","protocol":"HTTP/1.1","statusCode":200,"bytesSent":6801,"latencyMs":6,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"696c8d902891bb7da9c8a2fe9bc76ed2","spanId":"c0bbcc1941f7abe7","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:44:47.240252Z","remoteAddr":"10.3.248.28","method":"POST","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":201,"bytesSent":431,"latencyMs":79,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"078be690d145f2c084ff9a53862adc43","spanId":"e2e01be3eed01d3a","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:45:47.240252Z","remoteAddr":"10.0.96.178","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":33,"latencyMs":2.32,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"7bb2431c60a41f8fe472eb6a0e5b08c4","spanId":"34b68bfea5b5e660","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:46:47.240252Z","remoteAddr":"10.1.6.130","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":890,"latencyMs":12.21,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"2fbad3e3517b18fefe2b633567716ee2","spanId":"cf18320b730ece3b","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:47:47.240252Z","remoteAddr":"10.0.56.19","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":946,"latencyMs":12.81,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"e9032830585036a60bac60b0601ffa81","spanId":"d416877f16c1522b","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:48:47.240252Z","remoteAddr":"10.2.202.117","method":"DELETE","path":"/api/v1/sessions/{id}","protocol":"HTTP/1.1","statusCode":204,"bytesSent":0,"latencyMs":11.41,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"844da7d18dc179aebe2ebf44167b6d1a","spanId":"d89f59b6f5be9595","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:49:47.240252Z","remoteAddr":"10.1.49.58","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4706,"latencyMs":73.21,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"e0365ce050dd541c6d9e7940cf684fa0","spanId":"727951f729d14888","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:50:47.240252Z","remoteAddr":"10.2.205.65","method":"POST","path":"/api/v1/auth/token","protocol":"HTTP/1.1","statusCode":201,"bytesSent":331,"latencyMs":47.89,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"3bcc2526a0eef1455ec41e7720d59474","spanId":"a04c2a71408b70da","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:51:47.240252Z","remoteAddr":"10.2.9.135","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1891,"latencyMs":35.83,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"3683a74c5ab01cfed573538bd9bbec3e","spanId":"6d70987be3aa3759","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:52:47.240252Z","remoteAddr":"10.2.169.243","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":400,"bytesSent":401,"latencyMs":2.64,"userAgent":"k6/0.49.0","referer":"-","traceId":"0ff801c057a9aa0a58055a75f08903a4","spanId":"3dcd6ff50641972d","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:53:47.240252Z","remoteAddr":"10.3.163.66","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":705,"latencyMs":23.78,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"68c23f5d8fae596a410b61c3810fdca1","spanId":"99c2f47306c197ee","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:54:47.240252Z","remoteAddr":"10.3.62.4","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":32,"latencyMs":2.55,"userAgent":"k6/0.49.0","referer":"-","traceId":"ff0063273e444a3cfb8da7f3e41cae54","spanId":"cba362de3e3c9a27","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:55:47.240252Z","remoteAddr":"10.3.179.249","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":12144,"latencyMs":53.26,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"c4407607bfce136e3f6698b5b911c70b","spanId":"8bdd6bbd1d320d8a","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:56:47.240252Z","remoteAddr":"10.3.184.162","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":994,"latencyMs":15.95,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"91c66219685b143ee1d5fa4d6044aaed","spanId":"7dbb255d2569d9e3","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:57:47.240252Z","remoteAddr":"10.1.152.19","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":201,"bytesSent":236,"latencyMs":53.53,"userAgent":"k6/0.49.0","referer":"-","traceId":"07e0e6dba9ecd3041e2c8a617c3467a4","spanId":"d5492be3775fa4c9","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:58:47.240252Z","remoteAddr":"10.2.184.160","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":500,"bytesSent":271,"latencyMs":32.14,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"28dc7a71cfd4debd88138edec93e5c26","spanId":"b288ed9b520dd2ac","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:59:47.240252Z","remoteAddr":"10.0.103.8","method":"POST","path":"/api/v1/auth/token","protocol":"HTTP/1.1","statusCode":201,"bytesSent":296,"latencyMs":42.91,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"8b3fb85f9cc54c43a19445729c7568af","spanId":"748bebe779a2cca3","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:00:47.240252Z","remoteAddr":"10.0.14.162","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":200,"bytesSent":3971,"latencyMs":175.3,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"46bf528661cfd2bc34be1eea9e0424fc","spanId":"64f00e21a795375a","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:01:47.240252Z","remoteAddr":"10.1.173.57","method":"POST","path":"/api/v1/auth/token","protocol":"HTTP/1.1","statusCode":400,"bytesSent":273,"latencyMs":50.59,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"d38f173499a8f7cc0c28bb1442e7b7bb","spanId":"cf4f7fa32f8abba5","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:02:47.240252Z","remoteAddr":"10.1.69.168","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4204,"latencyMs":83.27,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"cabf38316b24dfbf8bac274200844013","spanId":"929c845ac75ac4a4","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:03:47.240252Z","remoteAddr":"10.0.30.41","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4295,"latencyMs":71.7,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"cecffce944533b2a3837a071dda4e910","spanId":"2ec5bea7ce355910","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:04:47.240252Z","remoteAddr":"10.2.233.242","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":714,"latencyMs":21.88,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"4eb3f5a8cdd7f7b0d29667e47d997dbb","spanId":"49eed277b0538a01","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:05:47.240252Z","remoteAddr":"10.3.144.204","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4542,"latencyMs":88.05,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"3b5e683f6db603595182331f17638368","spanId":"d7e9e40da7ee6e7a","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:06:47.240252Z","remoteAddr":"10.2.231.169","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":36,"latencyMs":3.29,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"f26982ea86228c6cc49709ad5b7c3dea","spanId":"07c63809dee79adc","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:07:47.240252Z","remoteAddr":"10.1.85.240","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":944,"latencyMs":20.41,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"4545040a2cfb26e9fc947d61429f580b","spanId":"da4cb794f38b65a8","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:08:47.240252Z","remoteAddr":"10.2.69.70","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13653,"latencyMs":61.56,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"93b09c93d979e5085aba81f432e87271","spanId":"4692b8b25f955a9b","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:09:47.240252Z","remoteAddr":"10.0.65.194","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":200,"bytesSent":3543,"latencyMs":222.11,"userAgent":"k6/0.49.0","referer":"-","traceId":"810b5d7216e3faafe38b8763d30b6718","spanId":"7534ba280258e6ab","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:10:47.240252Z","remoteAddr":"10.0.235.134","method":"GET","path":"/metrics","protocol":"HTTP/1.1","statusCode":200,"bytesSent":7356,"latencyMs":8.09,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"0a1d5c229d7b9f485f346750eefe237c","spanId":"93a60bf4f36faf1a","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:11:47.240252Z","remoteAddr":"10.0.51.166","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4476,"latencyMs":96.03,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"63973f04ef8e51b2c93e711a40c67e73","spanId":"ef26dcd08e9f6bce","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:12:47.240252Z","remoteAddr":"10.3.250.42","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":33,"latencyMs":3.54,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"80f88a586b9e8fb0f6966e64240cc9f3","spanId":"f790ca7e4e1f8b8a","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:13:47.240252Z","remoteAddr":"10.1.225.62","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":33,"latencyMs":3.93,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"acb1b1e1a7db6e0b17f46d5f85d90cf3","spanId":"b6234b62b350af1c","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:14:47.240252Z","remoteAddr":"10.3.189.144","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":963,"latencyMs":24,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"de6fa835db5495ba5dbcaa4ea778ff17","spanId":"48b78c25ab2ad0dd","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:15:47.240252Z","remoteAddr":"10.1.11.115","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":400,"bytesSent":97,"latencyMs":108.13,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"6d1648a8c01208b1cd5e0c4c366df2fc","spanId":"b407a06e3d486f2f","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:16:47.240252Z","remoteAddr":"10.3.202.96","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":679,"latencyMs":26.11,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"c1cd172c3ba1c5e31a05011116f8a1b5","spanId":"7a30d1b009f19c10","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:17:47.240252Z","remoteAddr":"10.0.239.250","method":"GET","path":"/metrics","protocol":"HTTP/1.1","statusCode":200,"bytesSent":6339,"latencyMs":9.02,"userAgent":"k6/0.49.0","referer":"-","traceId":"e18b3190c90764bec0f67dd23e04cf41","spanId":"3e0e2eee57acae7e","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:18:47.240252Z","remoteAddr":"10.2.157.135","method":"POST","path":"/api/v1/auth/token","protocol":"HTTP/1.1","statusCode":201,"bytesSent":292,"latencyMs":67.93,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"5eb56b7d8a2a576fffc6767ca4d2a5f6","spanId":"2aca2012ef0ad34c","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:19:47.240252Z","remoteAddr":"10.3.5.250","method":"POST","path":"/api/v1/auth/token","protocol":"HTTP/1.1","statusCode":201,"bytesSent":290,"latencyMs":64.82,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"541be90fb43957685ad39b3b0e7d9cbf","spanId":"84afe0681b7fc900","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:20:47.240252Z","remoteAddr":"10.0.224.239","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4865,"latencyMs":90.55,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"92351c9578f2c7f50221f057f58b73bb","spanId":"ad1c2038f3ba8de8","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:21:47.240252Z","remoteAddr":"10.3.9.103","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4327,"latencyMs":84.2,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"6b49d0a9589ac5660e37c322c369c2df","spanId":"348a6b43c7f87896","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:22:47.240252Z","remoteAddr":"10.2.220.233","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":34,"latencyMs":3.63,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"b1eabe6585cacbc56ed5c71965c6ea2a","spanId":"8d41b7e048ee2252","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:23:47.240252Z","remoteAddr":"10.2.34.203","method":"GET","path":"/metrics","protocol":"HTTP/1.1","statusCode":200,"bytesSent":7041,"latencyMs":8.36,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"f5bee11535c1ee0be2efb46acc2cbda1","spanId":"e2f7898143b82f43","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:24:47.240252Z","remoteAddr":"10.1.15.203","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":404,"bytesSent":204,"latencyMs":42.38,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"13c0b87a0aa705425997864142ff3e7e","spanId":"76b4d634be290eff","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:25:47.240252Z","remoteAddr":"10.1.93.213","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":717,"latencyMs":24.81,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"e04e53091b5adc8691c5a9dfa411bc8a","spanId":"a4a148161341bf9b","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:26:47.240252Z","remoteAddr":"10.0.69.12","method":"GET","path":"/api/v2/search","protocol":"HTTP/1.1","statusCode":200,"bytesSent":3896,"latencyMs":181.23,"userAgent":"k6/0.49.0","referer":"-","traceId":"d84cecb4ece3e499027c32b866b85e00","spanId":"5ff24da307a615f0","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:27:47.240252Z","remoteAddr":"10.0.77.32","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13459,"latencyMs":71.63,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"71dfdda4a672a18a60435ff0ffa22367","spanId":"21536718c43f4d53","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:28:47.240252Z","remoteAddr":"10.3.84.19","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":32,"latencyMs":3.69,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"df223428bfb9355cb5607b05c3848e14","spanId":"0ac4068071db4173","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:29:47.240252Z","remoteAddr":"10.0.12.133","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1934,"latencyMs":47.4,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"bb618ffec682f8a9bd1d369a6449626a","spanId":"ff573c08dfc37799","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:30:47.240252Z","remoteAddr":"10.3.180.169","method":"GET","path":"/metrics","protocol":"HTTP/1.1","statusCode":200,"bytesSent":7349,"latencyMs":9.48,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"40f2abeabc7d5408d3bbcb4e2dc54dcf","spanId":"026083529f0a3712","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:31:47.240252Z","remoteAddr":"10.0.143.59","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":404,"bytesSent":394,"latencyMs":23.43,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"b9dbfa4f9e1af6fb55ac020a21781736","spanId":"a3f2cd913dd14aaf","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:32:47.240252Z","remoteAddr":"10.2.175.78","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":34,"latencyMs":3.46,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"a5740924aefe495b204c615970727105","spanId":"aa4e189d26b1d293","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:33:47.240252Z","remoteAddr":"10.0.103.230","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":33,"latencyMs":3.39,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"b4ca1f8fca89fff67482d2cc310c5b25","spanId":"d7f8d904988f1878","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:34:47.240252Z","remoteAddr":"10.1.42.169","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4414,"latencyMs":93.87,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"3142df592afa41b56c60793e274f8edd","spanId":"8eee7ea0951dc8f5","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:35:47.240252Z","remoteAddr":"10.2.176.205","method":"GET","path":"/metrics","protocol":"HTTP/1.1","statusCode":200,"bytesSent":6367,"latencyMs":8.63,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"a11d8766d261f089281c92166a3fa287","spanId":"e40a2e0266de8e11","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:36:47.240252Z","remoteAddr":"10.1.130.174","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13396,"latencyMs":59.29,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"005f1573bb451c4a698a4971dbbb0022","spanId":"75a5e7e5d5afc44b","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:37:47.240252Z","remoteAddr":"10.3.228.123","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":201,"bytesSent":220,"latencyMs":62.03,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"24f53a41623a2ac285f1b869e843b455","spanId":"9a12ba40c2c49619","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:38:47.240252Z","remoteAddr":"10.3.26.199","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13288,"latencyMs":61.07,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"3e48c44b0d27172f865cee49e734fced","spanId":"f70574eb55092e5b","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:39:47.240252Z","remoteAddr":"10.1.55.50","method":"POST","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":201,"bytesSent":428,"latencyMs":162.23,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"ec69d5be576fc7d74e4d6128bf97b7d1","spanId":"09afb168c4002999","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:40:47.240252Z","remoteAddr":"10.3.39.209","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4611,"latencyMs":94.15,"userAgent":"k6/0.49.0","referer":"-","traceId":"682cf0d1f72860d042d0f29519e4bf72","spanId":"a1a90a5a99810186","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:41:47.240252Z","remoteAddr":"10.0.28.62","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":500,"bytesSent":391,"latencyMs":3.68,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"96e5df1734988f50577ee3e194a678b0","spanId":"ace65d45c5b6cb54","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:42:47.240252Z","remoteAddr":"10.3.43.113","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1835,"latencyMs":39.76,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"6b4b3e1f5ab4fa9f9e1a5cb10f552956","spanId":"55a61eecaa904e35","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:43:47.240252Z","remoteAddr":"10.0.140.200","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4278,"latencyMs":110.08,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"04c343ec9c8970fc8e50e0ff2f8b80b5","spanId":"ad06bf12d44ea645","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:44:47.240252Z","remoteAddr":"10.3.41.238","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1055,"latencyMs":17.91,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"4d98fd2bfbe214418742335a97747a3a","spanId":"15f5f0b718e8a0b8","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:45:47.240252Z","remoteAddr":"10.1.70.94","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13598,"latencyMs":65.59,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"12318453d87c4e9a40eb0fa54d7cfcd0","spanId":"74fb508ff45b7d6d","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:46:47.240252Z","remoteAddr":"10.2.16.175","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4515,"latencyMs":85.54,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"968fbad0c61da2632215e0486ef3e6c9","spanId":"0425fe7a7e7357d0","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:47:47.240252Z","remoteAddr":"10.0.62.27","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":201,"bytesSent":235,"latencyMs":74.13,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"a7faab50cd6b98a365eb1f82f24b8a9c","spanId":"c6b22dead7249a10","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:48:47.240252Z","remoteAddr":"10.2.126.190","method":"GET","path":"/metrics","protocol":"HTTP/1.1","statusCode":200,"bytesSent":6365,"latencyMs":8.86,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"848e3fcdf6e67e935cbbce7e48517882","spanId":"178bdef464ebdf17","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:49:47.240252Z","remoteAddr":"10.2.39.149","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1842,"latencyMs":45.82,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"7311c7448c3e79d22a3d447cf11f1229","spanId":"cbb4d26251ad896e","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:50:47.240252Z","remoteAddr":"10.0.141.204","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13615,"latencyMs":62.5,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"15799da795821bcfd68fa4b4c473fdde","spanId":"c9bc88dfcab7d4d8","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:51:47.240252Z","remoteAddr":"10.0.40.207","method":"POST","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":201,"bytesSent":381,"latencyMs":121.98,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"b49b3fd814cff228f83c239e1542a058","spanId":"81b87191a360072a","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:52:47.240252Z","remoteAddr":"10.3.191.193","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":404,"bytesSent":348,"latencyMs":64.4,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"780580d3691e86ec58e8447a575aaa62","spanId":"236e0c43bd5e6aaa","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:53:47.240252Z","remoteAddr":"10.3.16.211","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1809,"latencyMs":36.16,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"438658bee01564acbf99f7a99288a066","spanId":"0a75ff2e5fa6f4a2","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:54:47.240252Z","remoteAddr":"10.2.11.41","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":744,"latencyMs":25.15,"userAgent":"k6/0.49.0","referer":"-","traceId":"72b314ceb149d3abc67542d5754bd863","spanId":"484bcc0b1c569012","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:55:47.240252Z","remoteAddr":"10.3.77.188","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":32,"latencyMs":3.66,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"b63d04fac99ba387ec1133f35596b92e","spanId":"c0f8e672b26a8913","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:56:47.240252Z","remoteAddr":"10.0.126.217","method":"POST","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":201,"bytesSent":408,"latencyMs":146.61,"userAgent":"k6/0.49.0","referer":"-","traceId":"88487ea52fa25b2713443d1b5c210bbe","spanId":"d48a9d8f5f7d2900","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:57:47.240252Z","remoteAddr":"10.1.14.36","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1048,"latencyMs":22.09,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"f9e73503999e81c36c6ae159ec02f3fb","spanId":"0d0cd5f2272ecf2b","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:58:47.240252Z","remoteAddr":"10.1.41.72","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":500,"bytesSent":160,"latencyMs":65.03,"userAgent":"k6/0.49.0","referer":"-","traceId":"7aa071a1a6ff762accf53fe80dd220a3","spanId":"3dc38777acf6c2c1","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:59:47.240252Z","remoteAddr":"10.0.68.229","method":"DELETE","path":"/api/v1/sessions/{id}","protocol":"HTTP/1.1","statusCode":204,"bytesSent":0,"latencyMs":16.32,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"b5edb883616521d2e01266c7b8510f68","spanId":"4d1ed4af2d272868","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:00:47.240252Z","remoteAddr":"10.1.216.177","method":"DELETE","path":"/api/v1/sessions/{id}","protocol":"HTTP/1.1","statusCode":204,"bytesSent":0,"latencyMs":16.81,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"6d5bdfca104c1e014e63341803093396","spanId":"164c3ef23bf4e80f","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:01:47.240252Z","remoteAddr":"10.0.59.85","method":"POST","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":201,"bytesSent":395,"latencyMs":132,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"c1244afa6f392a85cf2de72abe1a9941","spanId":"4231e30bd52c9406","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:02:47.240252Z","remoteAddr":"10.0.205.249","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":32,"latencyMs":3.5,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"f669d2d4f24e7ac25ad88abc2ad62e7e","spanId":"d1be44fee09f8456","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:03:47.240252Z","remoteAddr":"10.2.253.197","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":12135,"latencyMs":81.13,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"1406a034dbcccf71c530569c8d5444e8","spanId":"b869dd58d5243aa2","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:04:47.240252Z","remoteAddr":"10.2.30.96","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":732,"latencyMs":26.59,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"6ec4eea7fcf02d5795588f68329423c3","spanId":"1a6ef68a8ad7aff0","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:05:47.240252Z","remoteAddr":"10.1.26.9","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1983,"latencyMs":48.62,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"cc4e69fc4afe4ff6454f9da1780185c0","spanId":"17998a4ce17dd695","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:06:47.240252Z","remoteAddr":"10.2.110.79","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":12824,"latencyMs":70.08,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"93d1f6537318b080e2cf738a634061fd","spanId":"d7a88c496362ff29","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:07:47.240252Z","remoteAddr":"10.2.251.178","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":691,"latencyMs":23.67,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"0785e6ef92d480f980c123575338dc86","spanId":"f81fb655e4bf8816","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:08:47.240252Z","remoteAddr":"10.1.240.252","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":704,"latencyMs":29.54,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"9d2ad542604bef5888771e4fe2d64a69","spanId":"40d5eeb504181458","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:09:47.240252Z","remoteAddr":"10.1.208.242","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":2009,"latencyMs":46.53,"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0","referer":"-","traceId":"9ef42d902f6cf2cc6bc265e1744d3ac8","spanId":"d5d588745aa581a5","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:10:47.240252Z","remoteAddr":"10.1.80.130","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13551,"latencyMs":68.86,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"6ef9cff418e3890ea2b3495667b107d7","spanId":"0852c833100fe685","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:11:47.240252Z","remoteAddr":"10.1.22.220","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1010,"latencyMs":20.35,"userAgent":"k6/0.49.0","referer":"-","traceId":"0dd9e85fd4bc0fc6a5f7dae06cb0cbaa","spanId":"1a5441380f629380","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:12:47.240252Z","remoteAddr":"10.2.93.131","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4939,"latencyMs":93.86,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"37e3a175558ab6f9443980f1415944a1","spanId":"a11f7b4c429d2168","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:13:47.240252Z","remoteAddr":"10.1.129.99","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1056,"latencyMs":19.83,"userAgent":"k6/0.49.0","referer":"-","traceId":"0637b4126f6d831e4323e1718819e255","spanId":"84f39c6f26f5e66f","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:14:47.240252Z","remoteAddr":"10.1.116.146","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":37,"latencyMs":3.57,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"ec910f8f75cc2cf860e93b9e394e83af","spanId":"62d3b0de2c702883","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:15:47.240252Z","remoteAddr":"10.2.128.113","method":"POST","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":400,"bytesSent":326,"latencyMs":139.11,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"16b09df2c13b926ff9151c3f9a35d042","spanId":"81f2ea172340d0aa","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:16:47.240252Z","remoteAddr":"10.0.254.48","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":422,"bytesSent":218,"latencyMs":84.81,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"d691d10b099fb240a500978b0a788e22","spanId":"e79f28c494e014fb","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:17:47.240252Z","remoteAddr":"10.0.246.79","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":2152,"latencyMs":50.63,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"3103708d7c27f072af2ddcc41e2f2994","spanId":"845e133d9fd4104d","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:18:47.240252Z","remoteAddr":"10.1.247.229","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1921,"latencyMs":43.04,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"50cd6a422afb7bf4edbc88f5435209c7","spanId":"2aa766719607ec2d","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:19:47.240252Z","remoteAddr":"10.1.238.212","method":"POST","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":500,"bytesSent":313,"latencyMs":130.88,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"c28f035c3af74fba221fc732a0158e0b","spanId":"5ff8bce01f2b6041","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:20:47.240252Z","remoteAddr":"10.1.192.32","method":"GET","path":"/api/v1/products","protocol":"HTTP/1.1","statusCode":200,"bytesSent":13264,"latencyMs":57.91,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"675da2afb5cc4bd7d047b9f8ee998a1f","spanId":"57e136764d6f5b4b","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:21:47.240252Z","remoteAddr":"10.0.192.164","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":201,"bytesSent":259,"latencyMs":72.97,"userAgent":"k6/0.49.0","referer":"-","traceId":"387039a3740cb5f3201ad1c4c155bc02","spanId":"82780ec2c1cb50af","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:22:47.240252Z","remoteAddr":"10.0.184.177","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1968,"latencyMs":49.58,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"00fce58b20ff79a724545ea009f0e18a","spanId":"d28006c8eff17f23","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:23:47.240252Z","remoteAddr":"10.3.29.96","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":968,"latencyMs":23.54,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"0ad9fbdab66468b46951ba6be41b0461","spanId":"73cd16ff9d98a242","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:24:47.240252Z","remoteAddr":"10.1.239.126","method":"DELETE","path":"/api/v1/sessions/{id}","protocol":"HTTP/1.1","statusCode":204,"bytesSent":0,"latencyMs":20.19,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"9794d891c49ea3932de340c9d9b2d9dd","spanId":"38b5306adf0d77f0","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:25:47.240252Z","remoteAddr":"10.0.239.76","method":"GET","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":404,"bytesSent":152,"latencyMs":50.66,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"4a9d8ad393a647d0eb59105cfbde8996","spanId":"aec11b89afd78253","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:26:47.240252Z","remoteAddr":"10.3.73.10","method":"DELETE","path":"/api/v1/sessions/{id}","protocol":"HTTP/1.1","statusCode":204,"bytesSent":0,"latencyMs":19.18,"userAgent":"k6/0.49.0","referer":"-","traceId":"3f5fc7c9c80d8b2bac1958a9297be997","spanId":"e981caeec2f4ef89","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:27:47.240252Z","remoteAddr":"10.0.255.205","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":35,"latencyMs":3.54,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"6ea94224fe5cbab80b6efa279266e88b","spanId":"108bf1f3229df16a","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:28:47.240252Z","remoteAddr":"10.0.3.25","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4447,"latencyMs":90.27,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"8f84d51cacdee1e066e40dfe320ea3f0","spanId":"4fed9f14a6e1208f","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:29:47.240252Z","remoteAddr":"10.2.247.251","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":654,"latencyMs":22.87,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"196b7ea4fbb986b90da461b671886657","spanId":"bdf00d313f049dd5","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:30:47.240252Z","remoteAddr":"10.1.74.59","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1004,"latencyMs":18.9,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"be5e7a491cddca061a42a7315f58bd2e","spanId":"0d55527a666ed75f","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:31:47.240252Z","remoteAddr":"10.3.230.81","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":400,"bytesSent":292,"latencyMs":24.88,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"76b44d0fa47d5a26ce22d047b90c17d0","spanId":"c9555146d0ca3242","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:32:47.240252Z","remoteAddr":"10.0.38.236","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":919,"latencyMs":20.17,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"739d3b374dfc7a86e625eb2e1785855a","spanId":"d0601b06a4d3954d","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:33:47.240252Z","remoteAddr":"10.1.2.146","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1056,"latencyMs":18.35,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"c8825dde76940f79128d0ad343d36175","spanId":"0d985e45ae2c4e8d","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:34:47.240252Z","remoteAddr":"10.3.108.20","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1011,"latencyMs":19.31,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"dd8226369321e24de70532cb9304fd9f","spanId":"d07ee65a34c86bbe","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:35:47.240252Z","remoteAddr":"10.0.160.242","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1025,"latencyMs":21.07,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"feffda8e0954f8beedef6d485956b837","spanId":"b1d0e4345bd735a1","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:36:47.240252Z","remoteAddr":"10.3.39.60","method":"GET","path":"/metrics","protocol":"HTTP/1.1","statusCode":200,"bytesSent":7410,"latencyMs":9.53,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"218c966224b5073935e4c475bf11b332","spanId":"7f603982313ed3cc","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:37:47.240252Z","remoteAddr":"10.0.233.78","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":709,"latencyMs":23.8,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"eb17f2f31e9d5f58d1d7e4fc98e94a8f","spanId":"6bacfff147a494e2","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:38:47.240252Z","remoteAddr":"10.1.201.59","method":"GET","path":"/metrics","protocol":"HTTP/1.1","statusCode":200,"bytesSent":6403,"latencyMs":8,"userAgent":"python-httpx/0.26.0","referer":"-","traceId":"e873a999c2bcf325d2b922760b6724c5","spanId":"b31f3117bfbab927","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:39:47.240252Z","remoteAddr":"10.3.126.186","method":"GET","path":"/api/v1/orders","protocol":"HTTP/1.1","statusCode":200,"bytesSent":4631,"latencyMs":81.04,"userAgent":"okhttp/4.11.0","referer":"-","traceId":"359e83ba85da1ed47e5ba3c56c2175e4","spanId":"c448179ad6cf3c83","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:40:47.240252Z","remoteAddr":"10.2.189.45","method":"GET","path":"/api/v1/products/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":1034,"latencyMs":20.74,"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0","referer":"-","traceId":"1e94cd269e6b317afc1ce5e26680253d","spanId":"08c9e8b539c8283a","upstream":"backend-02:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:41:47.240252Z","remoteAddr":"10.0.27.44","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":32,"latencyMs":3.22,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 Safari/605.1.15","referer":"-","traceId":"6b836b55bd315c99df15c26c5fdb5058","spanId":"7cc125a721dd1034","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:42:47.240252Z","remoteAddr":"10.2.64.250","method":"POST","path":"/api/v1/users","protocol":"HTTP/1.1","statusCode":201,"bytesSent":264,"latencyMs":62.16,"userAgent":"k6/0.49.0","referer":"-","traceId":"4ae6cd79c8f10948d777dce57028df67","spanId":"ef40955445431e5a","upstream":"backend-01:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:43:47.240252Z","remoteAddr":"10.0.124.61","method":"GET","path":"/api/v1/users/{id}","protocol":"HTTP/1.1","statusCode":200,"bytesSent":756,"latencyMs":28.7,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"e9219eb605defe15f38514c5d39f9be2","spanId":"5fbf8eb9accc9c07","upstream":"backend-03:8080"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:44:47.240252Z","remoteAddr":"10.2.178.96","method":"GET","path":"/health","protocol":"HTTP/1.1","statusCode":200,"bytesSent":36,"latencyMs":3.06,"userAgent":"Go-http-client/2.0","referer":"-","traceId":"c3bb7ee920221384925b064087de1865","spanId":"3e9a2c4f78a1603c","upstream":"backend-01:8080"}
+

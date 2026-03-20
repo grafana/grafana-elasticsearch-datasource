@@ -1,14 +1,43 @@
 apiVersion: 1
 
 datasources:
-  - name: 'elasticsearch'
-    type: 'grafana-elasticsearch-datasource'
+  - name: elasticsearch
+    uid: elasticsearch-e2e
+    type: elasticsearch
     access: proxy
-    isDefault: false
+    url: http://elasticsearch:9200
+    isDefault: true
     orgId: 1
     version: 1
     editable: true
     jsonData:
-      path: '/resources'
-    secureJsonData:
-      apiKey: 'api-key'
+      index: '[logs-]YYYY.MM.DD'
+      timeField: '@timestamp'
+      interval: Daily
+      logMessageField: message
+      logLevelField: fields.level
+
+  - name: httplogs
+    uid: httplogs-e2e
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    orgId: 1
+    version: 1
+    editable: true
+    jsonData:
+      index: httplogs
+      timeField: '@timestamp'
+      logMessageField: path
+
+  - name: infra
+    uid: infra-e2e
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    orgId: 1
+    version: 1
+    editable: true
+    jsonData:
+      index: infra
+      timeField: '@timestamp'

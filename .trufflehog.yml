@@ -1,0 +1,7 @@
+# Trufflehog configuration
+# https://github.com/trufflesecurity/trufflehog
+
+exclude_paths:
+  # Test fixture files contain synthetic traceId/spanId hex strings that
+  # trigger false positives. These files hold no real credentials.
+  - tests/e2e/fixtures/
