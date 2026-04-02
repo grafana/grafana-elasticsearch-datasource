@@ -5,7 +5,7 @@
 - Chore: Add linux/s390x and windows/arm64 targets to build [#220](https://github.com/grafana/grafana-elasticsearch-datasource/pull/220)
 - Dependency updates:
   - Fix(deps): Update module github.com/grafana/grafana-plugin-sdk-go to v0.291.0 [#222](https://github.com/grafana/grafana-elasticsearch-datasource/pull/222)
-  - Chore: Update dependency @grafana/data to v13.0.0-23907099936 [#229](https://github.com/grafana/grafana-elasticsearch-datasource/pull/229) and previous versions
+  - Chore: Update dependency @grafana/data to v13.0.0-23914290240 [#233](https://github.com/grafana/grafana-elasticsearch-datasource/pull/233) and previous versions
 
 ## 12.5.2
 
