@@ -71,6 +71,43 @@ describe('ElasticsearchVariableUtils', () => {
 
       expect(result.query).toBe('');
     });
+
+    it('should convert legacy {"find":"terms"} query to raw DSL', () => {
+      const result = migrateVariableQuery('{"find":"terms","field":"Platform.keyword"}');
+
+      expect(result.queryType).toBe('dsl');
+      expect(result.editorType).toBe('code');
+      const dsl = JSON.parse(result.query!);
+      expect(dsl.aggs['1'].terms.field).toBe('Platform.keyword');
+      expect(dsl.aggs['1'].terms.size).toBe(500);
+      expect(dsl.aggs['1'].terms.order).toEqual({ _key: 'asc' });
+      expect(dsl.query).toBeUndefined();
+    });
+
+    it('should preserve query filter from legacy {"find":"terms"} query in DSL', () => {
+      const result = migrateVariableQuery(
+        '{"find":"terms","field":"env","query":"region:eu-*","size":100,"order":"desc"}'
+      );
+
+      expect(result.queryType).toBe('dsl');
+      const dsl = JSON.parse(result.query!);
+      expect(dsl.aggs['1'].terms.field).toBe('env');
+      expect(dsl.aggs['1'].terms.size).toBe(100);
+      expect(dsl.aggs['1'].terms.order).toEqual({ _key: 'desc' });
+      expect(dsl.query.bool.filter[0].query_string.query).toBe('region:eu-*');
+    });
+
+    it('should fall through to raw_document for unrecognised JSON', () => {
+      const result = migrateVariableQuery('{"someOtherKey":"value"}');
+
+      expect(result.metrics).toEqual([{ type: 'raw_document', id: '1' }]);
+    });
+
+    it('should fall through to raw_document for plain Lucene strings', () => {
+      const result = migrateVariableQuery('status:active AND region:eu-*');
+
+      expect(result.metrics).toEqual([{ type: 'raw_document', id: '1' }]);
+    });
   });
 
   describe('convertFieldsToVariableFields', () => {
