@@ -31,6 +31,7 @@ export class ElasticsearchVariableSupport<
     if (request.targets.length < 1) {
       throw new Error('no variable query found');
     }
+
     const updatedQuery = migrateVariableQuery(request.targets[0]);
 
     if (updatedQuery.queryType === 'legacy_variable') {
