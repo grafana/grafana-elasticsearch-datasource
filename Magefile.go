@@ -28,3 +28,15 @@ func LinuxS390X() error {
 func WindowsARM64() error {
 	return build.Build{}.Custom("windows", "arm64")
 }
+
+// Test() wraps the plugin SDK's Test to make it accessible since we're
+// no longer using mage:import
+func Test() error {
+	return build.Test()
+}
+
+// TestRace() wraps the plugin SDK's Test to make it accessible since we're
+// no longer using mage:import
+func TestRace() error {
+	return build.TestRace()
+}
