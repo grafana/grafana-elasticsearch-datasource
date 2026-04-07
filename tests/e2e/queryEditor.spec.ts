@@ -1,5 +1,5 @@
 import { expect, test } from '@grafana/plugin-e2e';
-import { type Page, type Response } from '@playwright/test';
+import { type Locator, type Page, type Response } from '@playwright/test';
 
 import { QueryType } from '../src/types';
 
@@ -21,6 +21,15 @@ const QUERY_TYPE_LABELS: Array<{ value: QueryType; label: string }> = [
 const FIXTURE_FROM_ISO = '2026-03-17T21:00:00.000Z';
 const FIXTURE_TO_ISO = '2026-03-18T01:00:00.000Z';
 
+// Grafana 13 migrated query editor row selectors from aria-label to data-testid
+// (grafana/grafana#121784). This helper matches both so tests work across versions
+// until @grafana/plugin-e2e ships a fix and this repo upgrades.
+function getQueryEditorRow(page: Page, refId: string): Locator {
+  return page
+    .locator('[data-testid="data-testid Query editor row"], [aria-label="Query editor row"]')
+    .filter({ has: page.locator(`[data-testid="data-testid Query editor row title ${refId}"], [aria-label="Query editor row title ${refId}"]`) });
+}
+
 // All tests select the datasource explicitly since other test suites may change state.
 // The elasticsearch datasource is provisioned as the default, so it is always available.
 test.describe('Query editor', () => {
@@ -35,8 +44,8 @@ test.describe('Query editor', () => {
     test(
       'smoke: renders all query type options',
       { tag: '@plugins' },
-      async ({ explorePage }) => {
-        const queryRow = explorePage.getQueryEditorRow('A');
+      async ({ page }) => {
+        const queryRow = getQueryEditorRow(page, 'A');
 
         for (const { label } of QUERY_TYPE_LABELS) {
           await expect(queryRow.getByRole('radio', { name: label })).toBeVisible();
@@ -44,8 +53,8 @@ test.describe('Query editor', () => {
       }
     );
 
-    test('renders Lucene query field in all modes', async ({ explorePage }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+    test('renders Lucene query field in all modes', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
 
       for (const { label } of QUERY_TYPE_LABELS) {
         await queryRow.getByRole('radio', { name: label }).click();
@@ -55,30 +64,30 @@ test.describe('Query editor', () => {
   });
 
   test.describe('Metrics mode', () => {
-    test.beforeEach(async ({ explorePage }) => {
-      await explorePage.getQueryEditorRow('A').getByRole('radio', { name: 'Metrics' }).click();
+    test.beforeEach(async ({ page }) => {
+      await getQueryEditorRow(page, 'A').getByRole('radio', { name: 'Metrics' }).click();
     });
 
-    test('shows Metric row with default Count metric', async ({ explorePage }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+    test('shows Metric row with default Count metric', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
       await expect(queryRow.getByText('Metric (1)')).toBeVisible();
       await expect(queryRow.getByRole('button', { name: 'Count' })).toBeVisible();
     });
 
-    test('shows Group By row with default Date Histogram on @timestamp', async ({ explorePage }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+    test('shows Group By row with default Date Histogram on @timestamp', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
       await expect(queryRow.getByText('Group By')).toBeVisible();
       await expect(queryRow.getByRole('button', { name: 'Date Histogram' })).toBeVisible();
       await expect(queryRow.getByRole('button', { name: '@timestamp' })).toBeVisible();
     });
 
-    test('shows Alias field', async ({ explorePage }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+    test('shows Alias field', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
       await expect(queryRow.getByRole('textbox', { name: 'Alias' })).toBeVisible();
     });
 
-    test('can enter a Lucene query string', async ({ explorePage, page }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+    test('can enter a Lucene query string', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
       // The Lucene query input is a CodeMirror contenteditable — the first textbox in the row
       const queryField = queryRow.getByRole('textbox').first();
       await expect(queryField).toBeVisible();
@@ -89,50 +98,50 @@ test.describe('Query editor', () => {
   });
 
   test.describe('Logs mode', () => {
-    test.beforeEach(async ({ explorePage }) => {
-      await explorePage.getQueryEditorRow('A').getByRole('radio', { name: 'Logs' }).click();
+    test.beforeEach(async ({ page }) => {
+      await getQueryEditorRow(page, 'A').getByRole('radio', { name: 'Logs' }).click();
     });
 
-    test('hides the Alias field', async ({ explorePage }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+    test('hides the Alias field', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
       await expect(queryRow.getByRole('textbox', { name: 'Alias' })).not.toBeVisible();
     });
 
-    test('hides the Group By row', async ({ explorePage }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+    test('hides the Group By row', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
       await expect(queryRow.getByText('Group By')).not.toBeVisible();
     });
 
-    test('hides the Metric row', async ({ explorePage }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+    test('hides the Metric row', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
       await expect(queryRow.getByText('Metric (1)')).not.toBeVisible();
     });
   });
 
   test.describe('Raw Data mode', () => {
-    test.beforeEach(async ({ explorePage }) => {
-      await explorePage.getQueryEditorRow('A').getByRole('radio', { name: 'Raw Data' }).click();
+    test.beforeEach(async ({ page }) => {
+      await getQueryEditorRow(page, 'A').getByRole('radio', { name: 'Raw Data' }).click();
     });
 
-    test('hides the Alias field', async ({ explorePage }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+    test('hides the Alias field', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
       await expect(queryRow.getByRole('textbox', { name: 'Alias' })).not.toBeVisible();
     });
 
-    test('hides the Group By row', async ({ explorePage }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+    test('hides the Group By row', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
       await expect(queryRow.getByText('Group By')).not.toBeVisible();
     });
 
-    test('hides the Metric row', async ({ explorePage }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+    test('hides the Metric row', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
       await expect(queryRow.getByText('Metric (1)')).not.toBeVisible();
     });
   });
 
   test.describe('query execution', () => {
     test('executes a Metrics query and receives a response', async ({ explorePage, page }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+      const queryRow = getQueryEditorRow(page, 'A');
       // Metrics is the default mode — clicking it again won't trigger an auto-query.
       // Switch to Logs first so that switching back to Metrics fires an auto-query request.
       await queryRow.getByRole('radio', { name: 'Logs' }).click();
@@ -147,7 +156,7 @@ test.describe('Query editor', () => {
     });
 
     test('executes a Logs query and receives a response', async ({ explorePage, page }) => {
-      const queryRow = explorePage.getQueryEditorRow('A');
+      const queryRow = getQueryEditorRow(page, 'A');
       // Set up mock and waitForResponse BEFORE the mode switch so the auto-query is caught.
       await explorePage.mockQueryDataResponse({ results: { A: { frames: [] } } });
       const responsePromise = page.waitForResponse((resp) => resp.url().includes('/api/ds/query'));
