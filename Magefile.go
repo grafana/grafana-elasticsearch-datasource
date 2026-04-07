@@ -4,17 +4,17 @@
 package main
 
 import (
-	// mage:import
 	build "github.com/grafana/grafana-plugin-sdk-go/build"
 	"github.com/magefile/mage/mg"
 )
 
 // Default configures the default target.
-var Default = BuildAllPlus
+var Default = BuildAll
 
-// BuildAllPlus builds all default targets plus linux/s390x and windows/arm64,
-// to support bundling with Grafana builds on those platforms.
-func BuildAllPlus() {
+// BuildAll builds all default targets plus linux/s390x and windows/arm64,
+// to support bundling with Grafana builds on those platforms. This overrides
+// the buildAll from grafana-plugin-sdk-go.
+func BuildAll() {
 	b := build.Build{}
 	mg.Deps(b.Linux, b.Windows, b.Darwin, b.DarwinARM64, b.LinuxARM64, b.LinuxARM, LinuxS390X, WindowsARM64)
 }
