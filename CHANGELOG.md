@@ -1,5 +1,15 @@
 # Changelog
 
+## 12.5.4
+
+- Build: Override plugin sdk's BuildAll to enable extra platforms [#245](https://github.com/grafana/grafana-elasticsearch-datasource/pull/245)
+- Chore: Disable splashscreen to fix e2e tests [#246](https://github.com/grafana/grafana-elasticsearch-datasource/pull/246)
+- Dependency updates:
+  - Chore: Update dependency @grafana/data to v13.0.0-24126890812 [#250](https://github.com/grafana/grafana-elasticsearch-datasource/pull/250) and previous versions
+  - Chore: Update dependency @elastic/esql to v1.7.0 [#230](https://github.com/grafana/grafana-elasticsearch-datasource/pull/230)
+  - Chore: Update swc monorepo [#249](https://github.com/grafana/grafana-elasticsearch-datasource/pull/249)
+  - Fix(deps): Update module github.com/magefile/mage to v1.17.0 [#237](https://github.com/grafana/grafana-elasticsearch-datasource/pull/237)
+
 ## 12.5.3
 
 - Chore: Add linux/s390x and windows/arm64 targets to build [#220](https://github.com/grafana/grafana-elasticsearch-datasource/pull/220)
