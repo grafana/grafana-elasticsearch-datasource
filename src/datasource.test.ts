@@ -1550,7 +1550,7 @@ describe('ElasticDatasource', () => {
     });
   });
 
-  describe('addTimeRangeToEsqlQuery', () => {
+  describe('applyTemplateVariables for ES|QL queries adds time range filtering', () => {
     const fromISO = '2024-03-23T00:00:00.000Z';
     const toISO = '2024-03-24T00:00:00.000Z';
 
@@ -1608,7 +1608,7 @@ describe('ElasticDatasource', () => {
         { refId: 'A', query: 'FROM test-index | LIMIT 10', queryType: 'esql' },
         {}
       );
-      expect(result.query).toMatch(/FROM test-index \| WHERE @timestamp >=.*AND @timestamp <=.*\| LIMIT 10/);
+      expect(result.query).toMatch(/FROM test-index[\s|]+WHERE @timestamp >=.*AND @timestamp <=[\s\S]*LIMIT 10/s);
     });
 
     it('should insert time filter after FROM when WHERE exists on a different field', () => {
@@ -1617,7 +1617,7 @@ describe('ElasticDatasource', () => {
         { refId: 'A', query: 'FROM test-index | WHERE status == 200 | LIMIT 10', queryType: 'esql' },
         {}
       );
-      expect(result.query).toMatch(/FROM test-index \| WHERE @timestamp >=.*\| WHERE status == 200/);
+      expect(result.query).toMatch(/FROM test-index[\s\S]*WHERE @timestamp >=[\s\S]*WHERE status == 200/s);
     });
 
     it('should NOT add time filter when WHERE clause references the time field', () => {
@@ -1650,7 +1650,7 @@ describe('ElasticDatasource', () => {
         },
         {}
       );
-      expect(result.query).toMatch(/TS metrics-generic.otel-default \| WHERE @timestamp >=.*\| STATS/);
+      expect(result.query).toMatch(/TS metrics-generic.otel-default[\s\S]*WHERE @timestamp >=[\s\S]*STATS/s);
     });
 
     it('should NOT add time filter to TS query when WHERE on time field already exists', () => {
@@ -1667,6 +1667,14 @@ describe('ElasticDatasource', () => {
       expect(whereCount).toBe(1);
     });
 
+    it('should preserve comments when inserting time filter', () => {
+      const testDs = createDsWithTimeRange();
+      const query = 'FROM test-index /* my comment */ | LIMIT 10';
+      const result = testDs.applyTemplateVariables({ refId: 'A', query, queryType: 'esql' }, {});
+      expect(result.query).toContain('/* my comment */');
+      expect(result.query).toContain('WHERE @timestamp >=');
+    });
+
     it('should return empty query unchanged', () => {
       const testDs = createDsWithTimeRange();
       const result = testDs.applyTemplateVariables({ refId: 'A', query: '', queryType: 'esql' }, {});
@@ -1678,6 +1686,15 @@ describe('ElasticDatasource', () => {
       const input = '}{}{[';
       const result = testDs.applyTemplateVariables({ refId: 'A', query: input, queryType: 'esql' }, {});
       expect(result.query).toBe(input);
+    });
+
+    it('should store parse errors when ES|QL query has syntax errors', () => {
+      const testDs = createDsWithTimeRange();
+      const input = '}{}{[';
+      testDs.applyTemplateVariables({ refId: 'A', query: input, queryType: 'esql' }, {});
+      const errors = (testDs as any).esqlParseErrors.get('A');
+      expect(errors).toBeDefined();
+      expect(errors.length).toBeGreaterThan(0);
     });
 
     it('should contain the time macro placeholders before templateSrv resolves them', () => {
