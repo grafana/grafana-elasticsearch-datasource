@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { mutate, Parser, Walker, WrappingPrettyPrinter } from '@elastic/esql';
+=======
+import { BasicPrettyPrinter, mutate, Parser, Walker } from '@elastic/esql';
+>>>>>>> bbe95ac9d9073587f66e3c7f2de4ad84f721efff
 import { map as _map, cloneDeep, isNumber, isObject, isString } from 'lodash';
 import { Observable, from, generate, lastValueFrom, of } from 'rxjs';
 import { catchError, first, map, mergeMap, skipWhile, tap, throwIfEmpty } from 'rxjs/operators';
@@ -1216,8 +1220,13 @@ export class ElasticDatasource
       // Insert right after FROM/TS so the time filter runs before LIMIT or other commands
       mutate.generic.commands.insert(root, whereCmd, headerCmdIndex + 1);
 
+<<<<<<< HEAD
       return WrappingPrettyPrinter.print(root);
     } catch (e) {
+=======
+      return BasicPrettyPrinter.print(root);
+    } catch {
+>>>>>>> bbe95ac9d9073587f66e3c7f2de4ad84f721efff
       return esqlQuery;
     }
   }

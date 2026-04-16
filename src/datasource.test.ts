@@ -1591,9 +1591,7 @@ describe('ElasticDatasource', () => {
           if (!text) {
             return '';
           }
-          return text
-            .replace(/\$\{__from:date:iso\}/g, fromISO)
-            .replace(/\$\{__to:date:iso\}/g, toISO);
+          return text.replace(/\$\{__from:date:iso\}/g, fromISO).replace(/\$\{__to:date:iso\}/g, toISO);
         },
         containsTemplate: (text?: string) => text?.includes('$') ?? false,
         updateTimeRange: () => {},
@@ -1645,7 +1643,8 @@ describe('ElasticDatasource', () => {
       const result = testDs.applyTemplateVariables(
         {
           refId: 'A',
-          query: 'TS metrics-generic.otel-default | STATS AVG(cpu) BY BUCKET(@timestamp, 100, "${__from:date:iso}", "${__to:date:iso}")',
+          query:
+            'TS metrics-generic.otel-default | STATS AVG(cpu) BY BUCKET(@timestamp, 100, "${__from:date:iso}", "${__to:date:iso}")',
           queryType: 'esql',
         },
         {}
@@ -1740,10 +1739,7 @@ describe('ElasticDatasource', () => {
       };
 
       const testDs = new ElasticDatasource(instanceSettings as any, templateSrv as any);
-      testDs.applyTemplateVariables(
-        { refId: 'A', query: 'FROM test-index | LIMIT 10', queryType: 'esql' },
-        {}
-      );
+      testDs.applyTemplateVariables({ refId: 'A', query: 'FROM test-index | LIMIT 10', queryType: 'esql' }, {});
       const finalReplaceCall = replaceCalls[replaceCalls.length - 1];
       expect(finalReplaceCall).toContain('${__from:date:iso}');
       expect(finalReplaceCall).toContain('${__to:date:iso}');
