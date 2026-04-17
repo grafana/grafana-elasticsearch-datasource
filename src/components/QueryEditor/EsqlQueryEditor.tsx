@@ -32,7 +32,7 @@ function ensureESQL(monaco: Monaco) {
     provideDocumentFormattingEdits: (model) => {
       try {
         const source = model.getValue();
-        const { root, errors } = Parser.parse(source);
+        const { root, errors } = Parser.parse(source, { withFormatting: true });
 
         // Avoid rewriting text while the query is syntactically invalid.
         if (errors.length > 0) {
