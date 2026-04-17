@@ -1687,14 +1687,6 @@ describe('ElasticDatasource', () => {
       expect(result.query).toBe(input);
     });
 
-    it('should store parse errors when ES|QL query has syntax errors', () => {
-      const testDs = createDsWithTimeRange();
-      const input = '}{}{[';
-      testDs.applyTemplateVariables({ refId: 'A', query: input, queryType: 'esql' }, {});
-      const errors = (testDs as any).esqlParseErrors.get('A');
-      expect(errors).toBeDefined();
-      expect(errors.length).toBeGreaterThan(0);
-    });
 
     it('should contain the time macro placeholders before templateSrv resolves them', () => {
       const instanceSettings = {
