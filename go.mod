@@ -3,6 +3,7 @@ module github.com/grafana/grafana-elasticsearch-datasource
 go 1.26.7
 
 require (
+	github.com/elastic/go-elasticsearch/v8 v8.19.7
 	github.com/grafana/grafana-aws-sdk v1.5.3
 	github.com/grafana/grafana-plugin-sdk-go v0.296.3
 	github.com/grafana/macropro v1.0.2
@@ -38,6 +39,7 @@ require (
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.9.0 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
