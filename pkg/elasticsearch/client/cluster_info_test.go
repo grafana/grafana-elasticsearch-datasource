@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -34,7 +35,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, ts.Client(), ts.URL))
 
 		require.NoError(t, err)
 		require.NotNil(t, clusterInfo)
@@ -65,7 +66,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, ts.Client(), ts.URL))
 
 		require.NoError(t, err)
 		require.NotNil(t, clusterInfo)
@@ -74,7 +75,7 @@ func TestGetClusterInfo(t *testing.T) {
 	})
 
 	t.Run("Should return error when HTTP request fails", func(t *testing.T) {
-		clusterInfo, err := GetClusterInfo(http.DefaultClient, "http://invalid-url-that-does-not-exist.local:9999")
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, http.DefaultClient, "http://invalid-url-that-does-not-exist.local:9999"))
 
 		require.Error(t, err)
 		require.Equal(t, ClusterInfo{}, clusterInfo)
@@ -92,7 +93,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, ts.Client(), ts.URL))
 
 		require.Error(t, err)
 		require.Equal(t, ClusterInfo{}, clusterInfo)
@@ -113,7 +114,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, ts.Client(), ts.URL))
 
 		require.NoError(t, err)
 		require.Equal(t, ClusterInfo{}, clusterInfo)
@@ -132,11 +133,19 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, ts.Client(), ts.URL))
 
 		require.Error(t, err)
 		require.Equal(t, ClusterInfo{}, clusterInfo)
 		assert.Contains(t, err.Error(), "unexpected status code 401 getting ES cluster info")
+	})
+
+	t.Run("Should return error when elasticsearch client is nil", func(t *testing.T) {
+		clusterInfo, err := GetClusterInfo(context.Background(), nil)
+
+		require.Error(t, err)
+		require.Equal(t, ClusterInfo{}, clusterInfo)
+		assert.Contains(t, err.Error(), "elasticsearch client is required")
 	})
 }
 
