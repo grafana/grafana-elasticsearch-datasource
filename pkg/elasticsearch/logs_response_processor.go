@@ -25,7 +25,7 @@ func newLogsResponseProcessor(logger log.Logger) *logsResponseProcessor {
 }
 
 // processLogsResponse processes logs query responses
-func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, target *Query, configuredFields es.ConfiguredFields, queryRes *backend.DataResponse) error {
+func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, target *Query, configuredFields es.ConfiguredFields, dataplaneEnabled bool, queryRes *backend.DataResponse) error {
 	propNames := make(map[string]bool)
 	docs := make([]map[string]interface{}, len(res.Hits.Hits))
 	searchWords := make(map[string]bool)
@@ -101,9 +101,17 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 	sortedPropNames := sortPropNames(propNames, configuredFields, true)
 	fields := processDocsToDataFrameFields(docs, sortedPropNames, configuredFields)
 
+	if dataplaneEnabled {
+		canonical := buildLogLinesCanonicalFields(docs, configuredFields)
+		fields = append(canonical, fields...)
+	}
+
 	frames := data.Frames{}
 	frame := data.NewFrame("", fields...)
 	setPreferredVisType(frame, data.VisTypeLogs)
+	if dataplaneEnabled {
+		setLogLinesFrameMeta(frame)
+	}
 
 	var total int
 	if res.Hits.Total != nil {

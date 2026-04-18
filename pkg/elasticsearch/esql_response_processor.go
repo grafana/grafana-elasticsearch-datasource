@@ -20,7 +20,7 @@ const (
 
 // processEsqlLogsResponse processes ES|QL response for logs queries
 // Similar to how logs are processed in logs_response_processor.go
-func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configuredFields es.ConfiguredFields) (*backend.DataResponse, error) {
+func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configuredFields es.ConfiguredFields, dataplaneEnabled bool) (*backend.DataResponse, error) {
 	if response == nil || len(response.Columns) == 0 {
 		return &backend.DataResponse{
 			Frames: []*data.Frame{data.NewFrame(target.RefID)},
@@ -69,8 +69,16 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 	sortedPropNames := sortPropNames(propNames, configuredFields, true)
 	fields := processDocsToDataFrameFields(docs, sortedPropNames, configuredFields)
 
+	if dataplaneEnabled {
+		canonical := buildLogLinesCanonicalFields(docs, configuredFields)
+		fields = append(canonical, fields...)
+	}
+
 	frame := data.NewFrame(target.RefID, fields...)
 	setPreferredVisType(frame, data.VisTypeLogs)
+	if dataplaneEnabled {
+		setLogLinesFrameMeta(frame)
+	}
 
 	// Set logs metadata
 	limit := defaultSize
