@@ -140,10 +140,21 @@ func TestParseResolveResponse_InvalidJSON(t *testing.T) {
 	require.Error(t, err)
 }
 
+func newSchemaTestDatasourceInfo(t *testing.T, srv *httptest.Server) *es.DatasourceInfo {
+	t.Helper()
+	esClient, err := es.NewESClient(srv.Client(), srv.URL)
+	require.NoError(t, err)
+	return &es.DatasourceInfo{
+		URL:      srv.URL,
+		ESClient: esClient,
+	}
+}
+
 func TestListAllIndexNames_PrefersResolveOverCat(t *testing.T) {
 	var resolveCalls, catCalls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Elastic-Product", "Elasticsearch")
 		switch r.URL.Path {
 		case "/_resolve/index/*":
 			atomic.AddInt32(&resolveCalls, 1)
@@ -162,10 +173,7 @@ func TestListAllIndexNames_PrefersResolveOverCat(t *testing.T) {
 	defer srv.Close()
 
 	s := defaultSchemaSettings()
-	names, err := listAllIndexNames(context.Background(), &es.DatasourceInfo{
-		URL:        srv.URL,
-		HTTPClient: srv.Client(),
-	}, &s)
+	names, err := listAllIndexNames(context.Background(), newSchemaTestDatasourceInfo(t, srv), &s)
 	require.NoError(t, err)
 	require.Equal(t, []string{"logs-prod", "metrics", "metrics-current"}, names)
 	require.Equal(t, int32(1), atomic.LoadInt32(&resolveCalls))
@@ -176,6 +184,7 @@ func TestListAllIndexNames_FallsBackToCatWhenResolveFails(t *testing.T) {
 	var resolveCalls, catCalls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Elastic-Product", "Elasticsearch")
 		switch r.URL.Path {
 		case "/_resolve/index/*":
 			atomic.AddInt32(&resolveCalls, 1)
@@ -190,10 +199,7 @@ func TestListAllIndexNames_FallsBackToCatWhenResolveFails(t *testing.T) {
 	defer srv.Close()
 
 	s := defaultSchemaSettings()
-	names, err := listAllIndexNames(context.Background(), &es.DatasourceInfo{
-		URL:        srv.URL,
-		HTTPClient: srv.Client(),
-	}, &s)
+	names, err := listAllIndexNames(context.Background(), newSchemaTestDatasourceInfo(t, srv), &s)
 	require.NoError(t, err)
 	require.Equal(t, []string{"logs", "metrics"}, names)
 	require.Equal(t, int32(1), atomic.LoadInt32(&resolveCalls))
@@ -207,10 +213,7 @@ func TestListAllIndexNames_ErrorIncludesBothFailures(t *testing.T) {
 	defer srv.Close()
 
 	s := defaultSchemaSettings()
-	_, err := listAllIndexNames(context.Background(), &es.DatasourceInfo{
-		URL:        srv.URL,
-		HTTPClient: srv.Client(),
-	}, &s)
+	_, err := listAllIndexNames(context.Background(), newSchemaTestDatasourceInfo(t, srv), &s)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "resolve failed")
 	require.Contains(t, err.Error(), "cat fallback failed")
