@@ -29,9 +29,15 @@ func (rt *queryDataTestRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 		return nil, err
 	}
 
+	header := http.Header{}
+	// The go-elasticsearch client refuses to talk to a server that doesn't
+	// advertise itself via the X-Elastic-Product header. Emit it in tests so
+	// the product check inside the client library is satisfied.
+	header.Set("X-Elastic-Product", "Elasticsearch")
+
 	return &http.Response{
 		StatusCode: rt.statusCode,
-		Header:     http.Header{},
+		Header:     header,
 		Body:       io.NopCloser(bytes.NewReader(rt.body)),
 	}, nil
 }
@@ -41,6 +47,8 @@ func newFlowTestDsInfo(body []byte, statusCode int, requestCallback func(req *ht
 	client := http.Client{
 		Transport: &queryDataTestRoundTripper{body: body, statusCode: statusCode, requestCallback: requestCallback},
 	}
+
+	esClient, _ := es.NewESClient(&client, "http://localhost:9200")
 
 	configuredFields := es.ConfiguredFields{
 		TimeField:       "testtime",
@@ -53,7 +61,7 @@ func newFlowTestDsInfo(body []byte, statusCode int, requestCallback func(req *ht
 		Database:                   "[testdb-]YYYY.MM.DD",
 		ConfiguredFields:           configuredFields,
 		URL:                        "http://localhost:9200",
-		HTTPClient:                 &client,
+		ESClient:                   esClient,
 		MaxConcurrentShardRequests: 42,
 		IncludeFrozen:              false,
 	}
