@@ -52,7 +52,7 @@ func TestClient_ExecuteMultisearch(t *testing.T) {
 
 		ds := DatasourceInfo{
 			URL:                        ts.URL,
-			HTTPClient:                 ts.Client(),
+			ESClient:                   newTestESClient(t, ts.Client(), ts.URL),
 			Database:                   "[metrics-]YYYY.MM.DD",
 			ConfiguredFields:           configuredFields,
 			Interval:                   "Daily",
@@ -83,7 +83,8 @@ func TestClient_ExecuteMultisearch(t *testing.T) {
 		require.NotNil(t, request)
 		assert.Equal(t, http.MethodPost, request.Method)
 		assert.Equal(t, "/_msearch", request.URL.Path)
-		assert.Equal(t, "max_concurrent_shard_requests=6&ignore_throttled=false", request.URL.RawQuery)
+		assert.Equal(t, "6", request.URL.Query().Get("max_concurrent_shard_requests"))
+		assert.Equal(t, "false", request.URL.Query().Get("ignore_throttled"))
 
 		require.NotNil(t, requestBody)
 
@@ -141,7 +142,7 @@ func TestClient_ExecuteMultisearch(t *testing.T) {
 
 		ds := DatasourceInfo{
 			URL:                        ts.URL,
-			HTTPClient:                 ts.Client(),
+			ESClient:                   newTestESClient(t, ts.Client(), ts.URL),
 			Database:                   "[metrics-]YYYY.MM.DD",
 			ConfiguredFields:           configuredFields,
 			Interval:                   "Daily",
@@ -184,10 +185,14 @@ func TestClient_ExecuteMultisearch(t *testing.T) {
 	})
 
 	t.Run("Should return DownstreamError when index is invalid", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {}))
+		t.Cleanup(func() { ts.Close() })
+
 		ds := &DatasourceInfo{
-			URL:      "test",
+			URL:      ts.URL,
 			Database: "index-with-no-pattern",
 			Interval: intervalMonthly,
+			ESClient: newTestESClient(t, ts.Client(), ts.URL),
 		}
 
 		c, err := NewClient(context.Background(), ds, log.NewNullLogger())
@@ -207,9 +212,9 @@ func TestClient_ExecuteMultisearch(t *testing.T) {
 		}))
 
 		ds := &DatasourceInfo{
-			URL:        ts.URL,
-			Database:   "[metrics-]YYYY.MM.DD",
-			HTTPClient: ts.Client(),
+			URL:      ts.URL,
+			Database: "[metrics-]YYYY.MM.DD",
+			ESClient: newTestESClient(t, ts.Client(), ts.URL),
 		}
 
 		c, err := NewClient(context.Background(), ds, log.NewNullLogger())
@@ -286,7 +291,7 @@ func TestClient_Index(t *testing.T) {
 
 			ds := DatasourceInfo{
 				URL:                        ts.URL,
-				HTTPClient:                 ts.Client(),
+				ESClient:                   newTestESClient(t, ts.Client(), ts.URL),
 				Database:                   test.indexInDatasource,
 				ConfiguredFields:           configuredFields,
 				Interval:                   test.patternInDatasource,
@@ -471,9 +476,9 @@ func TestStreamMultiSearchResponse_ErrorHandling(t *testing.T) {
 		}))
 
 		ds := &DatasourceInfo{
-			URL:        ts.URL,
-			Database:   "[metrics-]YYYY.MM.DD",
-			HTTPClient: ts.Client(),
+			URL:      ts.URL,
+			Database: "[metrics-]YYYY.MM.DD",
+			ESClient: newTestESClient(t, ts.Client(), ts.URL),
 		}
 
 		c, err := NewClient(context.Background(), ds, log.NewNullLogger())

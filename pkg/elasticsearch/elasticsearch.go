@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -90,6 +89,11 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		return nil, err
 	}
 
+	esClient, err := es.NewESClient(httpCli, settings.URL)
+	if err != nil {
+		return nil, fmt.Errorf("error building elasticsearch client: %w", err)
+	}
+
 	// we used to have a field named `esVersion`, please do not use this name in the future.
 
 	timeField, ok := jsonData["timeField"].(string)
@@ -148,7 +152,7 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		includeFrozen = false
 	}
 
-	clusterInfo, err := es.GetClusterInfo(httpCli, settings.URL)
+	clusterInfo, err := es.GetClusterInfo(ctx, esClient)
 	if err != nil {
 		// Log warning but continue with default (non-serverless) behavior
 		// This handles cases where users don't have permission to access the root endpoint (403)
@@ -166,7 +170,7 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	model := es.DatasourceInfo{
 		ID:                         settings.ID,
 		URL:                        settings.URL,
-		HTTPClient:                 httpCli,
+		ESClient:                   esClient,
 		Database:                   index,
 		MaxConcurrentShardRequests: maxConcurrentShardRequests,
 		ConfiguredFields:           configuredFields,
@@ -199,24 +203,15 @@ func (ds *DataSource) CallResource(ctx context.Context, req *backend.CallResourc
 		return fmt.Errorf("invalid resource URL: %s", req.Path)
 	}
 
-	esUrl, err := createElasticsearchURL(req, ds.info)
+	request, err := buildCallResourceRequest(ctx, req)
 	if err != nil {
-		logger.Error("Failed to create request url", "error", err, "url", ds.info.URL, "path", req.Path)
-	}
-
-	request, err := http.NewRequestWithContext(ctx, req.Method, esUrl, bytes.NewBuffer(req.Body))
-	if err != nil {
-		logger.Error("Failed to create request", "error", err, "url", esUrl)
+		logger.Error("Failed to create request", "error", err, "path", req.Path)
 		return err
-	}
-
-	if ct := req.GetHTTPHeader("Content-Type"); ct != "" {
-		request.Header.Set("Content-Type", ct)
 	}
 
 	logger.Debug("Sending request to Elasticsearch", "resourcePath", req.Path)
 	start := time.Now()
-	response, err := ds.info.HTTPClient.Do(request)
+	response, err := ds.info.ESClient.Perform(request)
 	if err != nil {
 		status := "error"
 		if errors.Is(err, context.Canceled) {
@@ -262,22 +257,32 @@ func (ds *DataSource) CallResource(ctx context.Context, req *backend.CallResourc
 	})
 }
 
-func createElasticsearchURL(req *backend.CallResourceRequest, ds *es.DatasourceInfo) (string, error) {
-	esUrl, err := url.Parse(ds.URL)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse data source URL: %s, error: %w", ds.URL, err)
+// buildCallResourceRequest prepares an *http.Request whose path and query are
+// sufficient for the elasticsearch.Client transport to complete with the
+// configured cluster address. The transport prepends the address's scheme,
+// host and base path when Perform is called.
+func buildCallResourceRequest(ctx context.Context, req *backend.CallResourceRequest) (*http.Request, error) {
+	// path.Join collapses empty segments and strips trailing slashes. Preserve
+	// the previous behaviour by defaulting to "/" when the caller sends an
+	// empty path (version sniff against the root endpoint).
+	reqPath := "/" + strings.TrimPrefix(req.Path, "/")
+	if req.Path == "" {
+		reqPath = "/"
 	}
 
-	esUrl.Path = path.Join(esUrl.Path, req.Path)
+	u := &url.URL{Path: reqPath}
 	if isFieldCaps(req.Path) {
-		esUrl.RawQuery = "fields=*"
+		u.RawQuery = "fields=*"
 	}
-	esUrlString := esUrl.String()
-	// If the request path is empty and the URL does not end with a slash, add a slash to the URL.
-	// This ensures that for version checks executed to the root URL, the URL ends with a slash.
-	// This is helpful, for example, for load balancers that expect URLs to match the pattern /.*.
-	if req.Path == "" && esUrlString[len(esUrlString)-1:] != "/" {
-		return esUrl.String() + "/", nil
+
+	request, err := http.NewRequestWithContext(ctx, req.Method, u.String(), bytes.NewBuffer(req.Body))
+	if err != nil {
+		return nil, err
 	}
-	return esUrlString, nil
+
+	if ct := req.GetHTTPHeader("Content-Type"); ct != "" {
+		request.Header.Set("Content-Type", ct)
+	}
+
+	return request, nil
 }

@@ -6,28 +6,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"path"
 	"strings"
 	"time"
 
-	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+
+	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
 
 const ErrorBodyMaxSize = 200
 
 func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
 	logger := ds.logger.FromContext(ctx)
-
-	healthStatusUrl, err := url.Parse(ds.info.URL)
-	if err != nil {
-		logger.Error("Failed to parse data source URL", "error", err)
-		return &backend.CheckHealthResult{
-			Status:  backend.HealthStatusUnknown,
-			Message: "Failed to parse data source URL",
-		}, nil
-	}
 
 	// If the cluster is serverless, return a healthy result
 	if ds.info.ClusterInfo.IsServerless() {
@@ -37,30 +28,25 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 		}, nil
 	}
 
-	// check that ES is healthy
-	healthStatusUrl.Path = path.Join(healthStatusUrl.Path, "_cluster/health")
-	healthStatusUrl.RawQuery = "wait_for_status=yellow"
-
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, healthStatusUrl.String(), nil)
-	if err != nil {
-		logger.Error("Failed to create request", "error", err, "url", healthStatusUrl.String())
-		return &backend.CheckHealthResult{
-			Status:  backend.HealthStatusUnknown,
-			Message: "Failed to create request",
-		}, nil
-	}
-
 	start := time.Now()
-	logger.Debug("Sending healthcheck request to Elasticsearch", "url", healthStatusUrl.String())
-	response, err := ds.info.HTTPClient.Do(request)
+	logger.Debug("Sending healthcheck request to Elasticsearch")
 
+	healthReq := esapi.ClusterHealthRequest{
+		WaitForStatus: "yellow",
+	}
+	response, err := healthReq.Do(ctx, ds.info.ESClient)
 	if err != nil {
-		logger.Error("Failed to connect to Elasticsearch", "error", err, "url", healthStatusUrl.String())
+		logger.Error("Failed to connect to Elasticsearch", "error", err)
 		return &backend.CheckHealthResult{
 			Status:  backend.HealthStatusError,
 			Message: "Health check failed: Failed to connect to Elasticsearch",
 		}, nil
 	}
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			logger.Warn("Failed to close response body", "error", err)
+		}
+	}()
 
 	if response.StatusCode == http.StatusRequestTimeout {
 		return &backend.CheckHealthResult{
@@ -72,17 +58,11 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 	if response.StatusCode >= 400 {
 		return &backend.CheckHealthResult{
 			Status:  backend.HealthStatusError,
-			Message: fmt.Sprintf("Health check failed: Elasticsearch data source is not healthy. Status: %s", response.Status),
+			Message: fmt.Sprintf("Health check failed: Elasticsearch data source is not healthy. Status: %d %s", response.StatusCode, http.StatusText(response.StatusCode)),
 		}, nil
 	}
 
 	logger.Info("Response received from Elasticsearch", "statusCode", response.StatusCode, "status", "ok", "duration", time.Since(start))
-
-	defer func() {
-		if err := response.Body.Close(); err != nil {
-			logger.Warn("Failed to close response body", "error", err)
-		}
-	}()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -160,19 +140,18 @@ func validateIndex(ctx context.Context, ds *es.DatasourceInfo) (message string, 
 	}
 
 	indexList := strings.Join(indices, ",")
+	indexList = strings.TrimSpace(indexList)
 
-	validateUrl := fmt.Sprintf("%s/%s/_field_caps?fields=%s", ds.URL, indexList, ds.ConfiguredFields.TimeField)
-	if indexList == "" || strings.ReplaceAll(indexList, ",", "") == "" {
-		validateUrl = fmt.Sprintf("%s/_field_caps?fields=%s", ds.URL, ds.ConfiguredFields.TimeField)
+	req := esapi.FieldCapsRequest{
+		Fields: []string{ds.ConfiguredFields.TimeField},
+	}
+	if indexList != "" && strings.ReplaceAll(indexList, ",", "") != "" {
+		req.Index = []string{indexList}
 	}
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, validateUrl, nil)
+	response, err := req.Do(ctx, ds.ESClient)
 	if err != nil {
-		return fmt.Sprint("Failed to create request", "error", err, "url", validateUrl), "error"
-	}
-	response, err := ds.HTTPClient.Do(request)
-	if err != nil {
-		return fmt.Sprint("Failed to fetch field capabilities", "error", err, "url", validateUrl), "error"
+		return fmt.Sprint("Failed to fetch field capabilities", "error", err), "error"
 	}
 	defer func() {
 		if err := response.Body.Close(); err != nil {
