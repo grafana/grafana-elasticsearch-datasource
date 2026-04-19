@@ -87,6 +87,7 @@ import {
   isElasticsearchResponseWithHits,
 } from './types';
 import { getScriptValue, isTimeSeriesQuery } from './utils';
+import { QueryValidatorRegistry, esqlValidator, toDataQueryError } from './validation';
 
 export const REF_ID_STARTER_LOG_VOLUME = 'log-volume-';
 export const REF_ID_STARTER_LOG_SAMPLE = 'log-sample-';
@@ -132,6 +133,7 @@ export class ElasticDatasource
   isProxyAccess: boolean;
   databaseVersion: SemVer | null;
   defaultQueryMode?: QueryType;
+  validators: QueryValidatorRegistry;
 
   constructor(
     instanceSettings: DataSourceInstanceSettings<ElasticsearchOptions>,
@@ -169,6 +171,8 @@ export class ElasticDatasource
     }
     this.languageProvider = new LanguageProvider(this);
     this.variables = new ElasticsearchVariableSupport(this, ElasticsearchVariableEditor);
+    this.validators = new QueryValidatorRegistry();
+    this.validators.register('esql', esqlValidator);
   }
 
   getResourceRequest(path: string, params?: BackendSrvRequest['params'], options?: Partial<BackendSrvRequest>) {
@@ -696,7 +700,18 @@ export class ElasticDatasource
    */
   query(request: DataQueryRequest<ElasticsearchDataQuery>): Observable<DataQueryResponse> {
     const start = new Date();
-    return super.query(request).pipe(
+    const { validTargets, frontendErrors } = this.partitionTargets(request.targets);
+
+    if (validTargets.length === 0) {
+      return of({ data: [], errors: frontendErrors });
+    }
+
+    return super.query({ ...request, targets: validTargets }).pipe(
+      map((response) =>
+        frontendErrors.length
+          ? { ...response, errors: [...(response.errors ?? []), ...frontendErrors] }
+          : response
+      ),
       tap((response) => trackQuery(response, request, start)),
       map((response) => {
         response.data.forEach((dataFrame) => {
@@ -705,6 +720,24 @@ export class ElasticDatasource
         return response;
       })
     );
+  }
+
+  private partitionTargets(targets: ElasticsearchDataQuery[]): {
+    validTargets: ElasticsearchDataQuery[];
+    frontendErrors: DataQueryError[];
+  } {
+    const validTargets: ElasticsearchDataQuery[] = [];
+    const frontendErrors: DataQueryError[] = [];
+    const ctx = { timeField: this.timeField };
+    for (const target of targets) {
+      const errors = this.validators.validate(target, ctx);
+      if (errors.length === 0) {
+        validTargets.push(target);
+      } else {
+        frontendErrors.push(toDataQueryError(target.refId, errors));
+      }
+    }
+    return { validTargets, frontendErrors };
   }
 
   /**
@@ -1184,11 +1217,9 @@ export class ElasticDatasource
     }
 
     try {
-      const { root, errors } = Parser.parse(esqlQuery, { withFormatting: true });
-
-      if (errors.length) {
-        return esqlQuery;
-      }
+      // Parse errors are caught upfront by esqlValidator; this call should always
+      // succeed here. The try/catch remains as a defense-in-depth fallback.
+      const { root } = Parser.parse(esqlQuery, { withFormatting: true });
 
       const whereCommands = Walker.matchAll(root, {
         type: 'command',
