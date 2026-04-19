@@ -8,6 +8,14 @@ services:
         condition: service_healthy
       es-loader:
         condition: service_completed_successfully
+    configs:
+      # Run the externalized plugin in place of the core Elasticsearch plugin.
+      # Without as_external=true, DuplicatePluginIDValidation (pkg/services/pluginsintegration/pipeline/steps.go)
+      # drops the external plugin because the core one is already registered under id=elasticsearch.
+      # Env vars won't work here because Grafana only applies GF_PLUGIN_ELASTICSEARCH_* overrides if
+      # [plugin.elasticsearch] already exists in defaults.ini — and it doesn't.
+      - source: grafana_custom_ini
+        target: /etc/grafana/grafana.ini
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION:-9.3.1}
@@ -60,3 +68,9 @@ services:
           fi
         done
     restart: no
+
+configs:
+  grafana_custom_ini:
+    content: |
+      [plugin.elasticsearch]
+      as_external = true
