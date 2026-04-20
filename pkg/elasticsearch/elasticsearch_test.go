@@ -8,10 +8,18 @@ import (
 	"testing"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/stretchr/testify/require"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
+
+func unwrapTestDatasource(t *testing.T, instance instancemgmt.Instance) *DataSource {
+	t.Helper()
+	iw, ok := instance.(*instanceWithSchema)
+	require.True(t, ok, "expected *instanceWithSchema")
+	return iw.DataSource
+}
 
 type datasourceInfo struct {
 	TimeField                  any    `json:"timeField"`
@@ -79,7 +87,7 @@ func TestNewDatasource(t *testing.T) {
 		require.NotNil(t, instance)
 
 		// Verify that the datasource was created with empty (non-serverless) cluster info
-		dsInstance := instance.(*DataSource)
+		dsInstance := unwrapTestDatasource(t, instance)
 		require.False(t, dsInstance.info.ClusterInfo.IsServerless())
 		require.Equal(t, "", dsInstance.info.ClusterInfo.Version.BuildFlavor)
 	})
@@ -146,7 +154,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(*DataSource).info.MaxConcurrentShardRequests)
+			require.Equal(t, defaultMaxConcurrentShardRequests, unwrapTestDatasource(t, instance).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -167,7 +175,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, int64(10), instance.(*DataSource).info.MaxConcurrentShardRequests)
+			require.Equal(t, int64(10), unwrapTestDatasource(t, instance).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -188,7 +196,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, int64(10), instance.(*DataSource).info.MaxConcurrentShardRequests)
+			require.Equal(t, int64(10), unwrapTestDatasource(t, instance).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -209,7 +217,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(*DataSource).info.MaxConcurrentShardRequests)
+			require.Equal(t, defaultMaxConcurrentShardRequests, unwrapTestDatasource(t, instance).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -230,7 +238,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(*DataSource).info.MaxConcurrentShardRequests)
+			require.Equal(t, defaultMaxConcurrentShardRequests, unwrapTestDatasource(t, instance).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -251,7 +259,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, int64(10), instance.(*DataSource).info.MaxConcurrentShardRequests)
+			require.Equal(t, int64(10), unwrapTestDatasource(t, instance).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 
@@ -272,7 +280,7 @@ func TestNewDatasource(t *testing.T) {
 			}
 
 			instance, err := NewDatasource(context.Background(), dsSettings)
-			require.Equal(t, defaultMaxConcurrentShardRequests, instance.(*DataSource).info.MaxConcurrentShardRequests)
+			require.Equal(t, defaultMaxConcurrentShardRequests, unwrapTestDatasource(t, instance).info.MaxConcurrentShardRequests)
 			require.NoError(t, err)
 		})
 	})
