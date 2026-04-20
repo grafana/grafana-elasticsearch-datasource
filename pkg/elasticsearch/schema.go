@@ -138,7 +138,7 @@ func (p *SchemaProvider) resolveIndexForColumns(tableName string, tableParams ma
 		return idx, nil
 	}
 	// Allow wildcard patterns (e.g. "logs-*") — field caps supports them natively
-	return normalizeTableNameForLookup(tableName), nil
+	return strings.TrimSpace(tableName), nil
 }
 
 func (p *SchemaProvider) TableParameterValues(ctx context.Context, req *schemas.TableParameterValuesRequest) (*schemas.TableParametersValuesResponse, error) {
@@ -198,9 +198,4 @@ func (p *SchemaProvider) cachedFieldCapsColumns(ctx context.Context, index strin
 	p.colCache[index] = columnCacheEntry{at: time.Now(), cols: cols}
 	p.mu.Unlock()
 	return cols, nil
-}
-
-// normalizeTableNameForLookup returns the canonical table/index name (identity; trim only).
-func normalizeTableNameForLookup(name string) string {
-	return strings.TrimSpace(name)
 }

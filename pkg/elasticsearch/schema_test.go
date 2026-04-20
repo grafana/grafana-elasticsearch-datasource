@@ -11,11 +11,6 @@ import (
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
 
-func TestNormalizeTableNameForLookup(t *testing.T) {
-	require.Equal(t, "my_index", normalizeTableNameForLookup("my_index"))
-	require.Equal(t, "logs-2024", normalizeTableNameForLookup("logs-2024"))
-}
-
 func TestFallbackTableParams(t *testing.T) {
 	p := fallbackTableParams()
 	require.Len(t, p, 1)
