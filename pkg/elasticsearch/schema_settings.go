@@ -23,7 +23,7 @@ type schemaSettings struct {
 func defaultSchemaSettings() schemaSettings {
 	return schemaSettings{
 		MaxIndices:       defaultSchemaMaxIndices,
-		IncludeHidden:    true,
+		IncludeHidden:    false,
 		IndicesTimeout:   10 * time.Second,
 		FieldCapsTimeout: 15 * time.Second,
 	}
