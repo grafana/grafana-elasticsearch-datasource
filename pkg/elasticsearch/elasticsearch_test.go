@@ -9,6 +9,8 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/stretchr/testify/require"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
@@ -19,6 +21,26 @@ func unwrapTestDatasource(t *testing.T, instance instancemgmt.Instance) *DataSou
 	iw, ok := instance.(*instanceWithSchema)
 	require.True(t, ok, "expected *instanceWithSchema")
 	return iw.DataSource
+}
+
+// contextWithForwardedHeader simulates what the SDK's headerMiddleware does:
+// it injects a contextual HTTP client middleware that sets a header on outgoing
+// requests — but only when ForwardHTTPHeaders is true on the HTTP client options.
+func contextWithForwardedHeader(t *testing.T, key, value string) context.Context {
+	t.Helper()
+	return httpclient.WithContextualMiddleware(context.Background(),
+		httpclient.MiddlewareFunc(func(opts httpclient.Options, next http.RoundTripper) http.RoundTripper {
+			if !opts.ForwardHTTPHeaders {
+				return next
+			}
+			return httpclient.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				if req.Header.Get(key) == "" {
+					req.Header.Set(key, value)
+				}
+				return next.RoundTrip(req)
+			})
+		}),
+	)
 }
 
 type datasourceInfo struct {
@@ -40,6 +62,84 @@ func mockElasticsearchServer() *httptest.Server {
 			},
 		})
 	}))
+}
+
+func TestNewDatasource_ForwardHTTPHeaders(t *testing.T) {
+	t.Run("HTTP client forwards OAuth and other HTTP headers from request context", func(t *testing.T) {
+		// When oauthPassThru is enabled, the SDK's headerMiddleware puts forwarded
+		// headers (Authorization, X-Id-Token, cookies) into the context as a
+		// contextual HTTP client middleware. That middleware only fires if the HTTP
+		// client was created with ForwardHTTPHeaders: true.
+		//
+		// Before externalization this was not needed because Grafana's in-process
+		// HTTPClientMiddleware forwarded headers unconditionally. After
+		// externalization the context is lost over gRPC, so the plugin must opt-in.
+
+		var receivedAuthHeader string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			receivedAuthHeader = r.Header.Get("Authorization")
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/" || r.URL.Path == "" {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"version": map[string]interface{}{"build_flavor": "default"},
+				})
+				return
+			}
+			// Return minimal valid msearch response
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"responses": []interface{}{
+					map[string]interface{}{
+						"hits": map[string]interface{}{
+							"hits": []interface{}{},
+						},
+						"status": 200,
+						"aggregations": map[string]interface{}{
+							"2": map[string]interface{}{
+								"buckets": []interface{}{},
+							},
+						},
+					},
+				},
+			})
+		}))
+		defer server.Close()
+
+		dsSettings := backend.DataSourceInstanceSettings{
+			URL: server.URL,
+			JSONData: json.RawMessage(`{
+				"timeField": "@timestamp",
+				"oauthPassThru": true
+			}`),
+		}
+
+		instance, err := NewDatasource(context.Background(), dsSettings)
+		require.NoError(t, err)
+		ds := instance.(*DataSource)
+
+		// Simulate the SDK's headerMiddleware: it reads OAuth headers from
+		// req.GetHTTPHeaders() and injects them into the context via
+		// httpclient.WithContextualMiddleware — but only if the HTTP client
+		// opts have ForwardHTTPHeaders: true.
+		//
+		// We replicate that by injecting a contextual middleware directly,
+		// which is exactly what the SDK does at runtime.
+		oauthToken := "Bearer test-oauth-token-12345"
+		ctx := contextWithForwardedHeader(t, "Authorization", oauthToken)
+
+		query := backend.QueryDataRequest{
+			Queries: []backend.DataQuery{
+				{
+					RefID: "A",
+					JSON:  json.RawMessage(`{"metrics":[{"type":"count","id":"1"}],"bucketAggs":[{"type":"date_histogram","id":"2","settings":{"interval":"auto"}}]}`),
+				},
+			},
+		}
+
+		_, err = queryData(ctx, &query, ds.info, log.New())
+		require.NoError(t, err)
+		require.Equal(t, oauthToken, receivedAuthHeader,
+			"OAuth token must be forwarded to Elasticsearch when oauthPassThru is enabled")
+	})
 }
 
 func TestNewDatasource(t *testing.T) {

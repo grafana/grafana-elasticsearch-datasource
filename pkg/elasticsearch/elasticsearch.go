@@ -87,6 +87,8 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		return nil, fmt.Errorf("error getting http options: %w", err)
 	}
 
+	httpCliOpts.ForwardHTTPHeaders = true
+
 	// Set SigV4 service namespace
 	if httpCliOpts.SigV4 != nil {
 		httpCliOpts.SigV4.Service = "es"
