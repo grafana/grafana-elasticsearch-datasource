@@ -1,5 +1,22 @@
 # Changelog
 
+## 12.5.5
+
+- Fix: Enable ForwardHTTPHeaders so OAuth identity is forwarded to Elasticsearch [#271](https://github.com/grafana/grafana-elasticsearch-datasource/pull/271)
+- Feature: Automatically add a time range filter on ESQL queries when it's not provided [#261](https://github.com/grafana/grafana-elasticsearch-datasource/pull/261)
+- Dependency updates:
+  - Chore: Update dependency @grafana/data to v13.0.0 [#267](https://github.com/grafana/grafana-elasticsearch-datasource/pull/267) and previous versions
+  - Chore: Update dependency @elastic/esql to v1.8.0 [#265](https://github.com/grafana/grafana-elasticsearch-datasource/pull/265) and previous versions
+  - Chore: Update dependency @elastic/monaco-esql to v3.3.1 [#264](https://github.com/grafana/grafana-elasticsearch-datasource/pull/264)
+  - Chore: Update dependency @swc/core to ^1.15.24 [#277](https://github.com/grafana/grafana-elasticsearch-datasource/pull/277)
+  - Chore: Update dependency prettier to ^3.8.2 [#278](https://github.com/grafana/grafana-elasticsearch-datasource/pull/278) and previous versions
+  - Chore: Update dependency eslint-webpack-plugin to v6 [#260](https://github.com/grafana/grafana-elasticsearch-datasource/pull/260)
+  - Chore: Update dependency sass to v1.99.0 [#259](https://github.com/grafana/grafana-elasticsearch-datasource/pull/259)
+  - Chore: Update dependency @playwright/test to ^1.59.1 [#257](https://github.com/grafana/grafana-elasticsearch-datasource/pull/257)
+  - Fix(deps): Update module github.com/grafana/grafana-plugin-sdk-go to v0.291.1 [#262](https://github.com/grafana/grafana-elasticsearch-datasource/pull/262)
+  - Fix(deps): Update module github.com/magefile/mage to v1.17.1 [#242](https://github.com/grafana/grafana-elasticsearch-datasource/pull/242)
+  - Chore: Update module go.opentelemetry.io/otel/sdk to v1.43.0 [security] [#255](https://github.com/grafana/grafana-elasticsearch-datasource/pull/255)
+
 ## 12.5.4
 
 - Build: Override plugin sdk's BuildAll to enable extra platforms [#245](https://github.com/grafana/grafana-elasticsearch-datasource/pull/245)
