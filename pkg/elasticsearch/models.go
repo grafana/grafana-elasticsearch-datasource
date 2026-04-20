@@ -21,6 +21,28 @@ type Query struct {
 	TimeRange            backend.TimeRange
 	EditorType           *string `json:"editorType"`
 	IncludeRuntimeFields bool    `json:"includeRuntimeFields"`
+	// Index is an optional concrete index (or comma-separated list) for msearch / ES|QL target; used by grafanaSql normalization.
+	Index string `json:"index,omitempty"`
+	// SourceIncludes limits _source to specific fields (SELECT pushdown).
+	SourceIncludes []string `json:"sourceIncludes,omitempty"`
+	// BoolFilters holds structured bool query clauses (filter + must_not)
+	// injected by grafanaSql normalization for the Lucene path.
+	BoolFilters *BoolFilterSet `json:"-"`
+}
+
+// BoolFilterSet contains structured Elasticsearch bool filter/must_not clauses.
+type BoolFilterSet struct {
+	Filters []BoolFilterClause
+	MustNot []BoolFilterClause
+}
+
+// BoolFilterClause represents a single Elasticsearch filter clause.
+type BoolFilterClause struct {
+	Type   string // "term", "terms", "range", "wildcard"
+	Field  string
+	Value  any      // for term, wildcard
+	Values []any    // for terms
+	Bounds map[string]any // for range (gt, gte, lt, lte)
 }
 
 // BucketAgg represents a bucket aggregation of the time series query model of the datasource

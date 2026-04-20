@@ -86,6 +86,19 @@ func (b *SearchRequestBuilder) Build() (*SearchRequest, error) {
 	return &sr, nil
 }
 
+// SetIndex sets a concrete index (or comma-separated indices) for the msearch header.
+// When empty, the index pattern from datasource settings is expanded by interval.
+func (b *SearchRequestBuilder) SetIndex(index string) *SearchRequestBuilder {
+	b.index = index
+	return b
+}
+
+// SetSourceIncludes limits the _source fields returned to the given list.
+func (b *SearchRequestBuilder) SetSourceIncludes(fields []string) *SearchRequestBuilder {
+	b.customProps["_source"] = map[string]any{"includes": fields}
+	return b
+}
+
 // Size sets the size of the search request
 func (b *SearchRequestBuilder) Size(size int) *SearchRequestBuilder {
 	b.size = size
