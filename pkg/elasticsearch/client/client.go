@@ -1,15 +1,17 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -28,7 +30,7 @@ const (
 
 type DatasourceInfo struct {
 	ID                         int64
-	HTTPClient                 *http.Client
+	ESClient                   *elasticsearch.Client
 	URL                        string
 	Database                   string
 	ConfiguredFields           ConfiguredFields
@@ -64,13 +66,16 @@ var NewClient = func(ctx context.Context, ds *DatasourceInfo, logger log.Logger)
 
 	logger.Debug("Creating new client", "configuredFields", fmt.Sprintf("%#v", ds.ConfiguredFields), "interval", ds.Interval, "index", ds.Database)
 
+	if ds.ESClient == nil {
+		return nil, fmt.Errorf("elasticsearch client is not configured on datasource")
+	}
+
 	return &baseClientImpl{
 		logger:           logger,
 		ctx:              ctx,
 		ds:               ds,
 		configuredFields: ds.ConfiguredFields,
 		indexPattern:     ip,
-		transport:        newHTTPTransport(ctx, ds.HTTPClient, ds.URL, logger),
 		encoder:          newRequestEncoder(logger),
 		parser:           newResponseParser(logger),
 	}, nil
@@ -82,7 +87,6 @@ type baseClientImpl struct {
 	configuredFields ConfiguredFields
 	indexPattern     IndexPattern
 	logger           log.Logger
-	transport        *httpTransport
 	encoder          *requestEncoder
 	parser           *responseParser
 }
@@ -97,14 +101,6 @@ type multiRequest struct {
 	interval time.Duration
 }
 
-func (c *baseClientImpl) executeBatchRequest(uriPath, uriQuery string, requests []*multiRequest) (*http.Response, error) {
-	payload, err := c.encoder.encodeBatchRequests(requests)
-	if err != nil {
-		return nil, err
-	}
-	return c.transport.executeBatchRequest(uriPath, uriQuery, payload)
-}
-
 func (c *baseClientImpl) ExecuteMultisearch(r *MultiSearchRequest) (*MultiSearchResponse, error) {
 	var err error
 	multiRequests, err := c.createMultiSearchRequests(r.Requests)
@@ -112,9 +108,14 @@ func (c *baseClientImpl) ExecuteMultisearch(r *MultiSearchRequest) (*MultiSearch
 		return nil, err
 	}
 
-	queryParams := c.getMultiSearchQueryParameters()
+	payload, err := c.encoder.encodeBatchRequests(multiRequests)
+	if err != nil {
+		return nil, err
+	}
+
+	req := c.buildMsearchRequest(payload)
+
 	_, span := tracing.DefaultTracer().Start(c.ctx, "datasource.elasticsearch.queryData.executeMultisearch", trace.WithAttributes(
-		attribute.String("queryParams", queryParams),
 		attribute.String("url", c.ds.URL),
 	))
 	defer func() {
@@ -126,7 +127,7 @@ func (c *baseClientImpl) ExecuteMultisearch(r *MultiSearchRequest) (*MultiSearch
 	}()
 
 	start := time.Now()
-	clientRes, err := c.executeBatchRequest("_msearch", queryParams, multiRequests)
+	res, err := req.Do(c.ctx, c.ds.ESClient)
 	if err != nil {
 		status := "error"
 		if errors.Is(err, context.Canceled) {
@@ -137,20 +138,19 @@ func (c *baseClientImpl) ExecuteMultisearch(r *MultiSearchRequest) (*MultiSearch
 		if errors.As(err, &sourceErr) {
 			lp = append(lp, "statusSource", sourceErr.ErrorSource())
 		}
-		if clientRes != nil {
-			lp = append(lp, "statusCode", clientRes.StatusCode)
+		if res != nil {
+			lp = append(lp, "statusCode", res.StatusCode)
 		}
 		c.logger.Error("Error received from Elasticsearch", lp...)
 		return nil, err
 	}
-	res := clientRes
 	defer func() {
 		if err := res.Body.Close(); err != nil {
 			c.logger.Warn("Failed to close response body", "error", err)
 		}
 	}()
 
-	c.logger.Info("Response received from Elasticsearch", "status", "ok", "statusCode", res.StatusCode, "contentLength", res.ContentLength, "duration", time.Since(start), "stage", StageDatabaseRequest)
+	c.logger.Info("Response received from Elasticsearch", "status", "ok", "statusCode", res.StatusCode, "contentLength", res.Header.Get("Content-Length"), "duration", time.Since(start), "stage", StageDatabaseRequest)
 
 	_, resSpan := tracing.DefaultTracer().Start(c.ctx, "datasource.elasticsearch.queryData.executeMultisearch.decodeResponse")
 	defer func() {
@@ -170,6 +170,30 @@ func (c *baseClientImpl) ExecuteMultisearch(r *MultiSearchRequest) (*MultiSearch
 	msr.Status = res.StatusCode
 
 	return msr, nil
+}
+
+// buildMsearchRequest constructs the typed esapi request with our serverless /
+// frozen-index options applied. Pulling this out keeps the request shape easy
+// to assert in unit tests.
+func (c *baseClientImpl) buildMsearchRequest(payload []byte) esapi.MsearchRequest {
+	req := esapi.MsearchRequest{
+		Body: bytes.NewReader(payload),
+	}
+
+	// Serverless clusters don't support max_concurrent_shard_requests, so skip
+	// the query param on that flavor.
+	if !c.ds.ClusterInfo.IsServerless() && c.ds.MaxConcurrentShardRequests > 0 {
+		mcsr := int(c.ds.MaxConcurrentShardRequests)
+		req.MaxConcurrentShardRequests = &mcsr
+	}
+
+	// IncludeFrozen → ignore_throttled=false (i.e. don't throttle frozen indices).
+	if c.ds.IncludeFrozen {
+		ignoreThrottled := false
+		req.IgnoreThrottled = &ignoreThrottled
+	}
+
+	return req
 }
 
 func (c *baseClientImpl) createMultiSearchRequests(searchRequests []*SearchRequest) ([]*multiRequest, error) {
@@ -195,21 +219,6 @@ func (c *baseClientImpl) createMultiSearchRequests(searchRequests []*SearchReque
 	}
 
 	return multiRequests, nil
-}
-
-func (c *baseClientImpl) getMultiSearchQueryParameters() string {
-	var qs []string
-	// if the build flavor is not serverless, we can use the max concurrent shard requests
-	// this is because serverless clusters do not support max concurrent shard requests
-	if !c.ds.ClusterInfo.IsServerless() && c.ds.MaxConcurrentShardRequests > 0 {
-		qs = append(qs, fmt.Sprintf("max_concurrent_shard_requests=%d", c.ds.MaxConcurrentShardRequests))
-	}
-
-	if c.ds.IncludeFrozen {
-		qs = append(qs, "ignore_throttled=false")
-	}
-
-	return strings.Join(qs, "&")
 }
 
 func (c *baseClientImpl) MultiSearch() *MultiSearchRequestBuilder {
@@ -239,8 +248,10 @@ func (c *baseClientImpl) ExecuteEsql(query string) (*EsqlResponse, error) {
 		span.End()
 	}()
 
+	req := esapi.EsqlQueryRequest{Body: bytes.NewReader(payload)}
+
 	start := time.Now()
-	clientRes, err := c.transport.executeEsqlRequest(payload)
+	res, err := req.Do(c.ctx, c.ds.ESClient)
 	if err != nil {
 		status := "error"
 		if errors.Is(err, context.Canceled) {
@@ -251,28 +262,28 @@ func (c *baseClientImpl) ExecuteEsql(query string) (*EsqlResponse, error) {
 		if errors.As(err, &sourceErr) {
 			lp = append(lp, "statusSource", sourceErr.ErrorSource())
 		}
-		if clientRes != nil {
-			lp = append(lp, "statusCode", clientRes.StatusCode)
+		if res != nil {
+			lp = append(lp, "statusCode", res.StatusCode)
 		}
 		c.logger.Error("Error received from Elasticsearch ES|QL endpoint", lp...)
 		return nil, err
 	}
 	defer func() {
-		if err := clientRes.Body.Close(); err != nil {
+		if err := res.Body.Close(); err != nil {
 			c.logger.Warn("Failed to close response body", "error", err)
 		}
 	}()
 
-	c.logger.Info("Response received from Elasticsearch ES|QL endpoint", "status", "ok", "statusCode", clientRes.StatusCode, "contentLength", clientRes.ContentLength, "duration", time.Since(start), "stage", StageDatabaseRequest)
+	c.logger.Info("Response received from Elasticsearch ES|QL endpoint", "status", "ok", "statusCode", res.StatusCode, "contentLength", res.Header.Get("Content-Length"), "duration", time.Since(start), "stage", StageDatabaseRequest)
 
 	// Check for error status codes
-	if clientRes.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(clientRes.Body)
-		return nil, backend.DownstreamError(fmt.Errorf("ES|QL query failed with status %d: %s", clientRes.StatusCode, string(bodyBytes)))
+	if res.StatusCode >= 400 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return nil, backend.DownstreamError(fmt.Errorf("ES|QL query failed with status %d: %s", res.StatusCode, string(bodyBytes)))
 	}
 
 	var esqlResponse EsqlResponse
-	dec := json.NewDecoder(clientRes.Body)
+	dec := json.NewDecoder(res.Body)
 	if err := dec.Decode(&esqlResponse); err != nil {
 		return nil, backend.DownstreamError(fmt.Errorf("failed to decode ES|QL response: %w", err))
 	}

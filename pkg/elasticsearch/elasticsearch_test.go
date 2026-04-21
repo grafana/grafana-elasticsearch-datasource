@@ -378,35 +378,77 @@ func TestNewDatasource(t *testing.T) {
 	})
 }
 
-func TestCreateElasticsearchURL(t *testing.T) {
+func TestBuildCallResourceRequest(t *testing.T) {
 	tt := []struct {
-		name     string
-		settings es.DatasourceInfo
-		req      backend.CallResourceRequest
-		expected string
+		name             string
+		req              backend.CallResourceRequest
+		expectedPath     string
+		expectedRawQuery string
 	}{
-		{name: "with /_msearch path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "_msearch"}, expected: "http://localhost:9200/_msearch"},
-		{name: "with _msearch path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "_msearch"}, expected: "http://localhost:9200/_msearch"},
-		{name: "with _msearch path and valid url with /", settings: es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "_msearch"}, expected: "http://localhost:9200/_msearch"},
-		{name: "with _mapping path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "/_mapping"}, expected: "http://localhost:9200/_mapping"},
-		{name: "with /_mapping path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "/_mapping"}, expected: "http://localhost:9200/_mapping"},
-		{name: "with /_mapping path and valid url with /", settings: es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "/_mapping"}, expected: "http://localhost:9200/_mapping"},
-		{name: "with abc/_mapping path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "abc/_mapping"}, expected: "http://localhost:9200/abc/_mapping"},
-		{name: "with /abc/_mapping path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "abc/_mapping"}, expected: "http://localhost:9200/abc/_mapping"},
-		{name: "with /abc/_mapping path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "abc/_mapping"}, expected: "http://localhost:9200/abc/_mapping"},
-		// This is to support mapping for cluster searches that include ":"
-		{name: "with path including :", settings: es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "ab:c/_mapping"}, expected: "http://localhost:9200/ab:c/_mapping"},
-		{name: "with \"\" path and valid url and /", settings: es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://localhost:9200/"},
-		{name: "with \"\" path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://localhost:9200/"},
-		{name: "with \"\" path and valid url with path", settings: es.DatasourceInfo{URL: "http://elastic:9200/lb"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://elastic:9200/lb/"},
-		{name: "with \"\" path and valid url with path and /", settings: es.DatasourceInfo{URL: "http://elastic:9200/lb/"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://elastic:9200/lb/"},
+		{name: "with _msearch path", req: backend.CallResourceRequest{Path: "_msearch", Method: http.MethodPost}, expectedPath: "/_msearch"},
+		{name: "with /_msearch path", req: backend.CallResourceRequest{Path: "/_msearch", Method: http.MethodPost}, expectedPath: "/_msearch"},
+		{name: "with _mapping path", req: backend.CallResourceRequest{Path: "_mapping", Method: http.MethodGet}, expectedPath: "/_mapping"},
+		{name: "with /_mapping path", req: backend.CallResourceRequest{Path: "/_mapping", Method: http.MethodGet}, expectedPath: "/_mapping"},
+		{name: "with abc/_mapping path", req: backend.CallResourceRequest{Path: "abc/_mapping", Method: http.MethodGet}, expectedPath: "/abc/_mapping"},
+		// Paths with ":" are used for cross-cluster search
+		{name: "with path including :", req: backend.CallResourceRequest{Path: "ab:c/_mapping", Method: http.MethodGet}, expectedPath: "/ab:c/_mapping"},
+		{name: "with empty path", req: backend.CallResourceRequest{Path: "", Method: http.MethodGet}, expectedPath: "/"},
+		{name: "with _field_caps path adds fields=* query", req: backend.CallResourceRequest{Path: "_field_caps", Method: http.MethodPost}, expectedPath: "/_field_caps", expectedRawQuery: "fields=*"},
+		{name: "with abc/_field_caps path adds fields=* query", req: backend.CallResourceRequest{Path: "abc/_field_caps", Method: http.MethodPost}, expectedPath: "/abc/_field_caps", expectedRawQuery: "fields=*"},
 	}
 
 	for _, test := range tt {
 		t.Run(test.name, func(t *testing.T) {
-			url, err := createElasticsearchURL(&test.req, &test.settings)
+			request, err := buildCallResourceRequest(context.Background(), &test.req)
 			require.NoError(t, err)
-			require.Equal(t, test.expected, url)
+			require.Equal(t, test.expectedPath, request.URL.Path)
+			require.Equal(t, test.expectedRawQuery, request.URL.RawQuery)
+			require.Equal(t, test.req.Method, request.Method)
+		})
+	}
+}
+
+// TestCallResource_URLComposition verifies that the Elasticsearch client
+// correctly combines the configured base URL (scheme, host, base path) with
+// the relative path built by buildCallResourceRequest.
+func TestCallResource_URLComposition(t *testing.T) {
+	tt := []struct {
+		name         string
+		baseURL      string
+		req          backend.CallResourceRequest
+		expectedURL  string
+		expectedBody string
+	}{
+		{name: "root base URL + _msearch", baseURL: "", req: backend.CallResourceRequest{Path: "_msearch", Method: http.MethodPost}, expectedURL: "/_msearch"},
+		{name: "root base URL + /_msearch", baseURL: "", req: backend.CallResourceRequest{Path: "/_msearch", Method: http.MethodPost}, expectedURL: "/_msearch"},
+		{name: "root base URL + abc/_mapping", baseURL: "", req: backend.CallResourceRequest{Path: "abc/_mapping", Method: http.MethodGet}, expectedURL: "/abc/_mapping"},
+		{name: "root base URL + empty path", baseURL: "", req: backend.CallResourceRequest{Path: "", Method: http.MethodGet}, expectedURL: "/"},
+		{name: "root base URL + cross-cluster path", baseURL: "", req: backend.CallResourceRequest{Path: "ab:c/_mapping", Method: http.MethodGet}, expectedURL: "/ab:c/_mapping"},
+		{name: "root base URL + _field_caps adds fields=*", baseURL: "", req: backend.CallResourceRequest{Path: "_field_caps", Method: http.MethodPost}, expectedURL: "/_field_caps?fields=*"},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			var gotURL string
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotURL = r.URL.RequestURI()
+				w.Header().Set("X-Elastic-Product", "Elasticsearch")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			defer ts.Close()
+
+			esClient, err := es.NewESClient(ts.Client(), ts.URL+test.baseURL)
+			require.NoError(t, err)
+
+			request, err := buildCallResourceRequest(context.Background(), &test.req)
+			require.NoError(t, err)
+
+			resp, err := esClient.Perform(request)
+			require.NoError(t, err)
+			_ = resp.Body.Close()
+
+			require.Equal(t, test.expectedURL, gotURL)
 		})
 	}
 }
