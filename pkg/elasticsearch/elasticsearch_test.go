@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/stretchr/testify/require"
 
@@ -114,7 +114,7 @@ func TestNewDatasource_ForwardHTTPHeaders(t *testing.T) {
 
 		instance, err := NewDatasource(context.Background(), dsSettings)
 		require.NoError(t, err)
-		ds := instance.(*DataSource)
+		ds := instance.(*instanceWithSchema)
 
 		// Simulate the SDK's headerMiddleware: it reads OAuth headers from
 		// req.GetHTTPHeaders() and injects them into the context via
