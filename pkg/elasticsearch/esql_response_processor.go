@@ -102,6 +102,8 @@ func processEsqlRawDataResponse(response *es.EsqlResponse, target *Query) (*back
 // processEsqlMetricsResponse processes ES|QL response for metrics queries.
 // It maps a time column + numeric value column to a timeseries-multi frame
 // to match the shape returned by regular/raw DSL metrics queries.
+// When breakdown columns are present (columns that are neither time nor numeric),
+// rows are grouped by unique breakdown values and separate frames are created.
 func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query) (*backend.DataResponse, error) {
 	// Metrics mode requires STATS in ES|QL to produce an aggregation result.
 	// Without STATS, return a successful empty response.
@@ -136,18 +138,85 @@ func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query) (*back
 		return processEsqlRawDataResponse(response, target)
 	}
 
-	timeVector := make([]time.Time, 0, len(response.Values))
-	valueVector := make([]*float64, 0, len(response.Values))
+	// Identify breakdown columns (neither time nor value)
+	var breakdownColIdxs []int
+	for i := range response.Columns {
+		if i != timeColIdx && i != valueColIdx {
+			breakdownColIdxs = append(breakdownColIdxs, i)
+		}
+	}
+
+	metricType := countType
+	if len(target.Metrics) > 0 && target.Metrics[0] != nil && target.Metrics[0].Type != "" {
+		metricType = target.Metrics[0].Type
+	}
+
+	// No breakdown columns — single flat frame (original behavior)
+	if len(breakdownColIdxs) == 0 {
+		timeVector := make([]time.Time, 0, len(response.Values))
+		valueVector := make([]*float64, 0, len(response.Values))
+
+		for _, row := range response.Values {
+			if timeColIdx >= len(row) {
+				continue
+			}
+			ts, ok := parseEsqlDateTime(row[timeColIdx])
+			if !ok {
+				continue
+			}
+			var value *float64
+			if valueColIdx < len(row) && row[valueColIdx] != nil {
+				if v, ok := toFloat64(row[valueColIdx]); ok {
+					value = &v
+				}
+			}
+			timeVector = append(timeVector, ts)
+			valueVector = append(valueVector, value)
+		}
+
+		if len(timeVector) == 0 {
+			return processEsqlRawDataResponse(response, target)
+		}
+
+		frame := newTimeSeriesFrame(timeVector, nil, valueVector)
+		frame.Name = getMetricName(metricType)
+		return &backend.DataResponse{
+			Frames: []*data.Frame{frame},
+		}, nil
+	}
+
+	// Group rows by breakdown field values
+	type seriesData struct {
+		timeVector  []time.Time
+		valueVector []*float64
+		labels      map[string]string
+	}
+
+	// Use ordered tracking to produce deterministic frame order
+	seriesMap := make(map[string]*seriesData)
+	var seriesOrder []string
 
 	for _, row := range response.Values {
 		if timeColIdx >= len(row) {
 			continue
 		}
-
 		ts, ok := parseEsqlDateTime(row[timeColIdx])
 		if !ok {
 			continue
 		}
+
+		// Build the group key and labels from breakdown columns
+		labels := make(map[string]string, len(breakdownColIdxs))
+		keyParts := make([]string, len(breakdownColIdxs))
+		for i, colIdx := range breakdownColIdxs {
+			val := ""
+			if colIdx < len(row) && row[colIdx] != nil {
+				val = fmt.Sprintf("%v", row[colIdx])
+			}
+			labels[response.Columns[colIdx].Name] = val
+			keyParts[i] = val
+		}
+		key := strings.Join(keyParts, "|||")
 
 		var value *float64
 		if valueColIdx < len(row) && row[valueColIdx] != nil {
@@ -156,31 +225,30 @@ func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query) (*back
 			}
 		}
 
-		timeVector = append(timeVector, ts)
-		valueVector = append(valueVector, value)
+		sd, exists := seriesMap[key]
+		if !exists {
+			sd = &seriesData{labels: labels}
+			seriesMap[key] = sd
+			seriesOrder = append(seriesOrder, key)
+		}
+		sd.timeVector = append(sd.timeVector, ts)
+		sd.valueVector = append(sd.valueVector, value)
 	}
 
-	// No usable time points found; keep previous table behavior.
-	if len(timeVector) == 0 {
+	if len(seriesOrder) == 0 {
 		return processEsqlRawDataResponse(response, target)
 	}
 
-	metricType := countType
-	if len(target.Metrics) > 0 && target.Metrics[0] != nil && target.Metrics[0].Type != "" {
-		metricType = target.Metrics[0].Type
-	}
-
-	frame := data.NewFrame(
-		getMetricName(metricType),
-		data.NewField(data.TimeSeriesTimeFieldName, nil, timeVector),
-		data.NewField(data.TimeSeriesValueFieldName, nil, valueVector),
-	)
-	frame.Meta = &data.FrameMeta{
-		Type: data.FrameTypeTimeSeriesMulti,
+	frames := make([]*data.Frame, 0, len(seriesOrder))
+	for _, key := range seriesOrder {
+		sd := seriesMap[key]
+		frame := newTimeSeriesFrame(sd.timeVector, sd.labels, sd.valueVector)
+		frame.Name = getMetricName(metricType)
+		frames = append(frames, frame)
 	}
 
 	return &backend.DataResponse{
-		Frames: []*data.Frame{frame},
+		Frames: frames,
 	}, nil
 }
 
