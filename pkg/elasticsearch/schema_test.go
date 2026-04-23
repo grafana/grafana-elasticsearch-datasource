@@ -144,15 +144,15 @@ func TestListAllIndexNames_PrefersResolveOverCat(t *testing.T) {
 	var resolveCalls, catCalls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.URL.Path == "/_resolve/index/*":
+		switch r.URL.Path {
+		case "/_resolve/index/*":
 			atomic.AddInt32(&resolveCalls, 1)
 			_, _ = w.Write([]byte(`{
               "indices": [{"name": "metrics"}],
               "aliases": [{"name": "metrics-current"}],
               "data_streams": [{"name": "logs-prod"}]
             }`))
-		case r.URL.Path == "/_cat/indices":
+		case "/_cat/indices":
 			atomic.AddInt32(&catCalls, 1)
 			_, _ = w.Write([]byte(`[{"index": "should-not-be-returned"}]`))
 		default:
@@ -176,11 +176,11 @@ func TestListAllIndexNames_FallsBackToCatWhenResolveFails(t *testing.T) {
 	var resolveCalls, catCalls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.URL.Path == "/_resolve/index/*":
+		switch r.URL.Path {
+		case "/_resolve/index/*":
 			atomic.AddInt32(&resolveCalls, 1)
 			http.Error(w, "no such handler", http.StatusNotFound) // simulate ES < 7.9
-		case r.URL.Path == "/_cat/indices":
+		case "/_cat/indices":
 			atomic.AddInt32(&catCalls, 1)
 			_, _ = w.Write([]byte(`[{"index": "logs"}, {"index": "metrics"}]`))
 		default:
@@ -224,24 +224,34 @@ func TestIsForbiddenOrUnauthorized(t *testing.T) {
 
 func TestSchemaProvider_cacheKey(t *testing.T) {
 	p := NewSchemaProvider(&DataSource{info: &es.DatasourceInfo{ID: 42}})
+	dsis := &backend.DataSourceInstanceSettings{UID: "ds-uid"}
 
-	t.Run("uses namespace, datasource ID, user login and sub", func(t *testing.T) {
+	t.Run("uses namespace, datasource UID, user login and sub", func(t *testing.T) {
 		ctx := backend.WithPluginContext(context.Background(), backend.PluginContext{
-			Namespace: "stacks-7",
-			User:      &backend.User{Login: "alice"},
+			Namespace:                  "stacks-7",
+			User:                       &backend.User{Login: "alice"},
+			DataSourceInstanceSettings: dsis,
 		})
-		require.Equal(t, "stacks-7:42:indices", p.cacheKey(ctx, "indices"))
-		require.Equal(t, "stacks-7:42:cols:logs-*", p.cacheKey(ctx, "cols:logs-*"))
+		require.Equal(t, "stacks-7:ds-uid:indices", p.cacheKey(ctx, "indices"))
+		require.Equal(t, "stacks-7:ds-uid:cols:logs-*", p.cacheKey(ctx, "cols:logs-*"))
 	})
 
 	t.Run("falls back to underscores when namespace and user are missing", func(t *testing.T) {
-		ctx := backend.WithPluginContext(context.Background(), backend.PluginContext{})
-		require.Equal(t, "_:42:indices", p.cacheKey(ctx, "indices"))
+		ctx := backend.WithPluginContext(context.Background(), backend.PluginContext{
+			DataSourceInstanceSettings: dsis,
+		})
+		require.Equal(t, "_:ds-uid:indices", p.cacheKey(ctx, "indices"))
 	})
 
 	t.Run("different namespaces produce different keys", func(t *testing.T) {
-		ctxA := backend.WithPluginContext(context.Background(), backend.PluginContext{Namespace: "a"})
-		ctxB := backend.WithPluginContext(context.Background(), backend.PluginContext{Namespace: "b"})
+		ctxA := backend.WithPluginContext(context.Background(), backend.PluginContext{
+			Namespace:                  "a",
+			DataSourceInstanceSettings: dsis,
+		})
+		ctxB := backend.WithPluginContext(context.Background(), backend.PluginContext{
+			Namespace:                  "b",
+			DataSourceInstanceSettings: dsis,
+		})
 		require.NotEqual(t, p.cacheKey(ctxA, "indices"), p.cacheKey(ctxB, "indices"))
 	})
 }
@@ -257,7 +267,10 @@ func TestSchemaProvider_cachedFieldCapsColumns_singleflightDedupes(t *testing.T)
 	}
 
 	p := NewSchemaProvider(&DataSource{info: &es.DatasourceInfo{ID: 1}})
-	ctx := backend.WithPluginContext(context.Background(), backend.PluginContext{Namespace: "ns"})
+	ctx := backend.WithPluginContext(context.Background(), backend.PluginContext{
+		Namespace:                  "ns",
+		DataSourceInstanceSettings: &backend.DataSourceInstanceSettings{UID: "ds-uid"},
+	})
 
 	const n = 50
 	var wg sync.WaitGroup
@@ -307,11 +320,12 @@ func TestSchemaProvider_cachedFieldCapsColumns_differentKeysRunInParallel(t *tes
 
 	p := NewSchemaProvider(&DataSource{info: &es.DatasourceInfo{ID: 1}})
 
+	dsis := &backend.DataSourceInstanceSettings{UID: "ds-uid"}
 	keys := []string{
 		p.cacheKey(backend.WithPluginContext(context.Background(),
-			backend.PluginContext{Namespace: "ns"}), "cols:logs"),
+			backend.PluginContext{Namespace: "ns", DataSourceInstanceSettings: dsis}), "cols:logs"),
 		p.cacheKey(backend.WithPluginContext(context.Background(),
-			backend.PluginContext{Namespace: "ns"}), "cols:metrics"),
+			backend.PluginContext{Namespace: "ns", DataSourceInstanceSettings: dsis}), "cols:metrics"),
 	}
 	require.Len(t, keys, 2)
 	for i := 0; i < len(keys); i++ {

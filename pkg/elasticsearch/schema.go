@@ -73,7 +73,7 @@ func (p *SchemaProvider) cacheKey(ctx context.Context, sub string) string {
 		ns = "_"
 	}
 
-	return fmt.Sprintf("%s:%d:%s", ns, pCtx.DataSourceInstanceSettings.UID, sub)
+	return fmt.Sprintf("%s:%s:%s", ns, pCtx.DataSourceInstanceSettings.UID, sub)
 }
 
 func (p *SchemaProvider) Schema(ctx context.Context, _ *schemas.SchemaRequest) (*schemas.SchemaResponse, error) {
