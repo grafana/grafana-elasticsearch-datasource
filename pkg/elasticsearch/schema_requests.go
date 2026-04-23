@@ -1,6 +1,7 @@
 package elasticsearch
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,6 +15,24 @@ import (
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 	schemas "github.com/grafana/schemads"
 )
+
+// readResponseBody reads an HTTP response body, transparently decompressing
+// gzip-encoded payloads. Go's net/http only auto-decompresses when the stdlib
+// itself added Accept-Encoding: gzip; Grafana SDK HTTP middlewares (e.g. SigV4)
+// can pre-set headers or wrap the transport in ways that disable that, so we
+// have to honor Content-Encoding explicitly.
+func readResponseBody(resp *http.Response) ([]byte, error) {
+	reader := resp.Body
+	if strings.EqualFold(resp.Header.Get("Content-Encoding"), "gzip") {
+		gr, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("gzip reader: %w", err)
+		}
+		defer func() { _ = gr.Close() }()
+		reader = gr
+	}
+	return io.ReadAll(reader)
+}
 
 func listIndicesViaCat(ctx context.Context, info *es.DatasourceInfo, s *schemaSettings) ([]string, error) {
 	u, err := url.Parse(info.URL)
@@ -35,7 +54,7 @@ func listIndicesViaCat(ctx context.Context, info *es.DatasourceInfo, s *schemaSe
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(resp.Body)
+	body, err := readResponseBody(resp)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +93,7 @@ func listIndicesViaResolve(ctx context.Context, info *es.DatasourceInfo, s *sche
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(resp.Body)
+	body, err := readResponseBody(resp)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +146,7 @@ func fetchFieldCapsColumns(ctx context.Context, info *es.DatasourceInfo, index s
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(resp.Body)
+	body, err := readResponseBody(resp)
 	if err != nil {
 		return nil, err
 	}
