@@ -7,7 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	schemas "github.com/grafana/schemads"
+	"golang.org/x/sync/singleflight"
 )
 
 var (
@@ -34,10 +36,18 @@ var (
 type SchemaProvider struct {
 	ds *DataSource
 
-	mu              sync.Mutex
-	indicesCachedAt time.Time
-	indicesCached   []string
-	colCache        map[string]columnCacheEntry
+	mu           sync.Mutex
+	indicesCache map[string]indicesCacheEntry
+	colCache     map[string]columnCacheEntry
+
+	// sf collapses concurrent fetches that share the same cache key,
+	// so a cold cache for N parallel callers triggers a single ES call.
+	sf singleflight.Group
+}
+
+type indicesCacheEntry struct {
+	at    time.Time
+	names []string
 }
 
 type columnCacheEntry struct {
@@ -47,7 +57,23 @@ type columnCacheEntry struct {
 
 // NewSchemaProvider returns a schema provider backed by ds.
 func NewSchemaProvider(ds *DataSource) *SchemaProvider {
-	return &SchemaProvider{ds: ds, colCache: make(map[string]columnCacheEntry)}
+	return &SchemaProvider{
+		ds:           ds,
+		indicesCache: make(map[string]indicesCacheEntry),
+		colCache:     make(map[string]columnCacheEntry),
+	}
+}
+
+// cacheKey returns a tenant-scoped cache key composed of the Grafana
+// namespace, datasource ID, calling user, and an arbitrary sub-key.
+func (p *SchemaProvider) cacheKey(ctx context.Context, sub string) string {
+	pCtx := backend.PluginConfigFromContext(ctx)
+	ns := pCtx.Namespace
+	if ns == "" {
+		ns = "_"
+	}
+
+	return fmt.Sprintf("%s:%d:%s", ns, pCtx.DataSourceInstanceSettings.UID, sub)
 }
 
 func (p *SchemaProvider) Schema(ctx context.Context, _ *schemas.SchemaRequest) (*schemas.SchemaResponse, error) {
@@ -163,39 +189,53 @@ func fallbackTableSchema() schemas.Table {
 }
 
 func (p *SchemaProvider) cachedIndexNames(ctx context.Context) ([]string, error) {
+	key := p.cacheKey(ctx, "indices")
+
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	if time.Since(p.indicesCachedAt) < schemaIndicesCacheTTL && len(p.indicesCached) > 0 {
-		return p.indicesCached, nil
+	if e, ok := p.indicesCache[key]; ok && time.Since(e.at) < schemaIndicesCacheTTL && len(e.names) > 0 {
+		p.mu.Unlock()
+		return e.names, nil
 	}
-	s := p.ds.schemaSettings
-	names, err := listAllIndexNames(ctx, p.ds.info, &p.ds.schemaSettings)
+	p.mu.Unlock()
+
+	v, err, _ := p.sf.Do(key, func() (interface{}, error) {
+		names, err := listAllIndexNames(ctx, p.ds.info, &p.ds.schemaSettings)
+		if err != nil {
+			return nil, err
+		}
+		p.mu.Lock()
+		p.indicesCache[key] = indicesCacheEntry{at: time.Now(), names: names}
+		p.mu.Unlock()
+		return names, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if len(names) > s.MaxIndices {
-		names = names[:s.MaxIndices]
-	}
-	p.indicesCached = names
-	p.indicesCachedAt = time.Now()
-	return names, nil
+	return v.([]string), nil
 }
 
 func (p *SchemaProvider) cachedFieldCapsColumns(ctx context.Context, index string, timeField string) ([]schemas.Column, error) {
+	key := p.cacheKey(ctx, "cols:"+index)
+
 	p.mu.Lock()
-	entry, ok := p.colCache[index]
-	if ok && time.Since(entry.at) < schemaIndicesCacheTTL && len(entry.cols) > 0 {
+	if e, ok := p.colCache[key]; ok && time.Since(e.at) < schemaIndicesCacheTTL && len(e.cols) > 0 {
 		p.mu.Unlock()
-		return entry.cols, nil
+		return e.cols, nil
 	}
 	p.mu.Unlock()
 
-	cols, err := fetchFieldCapsColumns(ctx, p.ds.info, index, timeField, p.ds.schemaSettings.FieldCapsTimeout)
+	v, err, _ := p.sf.Do(key, func() (interface{}, error) {
+		cols, err := fetchFieldCapsColumns(ctx, p.ds.info, index, timeField, p.ds.schemaSettings.FieldCapsTimeout)
+		if err != nil {
+			return nil, err
+		}
+		p.mu.Lock()
+		p.colCache[key] = columnCacheEntry{at: time.Now(), cols: cols}
+		p.mu.Unlock()
+		return cols, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	p.mu.Lock()
-	p.colCache[index] = columnCacheEntry{at: time.Now(), cols: cols}
-	p.mu.Unlock()
-	return cols, nil
+	return v.([]schemas.Column), nil
 }

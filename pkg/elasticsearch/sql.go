@@ -50,8 +50,8 @@ func normalizeGrafanaSQLRequest(logger log.Logger, ds *DataSource, req *backend.
 			continue
 		}
 
-		index, ok := resolveSQLIndex(&sq)
-		if !ok || index == "" {
+		index := resolveSQLIndex(&sq)
+		if index == "" {
 			logger.Warn("grafanaSql missing index target", "table", sq.Table)
 			out = append(out, q)
 			continue
@@ -100,11 +100,11 @@ func normalizeGrafanaSQLRequest(logger log.Logger, ds *DataSource, req *backend.
 	}
 }
 
-func resolveSQLIndex(sq *schemas.Query) (string, bool) {
+func resolveSQLIndex(sq *schemas.Query) string {
 	if sq.Table == fallbackTableName {
-		return tableParamAny(sq.TableParameterValues, tableParamIndex), true
+		return tableParamAny(sq.TableParameterValues, tableParamIndex)
 	}
-	return strings.TrimSpace(sq.Table), true
+	return strings.TrimSpace(sq.Table)
 }
 
 func tableParamAny(m map[string]any, key string) string {

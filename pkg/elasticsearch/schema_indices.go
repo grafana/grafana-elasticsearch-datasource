@@ -16,16 +16,23 @@ import (
 const (
 	schemaIndicesCacheTTL = 2 * time.Minute
 	maxFieldColumns       = 2000
-	// safetyMaxIndices caps how many index names we load from _cat/indices to protect memory.
-	safetyMaxIndices = 10000
 )
 
 type catIndexRow struct {
 	Index string `json:"index"`
 }
 
-// listAllIndexNames returns sorted index names (filtered). Truncates to safetyMaxIndices if the cluster exceeds that.
-// Falls back to _resolve/index/* if _cat/indices returns 403/401.
+// listAllIndexNames returns sorted index names (filtered). Truncates to s.MaxIndices if the cluster exceeds that.
+//
+// Tries _resolve/index/* first because it is lighter weight, has friendlier
+// permission requirements (view_index_metadata vs the monitor cluster privilege
+// required by _cat/indices on many managed clusters), and surfaces user-facing
+// data stream names rather than their hidden .ds-* backing indices.
+//
+// Falls back to _cat/indices on any error from _resolve. The most common reason
+// for resolve to fail is the API not existing on Elasticsearch versions older
+// than 7.9; the fallback also covers transient errors and atypical permission
+// configurations where cat is allowed but resolve is not.
 func listAllIndexNames(ctx context.Context, info *es.DatasourceInfo, s *schemaSettings) ([]string, error) {
 	timeout := s.IndicesTimeout
 	if timeout == 0 {
@@ -34,16 +41,15 @@ func listAllIndexNames(ctx context.Context, info *es.DatasourceInfo, s *schemaSe
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	names, err := listIndicesViaCat(ctx, info, s)
+	names, err := listIndicesViaResolve(ctx, info, s)
+	if err == nil {
+		return names, nil
+	}
+	resolveErr := err
+
+	names, err = listIndicesViaCat(ctx, info, s)
 	if err != nil {
-		if isForbiddenOrUnauthorized(err) {
-			names, err = listIndicesViaResolve(ctx, info, s)
-			if err != nil {
-				return nil, fmt.Errorf("list indices fallback failed: %w", err)
-			}
-			return names, nil
-		}
-		return nil, err
+		return nil, fmt.Errorf("list indices: resolve failed (%v); cat fallback failed: %w", resolveErr, err)
 	}
 	return names, nil
 }
@@ -53,23 +59,39 @@ func isForbiddenOrUnauthorized(err error) bool {
 	return strings.Contains(s, "HTTP 403") || strings.Contains(s, "HTTP 401")
 }
 
-func filterAndSortIndices(rows []catIndexRow, s *schemaSettings) []string {
-	var names []string
-	for _, r := range rows {
-		name := strings.TrimSpace(r.Index)
+// filterAndSortIndices normalizes a raw list of names: trims whitespace, drops
+// hidden names (those with a leading "."), deduplicates, sorts, and truncates
+// to s.MaxIndices.
+//
+// Dedup matters because the resolve path concatenates indices, aliases and
+// data streams — distinct ES concepts that nonetheless share a flat namespace
+// and could in principle collide.
+func filterAndSortIndices(names []string, s *schemaSettings) []string {
+	seen := make(map[string]struct{}, len(names))
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
 		if !s.IncludeHidden && strings.HasPrefix(name, ".") {
 			continue
 		}
-		names = append(names, name)
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
 	}
-	sort.Strings(names)
-	if len(names) > safetyMaxIndices {
-		names = names[:safetyMaxIndices]
+	sort.Strings(out)
+	max := s.MaxIndices
+	if max <= 0 {
+		max = defaultSchemaMaxIndices
 	}
-	return names
+	if len(out) > max {
+		out = out[:max]
+	}
+	return out
 }
 
 func truncateForErr(b []byte) string {

@@ -70,10 +70,24 @@ func listIndicesViaCat(ctx context.Context, info *es.DatasourceInfo, s *schemaSe
 		return nil, fmt.Errorf("decode cat indices: %w", err)
 	}
 
-	return filterAndSortIndices(rows, s), nil
+	names := make([]string, 0, len(rows))
+	for _, r := range rows {
+		names = append(names, r.Index)
+	}
+	return filterAndSortIndices(names, s), nil
 }
 
-// listIndicesViaResolve uses _resolve/index/* as a fallback when _cat/indices is forbidden (ES 7.9+).
+// listIndicesViaResolve uses _resolve/index/* (ES 7.9+) to enumerate concrete
+// indices, aliases and data streams in a single lightweight call.
+//
+// The response contains three top-level arrays that we combine:
+//   - "indices": concrete indices. We skip those with a non-empty "data_stream"
+//     attribute since they are .ds-* backing indices that the user shouldn't
+//     query directly — we surface the data stream name instead.
+//   - "aliases": aliases users can query like indices.
+//   - "data_streams": user-facing data stream names.
+//
+// Dedup and hidden-name filtering happen in filterAndSortIndices.
 func listIndicesViaResolve(ctx context.Context, info *es.DatasourceInfo, s *schemaSettings) ([]string, error) {
 	u, err := url.Parse(info.URL)
 	if err != nil {
@@ -101,20 +115,47 @@ func listIndicesViaResolve(ctx context.Context, info *es.DatasourceInfo, s *sche
 		return nil, fmt.Errorf("resolve indices: HTTP %d: %s", resp.StatusCode, truncateForErr(body))
 	}
 
-	var resolveResp struct {
-		Indices []struct {
-			Name string `json:"name"`
-		} `json:"indices"`
+	names, err := parseResolveResponse(body)
+	if err != nil {
+		return nil, err
 	}
-	if err := json.Unmarshal(body, &resolveResp); err != nil {
+	return filterAndSortIndices(names, s), nil
+}
+
+// parseResolveResponse parses a _resolve/index/* response into a flat list of
+// user-facing names: concrete indices (excluding data stream backing indices),
+// aliases, and data streams.
+func parseResolveResponse(body []byte) ([]string, error) {
+	var resp struct {
+		Indices []struct {
+			Name       string `json:"name"`
+			DataStream string `json:"data_stream,omitempty"`
+		} `json:"indices"`
+		Aliases []struct {
+			Name string `json:"name"`
+		} `json:"aliases,omitempty"`
+		DataStreams []struct {
+			Name string `json:"name"`
+		} `json:"data_streams,omitempty"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, fmt.Errorf("decode resolve indices: %w", err)
 	}
 
-	rows := make([]catIndexRow, 0, len(resolveResp.Indices))
-	for _, idx := range resolveResp.Indices {
-		rows = append(rows, catIndexRow{Index: idx.Name})
+	names := make([]string, 0, len(resp.Indices)+len(resp.Aliases)+len(resp.DataStreams))
+	for _, idx := range resp.Indices {
+		if idx.DataStream != "" {
+			continue
+		}
+		names = append(names, idx.Name)
 	}
-	return filterAndSortIndices(rows, s), nil
+	for _, a := range resp.Aliases {
+		names = append(names, a.Name)
+	}
+	for _, ds := range resp.DataStreams {
+		names = append(names, ds.Name)
+	}
+	return names, nil
 }
 
 // fetchFieldCapsColumns loads field caps for a single index (or pattern) and returns schemads columns.
