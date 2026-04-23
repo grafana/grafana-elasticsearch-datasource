@@ -32,8 +32,28 @@ type instanceWithSchema struct {
 }
 
 func (i *instanceWithSchema) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	req = normalizeGrafanaSQLRequest(i.logger.FromContext(ctx), i.DataSource, req)
-	return i.DataSource.QueryData(ctx, req)
+	req, rejected := normalizeGrafanaSQLRequest(i.logger.FromContext(ctx), i.DataSource, req)
+
+	var resp *backend.QueryDataResponse
+	var err error
+	if req != nil && len(req.Queries) > 0 {
+		resp, err = i.DataSource.QueryData(ctx, req)
+		if err != nil {
+			return resp, err
+		}
+	}
+	if resp == nil {
+		resp = &backend.QueryDataResponse{}
+	}
+	if len(rejected) > 0 {
+		if resp.Responses == nil {
+			resp.Responses = backend.Responses{}
+		}
+		for refID, rerr := range rejected {
+			resp.Responses[refID] = backend.DataResponse{Error: rerr}
+		}
+	}
+	return resp, nil
 }
 
 func (i *instanceWithSchema) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {

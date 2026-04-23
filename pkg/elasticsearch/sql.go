@@ -23,22 +23,34 @@ const (
 )
 
 // normalizeGrafanaSQLRequest rewrites dsabstraction queries (grafanaSql) into native Elasticsearch query JSON.
-func normalizeGrafanaSQLRequest(logger log.Logger, ds *DataSource, req *backend.QueryDataRequest) *backend.QueryDataRequest {
+// It returns the (possibly mutated) request and a map of refIDs that could not be normalized,
+// keyed to the reason. Queries listed in the rejected map are dropped from the returned request;
+// callers should attach these as per-query error responses so the failure surfaces in Grafana
+// instead of being passed downstream as an unrunnable payload.
+func normalizeGrafanaSQLRequest(logger log.Logger, ds *DataSource, req *backend.QueryDataRequest) (*backend.QueryDataRequest, map[string]error) {
 	if req == nil || len(req.Queries) == 0 {
-		return req
+		return req, nil
 	}
 
 	cfg := req.PluginContext.GrafanaConfig
 	if cfg == nil {
 		logger.Warn("grafanaConfig is not set, skipping grafanaSql normalization")
-		return req
+		return req, nil
 	}
 	if !cfg.FeatureToggles().IsEnabled(dsAbstractionAppFeature) {
-		return req
+		return req, nil
 	}
 
 	cf := ds.info.ConfiguredFields
 	out := make([]backend.DataQuery, 0, len(req.Queries))
+	var rejected map[string]error
+	rejectQuery := func(refID string, err error) {
+		if rejected == nil {
+			rejected = make(map[string]error)
+		}
+		rejected[refID] = err
+	}
+
 	for _, q := range req.Queries {
 		var sq schemas.Query
 		if err := json.Unmarshal(q.JSON, &sq); err != nil {
@@ -50,29 +62,30 @@ func normalizeGrafanaSQLRequest(logger log.Logger, ds *DataSource, req *backend.
 			continue
 		}
 
-		index := resolveSQLIndex(&sq)
-		if index == "" {
-			logger.Warn("grafanaSql missing index target", "table", sq.Table)
-			out = append(out, q)
-			continue
-		}
-
 		refID := sq.RefID
 		if refID == "" {
 			refID = q.RefID
 		}
 
+		index := resolveSQLIndex(&sq)
+		if index == "" {
+			logger.Warn("grafanaSql missing index target", "refId", refID, "table", sq.Table)
+			rejectQuery(refID, fmt.Errorf("grafanaSql query %q is missing an index target (table=%q)", refID, sq.Table))
+			continue
+		}
+
 		tr := mergeTimeRangeFromFilters(q.TimeRange, sq.Filters, cf)
 		model, err := buildLuceneGrafanaSQL(refID, index, cf, sq.Filters)
 		if err != nil {
-			logger.Warn("grafanaSql normalization failed", "error", err, "table", sq.Table)
-			out = append(out, q)
+			logger.Warn("grafanaSql normalization failed", "refId", refID, "error", err, "table", sq.Table)
+			rejectQuery(refID, fmt.Errorf("grafanaSql query %q failed to normalize: %w", refID, err))
 			continue
 		}
 
 		jsonBytes, err := json.Marshal(model)
 		if err != nil {
-			out = append(out, q)
+			logger.Warn("grafanaSql JSON marshal failed", "refId", refID, "error", err, "table", sq.Table)
+			rejectQuery(refID, fmt.Errorf("grafanaSql query %q failed to encode: %w", refID, err))
 			continue
 		}
 
@@ -97,7 +110,7 @@ func normalizeGrafanaSQLRequest(logger log.Logger, ds *DataSource, req *backend.
 		Headers:       req.Headers,
 		Queries:       out,
 		Format:        req.Format,
-	}
+	}, rejected
 }
 
 func resolveSQLIndex(sq *schemas.Query) string {

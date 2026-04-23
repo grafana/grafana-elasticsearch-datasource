@@ -28,7 +28,8 @@ func TestNormalizeGrafanaSQLRequest_PassthroughWithoutToggle(t *testing.T) {
 		},
 		Queries: []backend.DataQuery{{RefID: "A", JSON: raw}},
 	}
-	out := normalizeGrafanaSQLRequest(backend.Logger, ds, req)
+	out, rejected := normalizeGrafanaSQLRequest(backend.Logger, ds, req)
+	require.Empty(t, rejected)
 	require.JSONEq(t, string(raw), string(out.Queries[0].JSON))
 }
 
@@ -59,7 +60,8 @@ func TestNormalizeGrafanaSQLRequest_IndexTable(t *testing.T) {
 			JSON:      raw,
 		}},
 	}
-	out := normalizeGrafanaSQLRequest(backend.Logger, ds, req)
+	out, rejected := normalizeGrafanaSQLRequest(backend.Logger, ds, req)
+	require.Empty(t, rejected)
 	require.Len(t, out.Queries, 1)
 	require.Equal(t, "lucene", out.Queries[0].QueryType)
 	var m map[string]any
@@ -95,11 +97,54 @@ func TestNormalizeGrafanaSQLRequest_FallbackTable(t *testing.T) {
 			JSON:      raw,
 		}},
 	}
-	out := normalizeGrafanaSQLRequest(backend.Logger, ds, req)
+	out, rejected := normalizeGrafanaSQLRequest(backend.Logger, ds, req)
+	require.Empty(t, rejected)
 	require.Len(t, out.Queries, 1)
 	var m map[string]any
 	require.NoError(t, json.Unmarshal(out.Queries[0].JSON, &m))
 	require.Equal(t, "my-idx", m["index"])
+}
+
+func TestNormalizeGrafanaSQLRequest_MissingIndexIsRejected(t *testing.T) {
+	ds := &DataSource{
+		info: &es.DatasourceInfo{
+			ConfiguredFields: es.ConfiguredFields{TimeField: "@timestamp"},
+		},
+	}
+	// fallbackTableName with no tableParameterValues.index → resolveSQLIndex returns ""
+	raw, err := json.Marshal(map[string]any{
+		"refId":      "A",
+		"grafanaSql": true,
+		"table":      fallbackTableName,
+		"filters":    []any{},
+	})
+	require.NoError(t, err)
+	// A second, well-formed query that should still be normalized alongside the rejected one.
+	rawB, err := json.Marshal(map[string]any{
+		"refId":      "B",
+		"grafanaSql": true,
+		"table":      "logs-0001",
+		"filters":    []any{},
+	})
+	require.NoError(t, err)
+	req := &backend.QueryDataRequest{
+		PluginContext: backend.PluginContext{
+			GrafanaConfig: backend.NewGrafanaCfg(map[string]string{
+				featuretoggles.EnabledFeatures: dsAbstractionAppFeature,
+			}),
+		},
+		Queries: []backend.DataQuery{
+			{RefID: "A", JSON: raw},
+			{RefID: "B", JSON: rawB},
+		},
+	}
+
+	out, rejected := normalizeGrafanaSQLRequest(backend.Logger, ds, req)
+	require.Len(t, rejected, 1)
+	require.Contains(t, rejected, "A")
+	require.ErrorContains(t, rejected["A"], "missing an index target")
+	require.Len(t, out.Queries, 1)
+	require.Equal(t, "B", out.Queries[0].RefID)
 }
 
 func TestMergeTimeRangeFromFilters(t *testing.T) {
@@ -298,7 +343,8 @@ func TestNormalizeGrafanaSQLRequest_LuceneBoolFilters(t *testing.T) {
 			JSON:      raw,
 		}},
 	}
-	out := normalizeGrafanaSQLRequest(backend.Logger, ds, req)
+	out, rejected := normalizeGrafanaSQLRequest(backend.Logger, ds, req)
+	require.Empty(t, rejected)
 	require.Len(t, out.Queries, 1)
 	require.Equal(t, "lucene", out.Queries[0].QueryType)
 	var m map[string]any
