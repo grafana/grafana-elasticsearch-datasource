@@ -99,116 +99,102 @@ func processEsqlRawDataResponse(response *es.EsqlResponse, target *Query) (*back
 	}, nil
 }
 
-// processEsqlMetricsResponse processes ES|QL response for metrics queries.
-// It maps a time column + numeric value column to a timeseries-multi frame
-// to match the shape returned by regular/raw DSL metrics queries.
-// When breakdown columns are present (columns that are neither time nor numeric),
-// rows are grouped by unique breakdown values and separate frames are created.
-func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query) (*backend.DataResponse, error) {
-	// Metrics mode requires STATS in ES|QL to produce an aggregation result.
-	// Without STATS, return a successful empty response.
-	if !hasEsqlStatsCommand(target.RawQuery) {
-		return &backend.DataResponse{}, nil
-	}
+// esqlColumnLayout holds the indices of time, value, and breakdown columns
+// identified from an ES|QL response.
+type esqlColumnLayout struct {
+	timeColIdx       int
+	valueColIdx      int
+	breakdownColIdxs []int
+}
 
-	if response == nil || len(response.Columns) == 0 {
-		return &backend.DataResponse{
-			Frames: []*data.Frame{data.NewFrame(target.RefID)},
-		}, nil
-	}
+// classifyEsqlColumns inspects ES|QL column metadata and returns the indices
+// of the first date column (time), the first numeric column (value), and all
+// remaining columns (breakdown dimensions).
+func classifyEsqlColumns(columns []es.EsqlColumn) esqlColumnLayout {
+	layout := esqlColumnLayout{timeColIdx: -1, valueColIdx: -1}
 
-	timeColIdx := -1
-	valueColIdx := -1
-
-	for i, col := range response.Columns {
+	for i, col := range columns {
 		switch col.Type {
 		case "date", "date_nanos":
-			if timeColIdx == -1 {
-				timeColIdx = i
+			if layout.timeColIdx == -1 {
+				layout.timeColIdx = i
 			}
 		case "long", "integer", "short", "byte", "double", "float", "half_float", "scaled_float":
-			if valueColIdx == -1 {
-				valueColIdx = i
+			if layout.valueColIdx == -1 {
+				layout.valueColIdx = i
 			}
 		}
 	}
 
-	// If the response doesn't look like time series data, keep existing table behavior.
-	if timeColIdx == -1 || valueColIdx == -1 {
-		return processEsqlRawDataResponse(response, target)
-	}
-
-	// Identify breakdown columns (neither time nor value)
-	var breakdownColIdxs []int
-	for i := range response.Columns {
-		if i != timeColIdx && i != valueColIdx {
-			breakdownColIdxs = append(breakdownColIdxs, i)
+	for i := range columns {
+		if i != layout.timeColIdx && i != layout.valueColIdx {
+			layout.breakdownColIdxs = append(layout.breakdownColIdxs, i)
 		}
 	}
 
-	metricType := countType
-	if len(target.Metrics) > 0 && target.Metrics[0] != nil && target.Metrics[0].Type != "" {
-		metricType = target.Metrics[0].Type
-	}
+	return layout
+}
 
-	// No breakdown columns — single flat frame (original behavior)
-	if len(breakdownColIdxs) == 0 {
-		timeVector := make([]time.Time, 0, len(response.Values))
-		valueVector := make([]*float64, 0, len(response.Values))
+// buildEsqlSingleSeriesFrame creates a single time series frame from rows
+// when there are no breakdown columns.
+func buildEsqlSingleSeriesFrame(response *es.EsqlResponse, layout esqlColumnLayout, metricName string) *data.Frame {
+	timeVector := make([]time.Time, 0, len(response.Values))
+	valueVector := make([]*float64, 0, len(response.Values))
 
-		for _, row := range response.Values {
-			if timeColIdx >= len(row) {
-				continue
-			}
-			ts, ok := parseEsqlDateTime(row[timeColIdx])
-			if !ok {
-				continue
-			}
-			var value *float64
-			if valueColIdx < len(row) && row[valueColIdx] != nil {
-				if v, ok := toFloat64(row[valueColIdx]); ok {
-					value = &v
-				}
-			}
-			timeVector = append(timeVector, ts)
-			valueVector = append(valueVector, value)
+	for _, row := range response.Values {
+		if layout.timeColIdx >= len(row) {
+			continue
 		}
-
-		if len(timeVector) == 0 {
-			return processEsqlRawDataResponse(response, target)
+		ts, ok := parseEsqlDateTime(row[layout.timeColIdx])
+		if !ok {
+			continue
 		}
-
-		frame := newTimeSeriesFrame(timeVector, nil, valueVector)
-		frame.Name = getMetricName(metricType)
-		return &backend.DataResponse{
-			Frames: []*data.Frame{frame},
-		}, nil
+		var value *float64
+		if layout.valueColIdx < len(row) && row[layout.valueColIdx] != nil {
+			if v, ok := toFloat64(row[layout.valueColIdx]); ok {
+				value = &v
+			}
+		}
+		timeVector = append(timeVector, ts)
+		valueVector = append(valueVector, value)
 	}
 
-	// Group rows by breakdown field values
-	type seriesData struct {
-		timeVector  []time.Time
-		valueVector []*float64
-		labels      map[string]string
+	if len(timeVector) == 0 {
+		return nil
 	}
 
-	// Use ordered tracking to produce deterministic frame order
-	seriesMap := make(map[string]*seriesData)
+	frame := newTimeSeriesFrame(timeVector, nil, valueVector)
+	frame.Name = metricName
+	return frame
+}
+
+// esqlSeriesData holds accumulated time/value vectors and labels for a single
+// breakdown group.
+type esqlSeriesData struct {
+	timeVector  []time.Time
+	valueVector []*float64
+	labels      map[string]string
+}
+
+// buildEsqlMultiSeriesFrames groups rows by breakdown column values and returns
+// one time series frame per unique combination of breakdown values.
+func buildEsqlMultiSeriesFrames(response *es.EsqlResponse, layout esqlColumnLayout, metricName string) []*data.Frame {
+	seriesMap := make(map[string]*esqlSeriesData)
 	var seriesOrder []string
 
 	for _, row := range response.Values {
-		if timeColIdx >= len(row) {
+		if layout.timeColIdx >= len(row) {
 			continue
 		}
-		ts, ok := parseEsqlDateTime(row[timeColIdx])
+		ts, ok := parseEsqlDateTime(row[layout.timeColIdx])
 		if !ok {
 			continue
 		}
 
 		// Build the group key and labels from breakdown columns
-		labels := make(map[string]string, len(breakdownColIdxs))
-		keyParts := make([]string, len(breakdownColIdxs))
-		for i, colIdx := range breakdownColIdxs {
+		labels := make(map[string]string, len(layout.breakdownColIdxs))
+		keyParts := make([]string, len(layout.breakdownColIdxs))
+		for i, colIdx := range layout.breakdownColIdxs {
 			val := ""
 			if colIdx < len(row) && row[colIdx] != nil {
 				val = fmt.Sprintf("%v", row[colIdx])
@@ -219,15 +205,15 @@ func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query) (*back
 		key := strings.Join(keyParts, "|||")
 
 		var value *float64
-		if valueColIdx < len(row) && row[valueColIdx] != nil {
-			if v, ok := toFloat64(row[valueColIdx]); ok {
+		if layout.valueColIdx < len(row) && row[layout.valueColIdx] != nil {
+			if v, ok := toFloat64(row[layout.valueColIdx]); ok {
 				value = &v
 			}
 		}
 
 		sd, exists := seriesMap[key]
 		if !exists {
-			sd = &seriesData{labels: labels}
+			sd = &esqlSeriesData{labels: labels}
 			seriesMap[key] = sd
 			seriesOrder = append(seriesOrder, key)
 		}
@@ -236,17 +222,60 @@ func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query) (*back
 	}
 
 	if len(seriesOrder) == 0 {
-		return processEsqlRawDataResponse(response, target)
+		return nil
 	}
 
 	frames := make([]*data.Frame, 0, len(seriesOrder))
 	for _, key := range seriesOrder {
 		sd := seriesMap[key]
 		frame := newTimeSeriesFrame(sd.timeVector, sd.labels, sd.valueVector)
-		frame.Name = getMetricName(metricType)
+		frame.Name = metricName
 		frames = append(frames, frame)
 	}
+	return frames
+}
 
+// processEsqlMetricsResponse processes ES|QL response for metrics queries.
+// It maps a time column + numeric value column to a timeseries-multi frame
+// to match the shape returned by regular/raw DSL metrics queries.
+// When breakdown columns are present (columns that are neither time nor numeric),
+// rows are grouped by unique breakdown values and separate frames are created.
+func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query) (*backend.DataResponse, error) {
+	if !hasEsqlStatsCommand(target.RawQuery) {
+		return &backend.DataResponse{}, nil
+	}
+
+	if response == nil || len(response.Columns) == 0 {
+		return &backend.DataResponse{
+			Frames: []*data.Frame{data.NewFrame(target.RefID)},
+		}, nil
+	}
+
+	layout := classifyEsqlColumns(response.Columns)
+
+	if layout.timeColIdx == -1 || layout.valueColIdx == -1 {
+		return processEsqlRawDataResponse(response, target)
+	}
+
+	metricName := getMetricName(countType)
+	if len(target.Metrics) > 0 && target.Metrics[0] != nil && target.Metrics[0].Type != "" {
+		metricName = getMetricName(target.Metrics[0].Type)
+	}
+
+	if len(layout.breakdownColIdxs) == 0 {
+		frame := buildEsqlSingleSeriesFrame(response, layout, metricName)
+		if frame == nil {
+			return processEsqlRawDataResponse(response, target)
+		}
+		return &backend.DataResponse{
+			Frames: []*data.Frame{frame},
+		}, nil
+	}
+
+	frames := buildEsqlMultiSeriesFrames(response, layout, metricName)
+	if frames == nil {
+		return processEsqlRawDataResponse(response, target)
+	}
 	return &backend.DataResponse{
 		Frames: frames,
 	}, nil
