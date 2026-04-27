@@ -89,6 +89,7 @@ type Query struct {
 // BoolQuery represents a bool query
 type BoolQuery struct {
 	Filters []Filter
+	MustNot []Filter
 }
 
 // MarshalJSON returns the JSON encoding of the boolean query.
@@ -100,6 +101,13 @@ func (q *BoolQuery) MarshalJSON() ([]byte, error) {
 			root["filter"] = q.Filters[0]
 		} else {
 			root["filter"] = q.Filters
+		}
+	}
+	if len(q.MustNot) > 0 {
+		if len(q.MustNot) == 1 {
+			root["must_not"] = q.MustNot[0]
+		} else {
+			root["must_not"] = q.MustNot
 		}
 	}
 	return json.Marshal(root)
@@ -136,7 +144,7 @@ type RangeFilter struct {
 	Format string
 }
 
-// MarshalJSON returns the JSON encoding of the query string filter.
+// MarshalJSON returns the JSON encoding of the range filter.
 func (f *RangeFilter) MarshalJSON() ([]byte, error) {
 	root := map[string]map[string]map[string]interface{}{
 		"range": {
@@ -152,6 +160,68 @@ func (f *RangeFilter) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(root)
+}
+
+// TermFilter represents a term search filter
+type TermFilter struct {
+	Filter
+	Key   string
+	Value any
+}
+
+// MarshalJSON returns the JSON encoding of the term filter.
+func (f *TermFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"term": map[string]any{f.Key: f.Value}})
+}
+
+// TermsFilter represents a terms (multi-value) search filter
+type TermsFilter struct {
+	Filter
+	Key    string
+	Values []any
+}
+
+// MarshalJSON returns the JSON encoding of the terms filter.
+func (f *TermsFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"terms": map[string]any{f.Key: f.Values}})
+}
+
+// GenericRangeFilter represents a range filter with arbitrary bounds.
+type GenericRangeFilter struct {
+	Filter
+	Key    string
+	Bounds map[string]any
+}
+
+// MarshalJSON returns the JSON encoding of the generic range filter.
+func (f *GenericRangeFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"range": map[string]any{f.Key: f.Bounds}})
+}
+
+// MatchPhraseFilter represents a match_phrase search filter.
+// Unlike term queries, match_phrase queries analyse the input text
+// using the field's analyzer, so they work for both text and keyword fields.
+type MatchPhraseFilter struct {
+	Filter
+	Key   string
+	Value any
+}
+
+// MarshalJSON returns the JSON encoding of the match_phrase filter.
+func (f *MatchPhraseFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"match_phrase": map[string]any{f.Key: f.Value}})
+}
+
+// WildcardFilter represents a wildcard search filter
+type WildcardFilter struct {
+	Filter
+	Key   string
+	Value string
+}
+
+// MarshalJSON returns the JSON encoding of the wildcard filter.
+func (f *WildcardFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"wildcard": map[string]any{f.Key: map[string]any{"value": f.Value}}})
 }
 
 // Aggregation represents an aggregation

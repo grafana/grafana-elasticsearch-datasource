@@ -19,6 +19,9 @@ func (e *elasticsearchDataQuery) processQuery(q *Query, ms *es.MultiSearchReques
 
 	defaultTimeField := e.client.GetConfiguredFields().TimeField
 	b := ms.Search(q.Interval, q.TimeRange)
+	if q.Index != "" {
+		b.SetIndex(q.Index)
+	}
 	b.Size(0)
 	filters := b.Query().Bool().Filter()
 	filters.AddDateRangeFilter(defaultTimeField, to, from, es.DateFormatEpochMS)
@@ -35,6 +38,14 @@ func (e *elasticsearchDataQuery) processQuery(q *Query, ms *es.MultiSearchReques
 	} else {
 		// For non-DSL queries (Lucene), add the query string filter
 		filters.AddQueryStringFilter(q.RawQuery, true)
+	}
+
+	if q.BoolFilters != nil {
+		applyBoolFilters(q.BoolFilters, b)
+	}
+
+	if len(q.SourceIncludes) > 0 {
+		b.SetSourceIncludes(q.SourceIncludes)
 	}
 
 	if isLogsQuery(q) {
@@ -202,6 +213,34 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 			aggBuilder.Metric(m.ID, m.Type, m.Field, func(a *es.MetricAggregation) {
 				a.Settings = m.generateSettingsForDSL()
 			})
+		}
+	}
+}
+
+func applyBoolFilters(bf *BoolFilterSet, b *es.SearchRequestBuilder) {
+	filterBuilder := b.Query().Bool().Filter()
+	for _, c := range bf.Filters {
+		applySingleClause(c, filterBuilder)
+	}
+	mustNotBuilder := b.Query().Bool().MustNot()
+	for _, c := range bf.MustNot {
+		applySingleClause(c, mustNotBuilder)
+	}
+}
+
+func applySingleClause(c BoolFilterClause, fb *es.FilterQueryBuilder) {
+	switch c.Type {
+	case "term":
+		fb.AddTermFilter(c.Field, c.Value)
+	case "terms":
+		fb.AddTermsFilter(c.Field, c.Values)
+	case "match_phrase":
+		fb.AddMatchPhraseFilter(c.Field, c.Value)
+	case "range":
+		fb.AddGenericRangeFilter(c.Field, c.Bounds)
+	case "wildcard":
+		if s, ok := c.Value.(string); ok {
+			fb.AddWildcardFilter(c.Field, s)
 		}
 	}
 }

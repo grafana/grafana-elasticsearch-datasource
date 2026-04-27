@@ -176,16 +176,22 @@ func (c *baseClientImpl) createMultiSearchRequests(searchRequests []*SearchReque
 	multiRequests := []*multiRequest{}
 
 	for _, searchReq := range searchRequests {
-		indices, err := c.indexPattern.GetIndices(searchReq.TimeRange)
-		if err != nil {
-			err := fmt.Errorf("failed to get indices from index pattern. %s", err)
-			return nil, backend.DownstreamError(err)
+		var indexHeader string
+		if searchReq.Index != "" {
+			indexHeader = searchReq.Index
+		} else {
+			indices, err := c.indexPattern.GetIndices(searchReq.TimeRange)
+			if err != nil {
+				err := fmt.Errorf("failed to get indices from index pattern. %s", err)
+				return nil, backend.DownstreamError(err)
+			}
+			indexHeader = strings.Join(indices, ",")
 		}
 		mr := multiRequest{
 			header: map[string]any{
 				"search_type":        "query_then_fetch",
 				"ignore_unavailable": true,
-				"index":              strings.Join(indices, ","),
+				"index":              indexHeader,
 			},
 			body:     searchReq,
 			interval: searchReq.Interval,

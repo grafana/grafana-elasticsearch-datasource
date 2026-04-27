@@ -52,7 +52,11 @@ func (e *requestEncoder) encodeBatchRequests(requests []*multiRequest) ([]byte, 
 			return nil, fmt.Errorf("unknown request type: %T", r.body)
 		}
 
-		body = strings.ReplaceAll(body, "$__interval_ms", strconv.FormatInt(r.interval.Milliseconds(), 10))
+		intervalMs := r.interval.Milliseconds()
+		if intervalMs <= 0 {
+			intervalMs = 1000
+		}
+		body = strings.ReplaceAll(body, "$__interval_ms", strconv.FormatInt(intervalMs, 10))
 		body = strings.ReplaceAll(body, "$__interval", r.interval.String())
 
 		payload.WriteString(body + "\n")

@@ -40,3 +40,11 @@ func Test() error {
 func TestRace() error {
 	return build.TestRace()
 }
+
+func Debugger() error {
+	return build.Debugger()
+}
+
+func ReloadPlugin() error {
+	return build.ReloadPlugin()
+}

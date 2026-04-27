@@ -37,6 +37,11 @@
       "port": 3222,
       "host": "127.0.0.1",
       "showLog": true
-    }
+    },
+    {
+      "name": "Attach to Go Process",
+      "type": "go",
+      "request": "attach"
+    },
   ]
 }

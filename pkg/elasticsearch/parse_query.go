@@ -46,6 +46,21 @@ func parseQuery(tsdbQuery []backend.DataQuery, logger log.Logger) ([]*Query, err
 		intervalMs := model.Get("intervalMs").MustInt64(0)
 		interval := q.Interval
 		includeRuntimeFields := model.Get("includeRuntimeFields").MustBool(false)
+		index := model.Get("index").MustString("")
+
+		var boolFilters *BoolFilterSet
+		if bf := model.Get("boolFilters"); bf.Interface() != nil {
+			boolFilters = parseBoolFilters(bf)
+		}
+
+		var sourceIncludes []string
+		if si := model.Get("sourceIncludes").MustArray(); len(si) > 0 {
+			for _, v := range si {
+				if s, ok := v.(string); ok && s != "" {
+					sourceIncludes = append(sourceIncludes, s)
+				}
+			}
+		}
 
 		queries = append(queries, &Query{
 			RawQuery:             rawQuery,
@@ -60,10 +75,53 @@ func parseQuery(tsdbQuery []backend.DataQuery, logger log.Logger) ([]*Query, err
 			TimeRange:            q.TimeRange,
 			EditorType:           editorType,
 			IncludeRuntimeFields: includeRuntimeFields,
+			Index:                index,
+			BoolFilters:          boolFilters,
+			SourceIncludes:       sourceIncludes,
 		})
 	}
 
 	return queries, nil
+}
+
+func parseBoolFilters(bf *simplejson.Json) *BoolFilterSet {
+	result := &BoolFilterSet{}
+	for _, raw := range bf.Get("filter").MustArray() {
+		if c := parseSingleBoolClause(raw); c != nil {
+			result.Filters = append(result.Filters, *c)
+		}
+	}
+	for _, raw := range bf.Get("mustNot").MustArray() {
+		if c := parseSingleBoolClause(raw); c != nil {
+			result.MustNot = append(result.MustNot, *c)
+		}
+	}
+	if len(result.Filters) == 0 && len(result.MustNot) == 0 {
+		return nil
+	}
+	return result
+}
+
+func parseSingleBoolClause(raw any) *BoolFilterClause {
+	m, ok := raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+	c := BoolFilterClause{}
+	if t, ok := m["type"].(string); ok {
+		c.Type = t
+	}
+	if f, ok := m["field"].(string); ok {
+		c.Field = f
+	}
+	c.Value = m["value"]
+	if vals, ok := m["values"].([]any); ok {
+		c.Values = vals
+	}
+	if bounds, ok := m["bounds"].(map[string]any); ok {
+		c.Bounds = bounds
+	}
+	return &c
 }
 
 func parseBucketAggs(model *simplejson.Json) ([]*BucketAgg, error) {

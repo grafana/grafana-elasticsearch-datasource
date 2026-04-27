@@ -118,7 +118,7 @@ func (e *elasticsearchDataQuery) executeEsqlQuery(q *Query) (*backend.DataRespon
 		return nil, backend.DownstreamError(fmt.Errorf("ES|QL query is empty"))
 	}
 
-	query := e.resolveEsqlIndexPlaceholder(q.RawQuery)
+	query := e.resolveEsqlIndexPlaceholder(q.RawQuery, q.Index)
 	e.logger.Debug("Executing ES|QL query", "query", query, "refID", q.RefID)
 
 	esqlRes, err := e.client.ExecuteEsql(query)
@@ -143,12 +143,16 @@ func (e *elasticsearchDataQuery) executeEsqlQuery(q *Query) (*backend.DataRespon
 	}
 }
 
-func (e *elasticsearchDataQuery) resolveEsqlIndexPlaceholder(query string) string {
-	if e.datasourceIndex == "" {
+func (e *elasticsearchDataQuery) resolveEsqlIndexPlaceholder(query string, indexOverride string) string {
+	idx := e.datasourceIndex
+	if indexOverride != "" {
+		idx = indexOverride
+	}
+	if idx == "" {
 		return query
 	}
 
-	return strings.ReplaceAll(query, "$__index", e.datasourceIndex)
+	return strings.ReplaceAll(query, "$__index", idx)
 }
 
 func (e *elasticsearchDataQuery) executeRegularQueries(queries []*Query, start time.Time) (*backend.QueryDataResponse, error) {

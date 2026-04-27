@@ -39,7 +39,8 @@ func (b *QueryBuilder) Bool() *BoolQueryBuilder {
 
 // BoolQueryBuilder represents a bool query builder
 type BoolQueryBuilder struct {
-	filterQueryBuilder *FilterQueryBuilder
+	filterQueryBuilder  *FilterQueryBuilder
+	mustNotQueryBuilder *FilterQueryBuilder
 }
 
 // NewBoolQueryBuilder create a new bool query builder
@@ -55,6 +56,14 @@ func (b *BoolQueryBuilder) Filter() *FilterQueryBuilder {
 	return b.filterQueryBuilder
 }
 
+// MustNot creates and returns the must_not query builder
+func (b *BoolQueryBuilder) MustNot() *FilterQueryBuilder {
+	if b.mustNotQueryBuilder == nil {
+		b.mustNotQueryBuilder = NewFilterQueryBuilder()
+	}
+	return b.mustNotQueryBuilder
+}
+
 // Build builds and return a bool query builder
 func (b *BoolQueryBuilder) Build() (*BoolQuery, error) {
 	boolQuery := BoolQuery{}
@@ -65,6 +74,14 @@ func (b *BoolQueryBuilder) Build() (*BoolQuery, error) {
 			return nil, err
 		}
 		boolQuery.Filters = filters
+	}
+
+	if b.mustNotQueryBuilder != nil {
+		mustNot, err := b.mustNotQueryBuilder.Build()
+		if err != nil {
+			return nil, err
+		}
+		boolQuery.MustNot = mustNot
 	}
 
 	return &boolQuery, nil
@@ -108,5 +125,36 @@ func (b *FilterQueryBuilder) AddQueryStringFilter(querystring string, analyseWil
 		Query:           querystring,
 		AnalyzeWildcard: analyseWildcard,
 	})
+	return b
+}
+
+// AddTermFilter adds an exact-match term filter
+func (b *FilterQueryBuilder) AddTermFilter(field string, value any) *FilterQueryBuilder {
+	b.filters = append(b.filters, &TermFilter{Key: field, Value: value})
+	return b
+}
+
+// AddTermsFilter adds a multi-value terms filter
+func (b *FilterQueryBuilder) AddTermsFilter(field string, values []any) *FilterQueryBuilder {
+	b.filters = append(b.filters, &TermsFilter{Key: field, Values: values})
+	return b
+}
+
+// AddGenericRangeFilter adds a range filter with arbitrary bounds (gt, gte, lt, lte).
+func (b *FilterQueryBuilder) AddGenericRangeFilter(field string, bounds map[string]any) *FilterQueryBuilder {
+	b.filters = append(b.filters, &GenericRangeFilter{Key: field, Bounds: bounds})
+	return b
+}
+
+// AddMatchPhraseFilter adds a match_phrase filter that analyses the input,
+// making it work correctly for both text and keyword field types.
+func (b *FilterQueryBuilder) AddMatchPhraseFilter(field string, value any) *FilterQueryBuilder {
+	b.filters = append(b.filters, &MatchPhraseFilter{Key: field, Value: value})
+	return b
+}
+
+// AddWildcardFilter adds a wildcard pattern filter
+func (b *FilterQueryBuilder) AddWildcardFilter(field string, pattern string) *FilterQueryBuilder {
+	b.filters = append(b.filters, &WildcardFilter{Key: field, Value: pattern})
 	return b
 }
