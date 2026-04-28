@@ -1,5 +1,9 @@
 # Changelog
 
+## 12.6.0
+
+- Feature: Experimental schema support for SQL querying
+
 ## 12.5.5
 
 - Fix: Enable ForwardHTTPHeaders so OAuth identity is forwarded to Elasticsearch [#271](https://github.com/grafana/grafana-elasticsearch-datasource/pull/271)
