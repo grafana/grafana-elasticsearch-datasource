@@ -1,5 +1,9 @@
 # Changelog
 
+## 12.6.1
+
+- Chore: Update Go version to 1.26.1
+
 ## 12.6.0
 
 - Feature: Experimental schema support for SQL querying

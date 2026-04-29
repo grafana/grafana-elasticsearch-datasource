@@ -1,6 +1,6 @@
 module github.com/grafana/grafana-elasticsearch-datasource
 
-go 1.26.0
+go 1.26.1
 
 require (
 	github.com/grafana/grafana-aws-sdk v1.4.3
