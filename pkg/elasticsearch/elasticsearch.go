@@ -82,6 +82,13 @@ func (ds *DataSource) QueryData(ctx context.Context, req *backend.QueryDataReque
 	return queryData(ctx, req, ds.info, logger)
 }
 
+// Dispose releases idle HTTP connections when the SDK replaces this instance on settings change, preventing FD leaks across recreations.
+func (ds *DataSource) Dispose() {
+	if ds.info != nil && ds.info.HTTPClient != nil {
+		ds.info.HTTPClient.CloseIdleConnections()
+	}
+}
+
 // separate function to allow testing the whole transformation and query flow
 func queryData(ctx context.Context, req *backend.QueryDataRequest, dsInfo *es.DatasourceInfo, logger log.Logger) (*backend.QueryDataResponse, error) {
 	if len(req.Queries) == 0 {

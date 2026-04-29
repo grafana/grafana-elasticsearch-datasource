@@ -386,6 +386,45 @@ func TestNewDatasource(t *testing.T) {
 	})
 }
 
+func TestDispose(t *testing.T) {
+	t.Run("closes idle connections on the underlying HTTP client", func(t *testing.T) {
+		server := mockElasticsearchServer()
+		defer server.Close()
+
+		dsInfo := datasourceInfo{
+			TimeField:                  "@timestamp",
+			MaxConcurrentShardRequests: 5,
+		}
+		settingsJSON, err := json.Marshal(dsInfo)
+		require.NoError(t, err)
+
+		instance, err := NewDatasource(context.Background(), backend.DataSourceInstanceSettings{
+			URL:      server.URL,
+			JSONData: json.RawMessage(settingsJSON),
+		})
+		require.NoError(t, err)
+
+		ds := instance.(*DataSource)
+
+		// Warm an idle connection by issuing a request through the client.
+		resp, err := ds.info.HTTPClient.Get(server.URL)
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+
+		require.NotPanics(t, func() { ds.Dispose() })
+	})
+
+	t.Run("is safe to call when HTTPClient is nil", func(t *testing.T) {
+		ds := &DataSource{info: &es.DatasourceInfo{}}
+		require.NotPanics(t, func() { ds.Dispose() })
+	})
+
+	t.Run("is safe to call when info is nil", func(t *testing.T) {
+		ds := &DataSource{}
+		require.NotPanics(t, func() { ds.Dispose() })
+	})
+}
+
 func TestCreateElasticsearchURL(t *testing.T) {
 	tt := []struct {
 		name     string
