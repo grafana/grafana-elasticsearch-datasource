@@ -20,9 +20,12 @@ export const ElasticsearchVariableEditor = (props: ElasticsearchVariableQueryEdi
   const handleQueryChange = (newQuery: ElasticsearchDataQuery) => {
     // Clear field mapping when the query structure changes significantly — the available fields
     // may be completely different (e.g. switching between Raw Document and Metrics tabs, or
-    // switching between Lucene and DSL query types).
-    const metricTypeChanged = newQuery.metrics?.[0]?.type !== query.metrics?.[0]?.type;
-    const queryTypeChanged = newQuery.queryType !== query.queryType;
+    // switching between Lucene and DSL query types). `undefined → defined` is the init reducer
+    // populating defaults on mount, not a real user change — don't clear meta then.
+    const prevMetricType = query.metrics?.[0]?.type;
+    const newMetricType = newQuery.metrics?.[0]?.type;
+    const metricTypeChanged = prevMetricType !== undefined && prevMetricType !== newMetricType;
+    const queryTypeChanged = query.queryType !== undefined && query.queryType !== newQuery.queryType;
     if (metricTypeChanged || queryTypeChanged) {
       props.onChange({ ...newQuery, meta: undefined });
     } else {
@@ -63,6 +66,12 @@ interface FieldMappingProps {
   query: ElasticsearchVariableQuery;
   onChange: ElasticsearchVariableQueryEditorProps['onChange'];
 }
+
+// Grafana UI's <Combobox> will not render a scalar string `value` that isn't in `options`
+// on older @grafana/ui versions (fixed upstream by grafana/grafana#95407, but we ship
+// against 11.6+). Passing the value as a ComboboxOption guarantees it renders regardless.
+const toComboboxValue = (value: string | undefined): ComboboxOption | null =>
+  value ? { value, label: value } : null;
 
 const FieldMapping = (props: FieldMappingProps) => {
   const { query, datasource, onChange } = props;
@@ -150,7 +159,7 @@ const FieldMapping = (props: FieldMappingProps) => {
           <Combobox
             isClearable
             createCustomValue
-            value={query.meta?.valueField}
+            value={toComboboxValue(query.meta?.valueField)}
             onChange={(e) => onMetaPropChange('valueField', e?.value)}
             width={40}
             options={choices}
@@ -160,7 +169,7 @@ const FieldMapping = (props: FieldMappingProps) => {
           <Combobox
             isClearable
             createCustomValue
-            value={query.meta?.textField}
+            value={toComboboxValue(query.meta?.textField)}
             onChange={(e) => onMetaPropChange('textField', e?.value)}
             width={40}
             options={choices}

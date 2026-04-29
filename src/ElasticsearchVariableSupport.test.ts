@@ -149,6 +149,38 @@ describe('ElasticsearchVariableSupport', () => {
       });
     });
 
+    it('should route {"find":"fields"} query through metricFindQuery', (done) => {
+      mockDatasource.metricFindQuery = jest.fn().mockResolvedValue([
+        { text: 'hostname', value: 'hostname' },
+        { text: 'status', value: 'status' },
+      ]);
+
+      const request: DataQueryRequest<ElasticsearchDataQuery> = {
+        targets: ['{"find":"fields","type":"keyword"}' as unknown as ElasticsearchDataQuery],
+        requestId: 'test',
+        interval: '1s',
+        intervalMs: 1000,
+        range: { from: dateTime(), to: dateTime(), raw: { from: 'now-1h', to: 'now' } },
+        scopedVars: {},
+        timezone: 'browser',
+        app: 'dashboard',
+        startTime: Date.now(),
+      };
+
+      variableSupport.query(request).subscribe({
+        next: (response) => {
+          expect(mockDatasource.query).not.toHaveBeenCalled();
+          expect(mockDatasource.metricFindQuery).toHaveBeenCalledWith('{"find":"fields","type":"keyword"}', {
+            range: request.range,
+          });
+          expect(response.data[0].fields[0].name).toBe('text');
+          expect(response.data[0].fields[0].values).toEqual(['hostname', 'status']);
+          done();
+        },
+        error: done,
+      });
+    });
+
     it('should handle meta field transformation', (done) => {
       const mockResponse: DataQueryResponse = {
         data: [
