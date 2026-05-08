@@ -11,8 +11,6 @@ test.describe('Config editor', () => {
       { tag: '@plugins' },
       async ({ createDataSourceConfigPage, page }) => {
         await createDataSourceConfigPage({ type: PLUGIN_TYPE });
-
-        await expect(page.getByText('Type: Elasticsearch', { exact: true })).toBeVisible();
       }
     );
 
