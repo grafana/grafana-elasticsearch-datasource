@@ -20,8 +20,8 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
 
-      - uses: grafana/plugin-actions/bundle-size@bundle-size/v1.0.2
+      - uses: grafana/plugin-actions/bundle-size@6b3176d6bd4b6885b6433410aeb42de2f76d8a09 # bundle-size/v1.0.2
