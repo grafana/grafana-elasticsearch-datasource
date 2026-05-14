@@ -1,5 +1,9 @@
 # Changelog
 
+## 12.6.3
+
+- Chore: Update Go version to 1.26.3
+
 ## 12.6.2
 
 - Chore: Update Go version to 1.26.2
