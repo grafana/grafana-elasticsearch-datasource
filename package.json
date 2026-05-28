@@ -68,7 +68,8 @@
     "webpack-virtual-modules": "^0.6.2"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24",
+    "npm": ">=11.15.0"
   },
   "dependencies": {
     "@elastic/esql": "^1.4.1",
