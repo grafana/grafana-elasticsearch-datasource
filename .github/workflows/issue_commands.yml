@@ -2,19 +2,25 @@ name: Run commands when issues are labeled
 on:
   issues:
     types: [labeled]
+
+permissions: {}
+
 jobs:
   main:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - name: Checkout Actions
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: 'grafana/grafana-github-actions'
           path: ./actions
-          ref: main
+          ref: 3c62d35c5a66e730186a338e45aeb8fa784e2d56 # main as of 2026-05-28
           persist-credentials: false
       - name: Install Actions
-        run: npm install --production --prefix ./actions
+        run: npm install --omit=dev --prefix ./actions
       - name: Run Commands
         uses: ./actions/commands
         with:

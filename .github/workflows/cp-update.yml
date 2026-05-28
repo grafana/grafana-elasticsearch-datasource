@@ -10,6 +10,8 @@ on:
 # `pull requests: read and write`
 # `workflows: read and write`
 
+permissions: {}
+
 jobs:
   release:
     runs-on: ubuntu-latest

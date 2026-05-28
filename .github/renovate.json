@@ -4,6 +4,8 @@
         "github>grafana/grafana-renovate-config//presets/automerge"
     ],
     "platformAutomerge": true,
+    "minimumReleaseAge": "3 days",
+    "internalChecksFilter": "strict",
     "packageRules": [
         {
             "description": "Disable minimum release age for Grafana owned npm packages (@grafana/*)",
