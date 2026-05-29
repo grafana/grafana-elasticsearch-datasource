@@ -21,7 +21,7 @@
     "@grafana/plugin-e2e": "^3.1.0",
     "@grafana/sign-plugin": "^3.2.2",
     "@grafana/tsconfig": "^2.0.1",
-    "@playwright/test": "^1.59.1",
+    "@playwright/test": "^1.60.0",
     "@stylistic/eslint-plugin-ts": "^4.0.0",
     "@swc/core": "^1.15.24",
     "@swc/jest": "^0.2.26",
