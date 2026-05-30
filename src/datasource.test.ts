@@ -242,6 +242,72 @@ describe('ElasticDatasource', () => {
       });
     });
 
+    describe('frontend validation', () => {
+      it('short-circuits an invalid ES|QL target with a per-refId error', async () => {
+        const fetchMock = jest.fn().mockReturnValue(of({ data: { results: {} } }));
+        setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
+        const query = {
+          ...createElasticQuery(),
+          targets: [{ refId: 'A', queryType: 'esql', query: 'FROM logs | WHER x > 1' }],
+        };
+        await expect(ds.query(query)).toEmitValuesWith((received) => {
+          expect(received[0].errors?.length).toBe(1);
+          expect(received[0].errors?.[0].refId).toBe('A');
+          expect(received[0].errors?.[0].message).toMatch(/\[\d+:\d+\]/);
+          expect(received[0].data).toEqual([]);
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+
+      it('sends valid targets to the backend while surfacing errors for invalid siblings', async () => {
+        const fetchMock = jest.fn().mockReturnValue(
+          of(
+            createResponse({
+              results: {
+                B: { frames: mockResponseFrames, refId: 'B', status: 200 },
+              },
+            })
+          )
+        );
+        setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
+        const query = {
+          ...createElasticQuery(),
+          targets: [
+            { refId: 'A', queryType: 'esql', query: 'FROM logs | WHER x > 1' },
+            { refId: 'B', queryType: 'lucene', query: 'foo:"bar"' },
+          ],
+        };
+        await expect(ds.query(query)).toEmitValuesWith((received) => {
+          expect(received[0].errors?.length).toBe(1);
+          expect(received[0].errors?.[0].refId).toBe('A');
+          expect(received[0].data.length).toBeGreaterThan(0);
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const sentQueries = fetchMock.mock.calls[0][0].data.queries;
+        expect(sentQueries).toHaveLength(1);
+        expect(sentQueries[0].refId).toBe('B');
+      });
+
+      it('lets valid ES|QL queries through to the backend unchanged', async () => {
+        const fetchMock = jest.fn().mockReturnValue(
+          of(
+            createResponse({
+              results: { A: { frames: mockResponseFrames, refId: 'A', status: 200 } },
+            })
+          )
+        );
+        setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
+        const query = {
+          ...createElasticQuery(),
+          targets: [{ refId: 'A', queryType: 'esql', query: 'FROM logs | LIMIT 10' }],
+        };
+        await expect(ds.query(query)).toEmitValuesWith((received) => {
+          expect(received[0].errors ?? []).toHaveLength(0);
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+    });
+
     describe('reportInteraction', () => {
       it('should report metric query', async () => {
         const query = {
