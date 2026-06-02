@@ -88,12 +88,11 @@ test.describe('Query editor', () => {
 
     test('can enter a Lucene query string', async ({ page }) => {
       const queryRow = getQueryEditorRow(page, 'A');
-      // The Lucene query input is a CodeMirror contenteditable — the first textbox in the row
-      const queryField = queryRow.getByRole('textbox').first();
+      const queryField = queryRow.getByPlaceholder('Enter a lucene query');
       await expect(queryField).toBeVisible();
       await queryField.click();
       await page.keyboard.type('status:200');
-      await expect(queryField).toContainText('status:200');
+      await expect(queryField).toHaveValue('status:200');
     });
   });
 
