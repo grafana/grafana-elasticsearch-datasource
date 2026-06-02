@@ -4,7 +4,7 @@ import { SemVer } from 'semver';
 
 import { getDefaultTimeRange, GrafanaTheme2, QueryEditorProps } from '@grafana/data';
 import { config } from '@grafana/runtime';
-import { Alert, ConfirmModal, InlineField, InlineLabel, Input, QueryField, useStyles2 } from '@grafana/ui';
+import { Alert, ConfirmModal, InlineField, InlineLabel, Input, useStyles2 } from '@grafana/ui';
 
 import { ElasticsearchDataQuery, QueryType } from '../../dataquery.gen';
 import { useNextId } from '../../hooks/useNextId';
@@ -90,7 +90,11 @@ export const ElasticSearchQueryField = ({ value, onChange }: { value?: string; o
 
   return (
     <div className={styles.queryItem}>
-      <QueryField query={value} onChange={onChange} placeholder="Enter a lucene query" portalOrigin="elasticsearch" />
+      <Input
+        value={value ?? ''}
+        onChange={(e) => onChange(e.currentTarget.value)}
+        placeholder="Enter a lucene query"
+      />
     </div>
   );
 };
