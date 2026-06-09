@@ -88,12 +88,16 @@ test.describe('Query editor', () => {
 
     test('can enter a Lucene query string', async ({ page }) => {
       const queryRow = getQueryEditorRow(page, 'A');
-      // The Lucene query input is a CodeMirror contenteditable — the first textbox in the row
+      // On Grafana <12 the core elasticsearch datasource still ships a Slate-based
+      // contentEditable; on 12+ the externalised plugin renders a plain <input>.
+      // Match both: getByRole('textbox') covers each, and the assertion reads value || textContent.
       const queryField = queryRow.getByRole('textbox').first();
       await expect(queryField).toBeVisible();
       await queryField.click();
       await page.keyboard.type('status:200');
-      await expect(queryField).toContainText('status:200');
+      await expect
+        .poll(() => queryField.evaluate((el) => (el as HTMLInputElement).value || el.textContent || ''))
+        .toContain('status:200');
     });
   });
 

@@ -2,7 +2,7 @@ import { css } from '@emotion/css';
 import { uniqueId } from 'lodash';
 import React, { useEffect, useMemo } from 'react';
 
-import { InlineField, Input, QueryField } from '@grafana/ui';
+import { InlineField, Input } from '@grafana/ui';
 import { Filters } from '../../../../../dataquery.gen';
 
 import { useDispatch, useStatelessReducer } from '../../../../../hooks/useStatelessReducer';
@@ -51,18 +51,13 @@ export const FiltersSettingsEditor = ({ bucketAgg }: Props) => {
             })}
           >
             <InlineField label="Query" labelWidth={8}>
-              <div
-                className={css({
-                  width: '150px',
-                })}
-              >
-                <QueryField
-                  placeholder="Lucene Query"
-                  portalOrigin="elasticsearch"
-                  onChange={(query) => dispatch(changeFilter({ index, filter: { ...filter, query } }))}
-                  query={filter.query}
-                />
-              </div>
+              <Input
+                width={16}
+                id={`${baseId}-query-${index}`}
+                placeholder="Lucene Query"
+                onBlur={(e) => dispatch(changeFilter({ index, filter: { ...filter, query: e.target.value } }))}
+                defaultValue={filter.query}
+              />
             </InlineField>
             <InlineField label="Label" labelWidth={8}>
               <Input
