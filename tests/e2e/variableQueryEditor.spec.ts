@@ -141,20 +141,42 @@ test.describe('Variable query editor', () => {
   });
 
   test.describe('field mapping', () => {
+    // The FieldMapping preview query fires the moment the datasource is picked.
+    // Grafana UI's Combobox snapshots its menu items at open time and does not
+    // refresh while open, so any test that asserts on options must wait for the
+    // mocked response to land before clicking — otherwise the menu opens empty
+    // and the assertions race against a setChoices() that comes too late.
+    const waitForFieldMappingResponse = (page: import('@playwright/test').Page) =>
+      page.waitForResponse((resp) => {
+        if (!resp.url().includes('/api/ds/query') || resp.request().method() !== 'POST') {
+          return false;
+        }
+        try {
+          const body = resp.request().postDataJSON();
+          return body?.queries?.some(
+            (q: { refId?: string }) => q.refId === 'ElasticsearchVariableQueryEditor-VariableQuery'
+          );
+        } catch {
+          return false;
+        }
+      });
+
     test('Value/Text Field dropdowns populate from mocked preview response', async ({
       variableEditPage,
       page,
     }) => {
       await variableEditPage.setVariableType('Query');
-      // Mock must be registered before datasource selection because the FieldMapping
-      // preview query fires the moment the datasource is picked.
+      // Mock must be registered before datasource selection because the preview
+      // query fires the moment the datasource is picked.
       await variableEditPage.mockQueryDataResponse(
         mockVariablePreviewFrame([
           { name: 'key', values: ['GET', 'POST'] },
           { name: 'Count', values: [12, 34] },
         ])
       );
+      const responsePromise = waitForFieldMappingResponse(page);
       await variableEditPage.datasource.set('elasticsearch');
+      await responsePromise;
 
       const valueCombobox = comboboxForField(page, 'Value Field');
       await expect(valueCombobox).toBeVisible();
@@ -171,7 +193,9 @@ test.describe('Variable query editor', () => {
       // Empty frame ⇒ no auto-populated options. createCustomValue is enabled on the
       // Combobox so the user can still enter a field name manually.
       await variableEditPage.mockQueryDataResponse(mockVariablePreviewFrame([]));
+      const responsePromise = waitForFieldMappingResponse(page);
       await variableEditPage.datasource.set('elasticsearch');
+      await responsePromise;
 
       const valueCombobox = comboboxForField(page, 'Value Field');
       await valueCombobox.click();
