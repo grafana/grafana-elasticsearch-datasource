@@ -1,5 +1,14 @@
 # Changelog
 
+## 12.6.4
+
+- Fix: Replace Slate-based QueryField with Input to resolve panel-editor crash on Grafana 13.1+ [#310](https://github.com/grafana/grafana-elasticsearch-datasource/pull/310)
+- Fix: Correctly render multi-field terms breakdown [#282](https://github.com/grafana/grafana-elasticsearch-datasource/pull/282)
+- Chore: Security hardening sweep — dependency, Renovate, and GitHub Actions tightening; clears GO-2026-5026 and GO-2026-4918 [#304](https://github.com/grafana/grafana-elasticsearch-datasource/pull/304)
+- Chore: Auto-audit hygiene fixes — Node `>=24` engines, supply-chain-hardened `.npmrc`, plugin scaffolding refresh [#308](https://github.com/grafana/grafana-elasticsearch-datasource/pull/308)
+- CI: Bump plugin-ci-workflows to v8.0.1 (GATB token migration) [#292](https://github.com/grafana/grafana-elasticsearch-datasource/pull/292)
+- Chore: Run externalised plugin in place of core in docker compose [#275](https://github.com/grafana/grafana-elasticsearch-datasource/pull/275)
+
 ## 12.6.3
 
 - Chore: Update Go version to 1.26.3
