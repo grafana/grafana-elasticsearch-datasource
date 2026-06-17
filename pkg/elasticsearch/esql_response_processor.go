@@ -70,7 +70,9 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 	fields := processDocsToDataFrameFields(docs, sortedPropNames, configuredFields)
 
 	if dataplaneEnabled {
-		canonical := buildLogLinesCanonicalFields(docs, configuredFields)
+		// ES|QL columns have no _source/fields distinction, so all keys are
+		// regular Field-category labels; pass nil metadata for every row.
+		canonical := buildLogLinesCanonicalFields(docs, configuredFields, nil)
 		fields = append(canonical, fields...)
 	}
 
