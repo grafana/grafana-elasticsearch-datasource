@@ -12,6 +12,7 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	"github.com/grafana/grafana-plugin-sdk-go/config"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
@@ -35,7 +36,7 @@ var newElasticsearchDataQuery = func(ctx context.Context, client es.Client, req 
 	_, fromAlert := req.Headers[headerFromAlert]
 	fromExpression := req.GetHTTPHeader(headerFromExpression) != ""
 
-	cfg := backend.GrafanaConfigFromContext(ctx)
+	cfg := config.GrafanaConfigFromContext(ctx)
 	dataplaneEnabled := cfg.FeatureToggles().IsEnabled(dataplaneFeatureToggle)
 
 	return &elasticsearchDataQuery{
