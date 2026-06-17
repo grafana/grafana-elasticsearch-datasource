@@ -8,6 +8,7 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	"github.com/grafana/grafana-plugin-sdk-go/config"
 	"github.com/grafana/grafana-plugin-sdk-go/experimental/featuretoggles"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -2000,10 +2001,10 @@ func TestExecuteElasticsearchDataQuery_ReplacesEsqlIndexPlaceholder(t *testing.T
 		},
 	}
 
-	cfg := backend.NewGrafanaCfg(map[string]string{
+	cfg := config.NewGrafanaCfg(map[string]string{
 		featuretoggles.EnabledFeatures: "elasticsearchESQLQuery",
 	})
-	ctx := backend.WithGrafanaConfig(context.Background(), cfg)
+	ctx := config.WithGrafanaConfig(context.Background(), cfg)
 
 	query := newElasticsearchDataQuery(ctx, c, &dataRequest, log.New(), "logs-*")
 	_, err := query.execute()
@@ -2017,10 +2018,10 @@ func TestRawDSLQuery(t *testing.T) {
 	to := time.Date(2018, 5, 15, 17, 55, 0, 0, time.UTC)
 
 	// Create context with raw DSL query feature toggle enabled
-	cfg := backend.NewGrafanaCfg(map[string]string{
+	cfg := config.NewGrafanaCfg(map[string]string{
 		featuretoggles.EnabledFeatures: "elasticsearchRawDSLQuery",
 	})
-	ctx := backend.WithGrafanaConfig(context.Background(), cfg)
+	ctx := config.WithGrafanaConfig(context.Background(), cfg)
 
 	t.Run("With raw DSL query", func(t *testing.T) {
 		t.Run("Basic raw DSL query with aggregations", func(t *testing.T) {
