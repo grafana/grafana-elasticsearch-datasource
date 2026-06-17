@@ -36,7 +36,7 @@ var newElasticsearchDataQuery = func(ctx context.Context, client es.Client, req 
 	_, fromAlert := req.Headers[headerFromAlert]
 	fromExpression := req.GetHTTPHeader(headerFromExpression) != ""
 
-	cfg := backend.GrafanaConfigFromContext(ctx)
+	cfg := config.GrafanaConfigFromContext(ctx)
 	dataplaneEnabled := cfg.FeatureToggles().IsEnabled(dataplaneFeatureToggle)
 
 	return &elasticsearchDataQuery{
