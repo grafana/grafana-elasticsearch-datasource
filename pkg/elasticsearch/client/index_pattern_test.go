@@ -41,6 +41,20 @@ func TestIndexPattern(t *testing.T) {
 			require.Equal(t, indices[0], "2018.05.15.17-data")
 		})
 
+		// Regression coverage for https://github.com/grafana/grafana/issues/123095:
+		// the 12-hour `hh` token must format the UTC hour. At UTC midnight that
+		// is 12 (00 in 24-hour clock maps to 12 in 12-hour clock), regardless of
+		// the host timezone — the time range arrives here already in UTC via
+		// dynamicIndexPattern.GetIndices.
+		t.Run("12-hour hh format resolves UTC midnight as 12", func(t *testing.T) {
+			from := time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)
+			to := time.Date(2026, 4, 20, 0, 1, 0, 0, time.UTC)
+			timeRange := backend.TimeRange{From: from, To: to}
+			indexPatternScenario(t, intervalHourly, "[nginx_access-]YYYY.MM.DD.hh", timeRange, func(indices []string) {
+				require.Equal(t, []string{"nginx_access-2026.04.20.12"}, indices)
+			})
+		})
+
 		indexPatternScenario(t, intervalDaily, "[data-]YYYY.MM.DD", timeRange, func(indices []string) {
 			require.Len(t, indices, 1)
 			require.Equal(t, indices[0], "data-2018.05.15")
