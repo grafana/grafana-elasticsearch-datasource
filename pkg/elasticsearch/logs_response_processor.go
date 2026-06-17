@@ -28,6 +28,14 @@ func newLogsResponseProcessor(logger log.Logger) *logsResponseProcessor {
 func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, target *Query, configuredFields es.ConfiguredFields, dataplaneEnabled bool, queryRes *backend.DataResponse) error {
 	propNames := make(map[string]bool)
 	docs := make([]map[string]interface{}, len(res.Hits.Hits))
+	// metadataKeys[i] records the keys in docs[i] that originated from
+	// hit["fields"] (doc-value returns) rather than _source. Only populated
+	// when the dataplane toggle is on; consumed by buildLogLinesCanonicalFields
+	// to tag those keys as "Metadata" in labelTypes.
+	var metadataKeys []map[string]struct{}
+	if dataplaneEnabled {
+		metadataKeys = make([]map[string]struct{}, len(res.Hits.Hits))
+	}
 	searchWords := make(map[string]bool)
 
 	for hitIdx, hit := range res.Hits.Hits {
@@ -63,8 +71,18 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 		if hit["fields"] != nil {
 			source, ok := hit["fields"].(map[string]interface{})
 			if ok {
+				var fieldsOrigin map[string]struct{}
+				if dataplaneEnabled {
+					fieldsOrigin = make(map[string]struct{}, len(source))
+				}
 				for k, v := range source {
 					doc[k] = unwrapFieldValue(v)
+					if dataplaneEnabled {
+						fieldsOrigin[k] = struct{}{}
+					}
+				}
+				if dataplaneEnabled {
+					metadataKeys[hitIdx] = fieldsOrigin
 				}
 			}
 		}
@@ -102,7 +120,7 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 	fields := processDocsToDataFrameFields(docs, sortedPropNames, configuredFields)
 
 	if dataplaneEnabled {
-		canonical := buildLogLinesCanonicalFields(docs, configuredFields)
+		canonical := buildLogLinesCanonicalFields(docs, configuredFields, metadataKeys)
 		fields = append(canonical, fields...)
 	}
 

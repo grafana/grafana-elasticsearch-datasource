@@ -58,6 +58,10 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 				"message":    "hello world",
 				"lvl":        "info",
 				"host":       "host-a",
+				"tags":       []interface{}{"alpha", "beta"},
+			},
+			"fields": map[string]interface{}{
+				"region": []interface{}{"us-east-1"},
 			},
 		},
 		{
@@ -92,7 +96,7 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 		require.Empty(t, string(frame.Meta.Type))
 		require.Equal(t, data.VisTypeLogs, string(frame.Meta.PreferredVisualization))
 
-		for _, name := range []string{"timestamp", "body", "severity", "labels"} {
+		for _, name := range []string{"timestamp", "body", "severity", "labels", "labelTypes"} {
 			for _, f := range frame.Fields {
 				require.NotEqualf(t, name, f.Name, "canonical field %q should not exist when flag is off", name)
 			}
@@ -119,6 +123,7 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 		require.Equal(t, "severity", frame.Fields[2].Name)
 		require.Equal(t, "id", frame.Fields[3].Name)
 		require.Equal(t, "labels", frame.Fields[4].Name)
+		require.Equal(t, "labelTypes", frame.Fields[5].Name)
 
 		bodyField := fieldByName(t, frame, "body")
 		require.Equal(t, "hello world", bodyField.At(0).(string))
@@ -144,12 +149,21 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 		require.NoError(t, json.Unmarshal(raw, &labels))
 		require.Equal(t, "host-a", labels["host"])
 		require.Equal(t, "logs-000001", labels["_index"])
+		require.Equal(t, "us-east-1", labels["region"], "doc-value field should be unwrapped from its array")
 		require.NotContains(t, labels, "@timestamp")
 		require.NotContains(t, labels, "message")
 		require.NotContains(t, labels, "lvl")
 		require.NotContains(t, labels, "level")
 		require.NotContains(t, labels, "id")
 		require.NotContains(t, labels, "_source")
+
+		labelTypesField := fieldByName(t, frame, "labelTypes")
+		rawTypes := labelTypesField.At(0).(json.RawMessage)
+		var types map[string]string
+		require.NoError(t, json.Unmarshal(rawTypes, &types))
+		require.Equal(t, labelTypeField, types["host"], "host comes from _source → Field")
+		require.Equal(t, labelTypeMetadata, types["region"], "region came from hit.fields → Metadata")
+		require.Equal(t, labelTypeArrayField, types["tags"], "tags is a JSON array → ArrayField")
 	})
 }
 
@@ -178,6 +192,7 @@ func TestEsqlLogsResponseProcessor_Dataplane(t *testing.T) {
 		for _, f := range frame.Fields {
 			require.NotEqual(t, "timestamp", f.Name)
 			require.NotEqual(t, "body", f.Name)
+			require.NotEqual(t, "labelTypes", f.Name)
 		}
 	})
 
@@ -191,6 +206,7 @@ func TestEsqlLogsResponseProcessor_Dataplane(t *testing.T) {
 		require.Equal(t, data.FrameTypeVersion{0, 0}, frame.Meta.TypeVersion)
 		require.Equal(t, "timestamp", frame.Fields[0].Name)
 		require.Equal(t, "body", frame.Fields[1].Name)
+		require.Equal(t, "labelTypes", frame.Fields[5].Name)
 
 		bodyField := fieldByName(t, frame, "body")
 		require.Equal(t, "esql line one", bodyField.At(0).(string))
@@ -208,10 +224,56 @@ func TestEsqlLogsResponseProcessor_Dataplane(t *testing.T) {
 		require.NotContains(t, labels, "@timestamp")
 		require.NotContains(t, labels, "message")
 		require.NotContains(t, labels, "lvl")
+
+		labelTypesField := fieldByName(t, frame, "labelTypes")
+		rawTypes := labelTypesField.At(0).(json.RawMessage)
+		var types map[string]string
+		require.NoError(t, json.Unmarshal(rawTypes, &types))
+		require.Equal(t, labelTypeField, types["host"], "ES|QL columns are all Field-category")
 	})
 }
 
-func TestBuildLogLabelsJSON_EmptyWhenNothingRemains(t *testing.T) {
+func TestLogsResponseProcessor_DataplaneBodyDoesNotFallBackToSource(t *testing.T) {
+	// When LogMessageField is unset, body should stay empty rather than
+	// falling back to the whole flattened _source JSON blob. The spec
+	// requires body to be a non-nullable string; "" is compliant and
+	// honest, whereas a JSON-encoded doc isn't a meaningful "message".
+	configuredFields := es.ConfiguredFields{
+		TimeField:       "@timestamp",
+		LogMessageField: "",
+		LogLevelField:   "lvl",
+	}
+
+	hits := []map[string]interface{}{
+		{
+			"_id":    "doc-1",
+			"_type":  "_doc",
+			"_index": "logs-000001",
+			"_source": map[string]interface{}{
+				"@timestamp": "2024-01-02T03:04:05.123Z",
+				"lvl":        "info",
+				"host":       "host-a",
+			},
+		},
+	}
+	searchResponse := &es.SearchResponse{
+		Hits: &es.SearchResponseHits{
+			Hits:  hits,
+			Total: &es.SearchResponseHitsTotal{Value: 1, Relation: "eq"},
+		},
+	}
+
+	processor := newLogsResponseProcessor(log.New())
+	queryRes := backend.DataResponse{}
+	err := processor.processLogsResponse(searchResponse, newLogsDataplaneQuery(t), configuredFields, true, &queryRes)
+	require.NoError(t, err)
+	frame := queryRes.Frames[0]
+
+	bodyField := fieldByName(t, frame, "body")
+	require.Equal(t, "", bodyField.At(0).(string), "body must be empty (not _source JSON) when LogMessageField is unset")
+}
+
+func TestBuildLogLabelsAndTypes_EmptyWhenNothingRemains(t *testing.T) {
 	configuredFields := dataplaneConfiguredFields()
 	doc := map[string]interface{}{
 		"@timestamp": "2024-01-02T00:00:00Z",
@@ -221,6 +283,22 @@ func TestBuildLogLabelsJSON_EmptyWhenNothingRemains(t *testing.T) {
 		"id":         "x",
 		"_source":    "{}",
 	}
-	raw := buildLogLabelsJSON(doc, configuredFields)
-	require.Equal(t, "{}", string(raw))
+	labels, types := buildLogLabelsAndTypes(doc, configuredFields, nil)
+	require.Equal(t, "{}", string(labels))
+	require.Equal(t, "{}", string(types))
+}
+
+func TestClassifyLabelType(t *testing.T) {
+	t.Run("array value beats metadata flag", func(t *testing.T) {
+		got := classifyLabelType("region", []interface{}{"us-east-1"}, map[string]struct{}{"region": {}})
+		require.Equal(t, labelTypeArrayField, got)
+	})
+	t.Run("metadata flag wins over scalar fallback", func(t *testing.T) {
+		got := classifyLabelType("region", "us-east-1", map[string]struct{}{"region": {}})
+		require.Equal(t, labelTypeMetadata, got)
+	})
+	t.Run("plain scalar is Field", func(t *testing.T) {
+		got := classifyLabelType("host", "host-a", nil)
+		require.Equal(t, labelTypeField, got)
+	})
 }
