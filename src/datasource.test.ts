@@ -159,8 +159,11 @@ describe('ElasticDatasource', () => {
       expect(values[0].text).toBe('foo');
       expect(values[0].value).toBe('foo');
 
+      // When ES returns `key_as_string` (typed fields: boolean, date, ip), text
+      // and value must align on the human-readable form so ad-hoc filter URLs
+      // don't end up as `field|=|<raw>,<text>`. See issue #106053.
       expect(values[1].text).toBe('six');
-      expect(values[1].value).toBe('6');
+      expect(values[1].value).toBe('six');
 
       expect(values[2].text).toBe('7');
       expect(values[2].value).toBe('7');
@@ -1399,6 +1402,45 @@ describe('ElasticDatasource', () => {
       expect(results[0].text).toEqual('test');
       expect(results[1].text).toEqual('test2_as_string');
       expect(results[2].text).toEqual('5');
+    });
+
+    // Regression test for https://github.com/grafana/grafana/issues/106053:
+    // For typed-field buckets (boolean/date/ip) Elasticsearch returns a numeric
+    // `key` alongside a human-readable `key_as_string`. The variable system
+    // serialises both `text` and `value` into the URL, so when value was the
+    // raw `key` (e.g. `1` for boolean true) ad-hoc filters ended up like
+    // `tag.error|=|1,true` and broke the query. Both must align on the
+    // human-readable form.
+    it('should align value with key_as_string for typed-field buckets (issue #106053)', async () => {
+      const data = {
+        responses: [
+          {
+            aggregations: {
+              '1': {
+                buckets: [
+                  // Boolean `true` — ES returns key as 1, key_as_string as "true".
+                  { doc_count: 7, key: 1, key_as_string: 'true' },
+                  // Boolean `false`.
+                  { doc_count: 3, key: 0, key_as_string: 'false' },
+                  // Plain string bucket (no key_as_string) — must keep raw key as value.
+                  { doc_count: 4, key: 'plain-string' },
+                ],
+              },
+            },
+          },
+        ],
+      };
+
+      const ds = createElasticDatasource();
+      jest.spyOn(ds, 'postResource').mockResolvedValue(data);
+
+      const results = await ds.metricFindQuery('{"find": "terms", "field": "tag.error"}');
+
+      expect(results).toEqual([
+        { text: 'true', value: 'true' },
+        { text: 'false', value: 'false' },
+        { text: 'plain-string', value: 'plain-string' },
+      ]);
     });
 
     it('should not set search type to count', async () => {
