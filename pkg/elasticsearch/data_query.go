@@ -12,6 +12,7 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	"github.com/grafana/grafana-plugin-sdk-go/config"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
@@ -82,7 +83,7 @@ func (e *elasticsearchDataQuery) execute() (*backend.QueryDataResponse, error) {
 
 	// Execute ES|QL queries individually (each requires a separate HTTP call to /_query)
 	if len(esqlQueries) > 0 {
-		cfg := backend.GrafanaConfigFromContext(e.ctx)
+		cfg := config.GrafanaConfigFromContext(e.ctx)
 		if !cfg.FeatureToggles().IsEnabled("elasticsearchESQLQuery") {
 			for _, q := range esqlQueries {
 				response.Responses[q.RefID] = backend.ErrorResponseWithErrorSource(
