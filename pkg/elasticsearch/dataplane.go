@@ -9,11 +9,24 @@ import (
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
 
-// dataplaneFeatureToggle gates emission of Grafana dataplane-compliant frames.
-// When the toggle is enabled, logs responses are tagged with
-// data.FrameTypeLogLines and include canonical timestamp/body/severity/id/labels
-// fields as described in https://github.com/grafana/dataplane/blob/main/docs/contract/logs.md.
-const dataplaneFeatureToggle = "elasticsearchDataplane"
+// dataplaneFeatureToggle gates emission of Grafana dataplane-compliant logs
+// frames. When enabled, logs responses are tagged with data.FrameTypeLogLines
+// and carry the canonical timestamp/body/severity/id/labels/labelTypes fields
+// described in https://github.com/grafana/dataplane/blob/main/docs/contract/logs.md.
+//
+// The toggle is scoped to logs specifically to leave room for a separate
+// metrics-dataplane toggle later (mirroring lokiLogsDataplane / lokiMetricDataplane).
+const dataplaneFeatureToggle = "elasticsearchLogsDataplane"
+
+// labelTypeField marks a label as a regular log field (from _source).
+const labelTypeField = "Field"
+
+// labelTypeMetadata marks a label as metadata, e.g. a doc-value returned via
+// the `fields` parameter rather than the document _source.
+const labelTypeMetadata = "Metadata"
+
+// labelTypeArrayField marks a label whose value is a JSON array.
+const labelTypeArrayField = "ArrayField"
 
 // setLogLinesFrameMeta tags a frame with the LogLines dataplane type.
 // Callers must have already prepended the canonical fields so that the
@@ -27,21 +40,26 @@ func setLogLinesFrameMeta(frame *data.Frame) {
 	frame.Meta.TypeVersion = data.FrameTypeVersion{0, 0}
 }
 
-// buildLogLinesCanonicalFields produces the five canonical fields required by
+// buildLogLinesCanonicalFields produces the six canonical fields required by
 // the Grafana dataplane LogLines contract, in contract order:
-// timestamp, body, severity, id, labels.
+// timestamp, body, severity, id, labels, labelTypes.
 //
-// The docs slice is the same per-hit map the existing processors build; this
-// function reads from it without mutation. Unmapped rows fall back to zero
-// values (time.Time{}, empty string) so the fields remain non-nullable per
-// the contract's "must be non nullable" requirement for timestamp and body.
-func buildLogLinesCanonicalFields(docs []map[string]interface{}, configuredFields es.ConfiguredFields) []*data.Field {
+// metadataKeys[i] holds the doc keys for hit i that originated from
+// hit["fields"] (doc-value returns) rather than _source. These are tagged
+// as "Metadata" in labelTypes; everything else is "Field" or "ArrayField"
+// depending on its runtime type. Pass nil when no such distinction exists
+// (e.g. ES|QL responses, where all keys are Field-equivalent columns).
+//
+// timestamp and body are non-nullable per the spec; rows with no parsable
+// time stay at the zero time.Time and rows with no body stay at "".
+func buildLogLinesCanonicalFields(docs []map[string]interface{}, configuredFields es.ConfiguredFields, metadataKeys []map[string]struct{}) []*data.Field {
 	size := len(docs)
 	timestamps := make([]time.Time, size)
 	bodies := make([]string, size)
 	severities := make([]*string, size)
 	ids := make([]*string, size)
 	labels := make([]json.RawMessage, size)
+	labelTypes := make([]json.RawMessage, size)
 
 	for i, doc := range docs {
 		if configuredFields.TimeField != "" {
@@ -55,14 +73,12 @@ func buildLogLinesCanonicalFields(docs []map[string]interface{}, configuredField
 				bodies[i] = v
 			}
 		}
-		if bodies[i] == "" {
-			if v, ok := doc["_source"].(string); ok {
-				bodies[i] = v
-			}
-		}
 
 		// severity mirrors the "level" field already populated upstream from
-		// configuredFields.LogLevelField; left nil when absent per spec (optional).
+		// configuredFields.LogLevelField. Pass-through: values are expected to
+		// already match Grafana's log-level enum (critical/error/warning/info/
+		// debug/trace) — this contract is enforced by data-source config, not
+		// here. Left nil when absent per spec.
 		if v, ok := doc["level"].(string); ok {
 			vv := v
 			severities[i] = &vv
@@ -73,7 +89,11 @@ func buildLogLinesCanonicalFields(docs []map[string]interface{}, configuredField
 			ids[i] = &vv
 		}
 
-		labels[i] = buildLogLabelsJSON(doc, configuredFields)
+		var meta map[string]struct{}
+		if i < len(metadataKeys) {
+			meta = metadataKeys[i]
+		}
+		labels[i], labelTypes[i] = buildLogLabelsAndTypes(doc, configuredFields, meta)
 	}
 
 	return []*data.Field{
@@ -82,6 +102,7 @@ func buildLogLinesCanonicalFields(docs []map[string]interface{}, configuredField
 		data.NewField("severity", nil, severities),
 		data.NewField("id", nil, ids),
 		data.NewField("labels", nil, labels),
+		data.NewField("labelTypes", nil, labelTypes),
 	}
 }
 
@@ -105,14 +126,19 @@ func parseDocTimeValue(v interface{}) (time.Time, bool) {
 	return t, true
 }
 
-// buildLogLabelsJSON marshals a doc's non-canonical fields into a single JSON
-// object, suitable for use as the LogLines `labels` field.
+// buildLogLabelsAndTypes marshals a doc's non-canonical fields into two JSON
+// objects: the `labels` payload (a Record<string,any> of key→value) and the
+// `labelTypes` payload (a Record<string,string> of key→category).
 //
 // Excluded keys: the configured time, message, and level source fields (those
 // are promoted to canonical fields); the internally computed "id" and "level"
 // mirrors; and "_source" (the whole-document JSON blob, which would duplicate
 // every other field).
-func buildLogLabelsJSON(doc map[string]interface{}, configuredFields es.ConfiguredFields) json.RawMessage {
+//
+// metadataKeys names the keys that originated from hit["fields"] (doc-value
+// returns) rather than _source. Those become "Metadata"; values whose runtime
+// type is an array become "ArrayField"; everything else is "Field".
+func buildLogLabelsAndTypes(doc map[string]interface{}, configuredFields es.ConfiguredFields, metadataKeys map[string]struct{}) (json.RawMessage, json.RawMessage) {
 	excluded := map[string]struct{}{
 		"id":      {},
 		"level":   {},
@@ -129,18 +155,39 @@ func buildLogLabelsJSON(doc map[string]interface{}, configuredFields es.Configur
 	}
 
 	filtered := make(map[string]interface{}, len(doc))
+	types := make(map[string]string, len(doc))
 	for k, v := range doc {
 		if _, skip := excluded[k]; skip {
 			continue
 		}
 		filtered[k] = v
+		types[k] = classifyLabelType(k, v, metadataKeys)
 	}
+
 	if len(filtered) == 0 {
-		return json.RawMessage("{}")
+		return json.RawMessage("{}"), json.RawMessage("{}")
 	}
-	bytes, err := json.Marshal(filtered)
+
+	labelsBytes, err := json.Marshal(filtered)
 	if err != nil {
-		return json.RawMessage("{}")
+		return json.RawMessage("{}"), json.RawMessage("{}")
 	}
-	return json.RawMessage(bytes)
+	typesBytes, err := json.Marshal(types)
+	if err != nil {
+		return json.RawMessage(labelsBytes), json.RawMessage("{}")
+	}
+	return json.RawMessage(labelsBytes), json.RawMessage(typesBytes)
+}
+
+// classifyLabelType returns the dataplane labelTypes category for a doc field.
+// Array values take priority over Metadata so consumers see the structural hint
+// regardless of where the value originated.
+func classifyLabelType(key string, value interface{}, metadataKeys map[string]struct{}) string {
+	if _, ok := value.([]interface{}); ok {
+		return labelTypeArrayField
+	}
+	if _, ok := metadataKeys[key]; ok {
+		return labelTypeMetadata
+	}
+	return labelTypeField
 }
