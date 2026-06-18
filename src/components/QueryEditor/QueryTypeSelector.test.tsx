@@ -52,7 +52,7 @@ describe('QueryTypeSelector', () => {
     const logsRadio = screen.getByRole('radio', { name: 'Logs' });
     await userEvent.click(logsRadio);
 
-    expect(dispatch).toHaveBeenCalledWith(changeMetricType({ id: '1', type: 'logs' }));
+    expect(dispatch).toHaveBeenCalledWith(changeMetricType({ id: '1', type: 'logs', previousType: 'count' }));
   });
 
   it('should convert query type to metric type correctly for raw_data', async () => {
@@ -68,7 +68,7 @@ describe('QueryTypeSelector', () => {
     const rawDataRadio = screen.getByRole('radio', { name: 'Raw Data' });
     await userEvent.click(rawDataRadio);
 
-    expect(dispatch).toHaveBeenCalledWith(changeMetricType({ id: '1', type: 'raw_data' }));
+    expect(dispatch).toHaveBeenCalledWith(changeMetricType({ id: '1', type: 'raw_data', previousType: 'count' }));
   });
 
   it('should convert query type to metric type correctly for raw_document', async () => {
@@ -84,7 +84,7 @@ describe('QueryTypeSelector', () => {
     const rawDocumentRadio = screen.getByRole('radio', { name: 'Raw Document' });
     await userEvent.click(rawDocumentRadio);
 
-    expect(dispatch).toHaveBeenCalledWith(changeMetricType({ id: '1', type: 'raw_document' }));
+    expect(dispatch).toHaveBeenCalledWith(changeMetricType({ id: '1', type: 'raw_document', previousType: 'count' }));
   });
 
   it('should convert metrics query type to count metric type', async () => {
@@ -100,7 +100,7 @@ describe('QueryTypeSelector', () => {
     const metricsRadio = screen.getByRole('radio', { name: 'Metrics' });
     await userEvent.click(metricsRadio);
 
-    expect(dispatch).toHaveBeenCalledWith(changeMetricType({ id: '1', type: 'count' }));
+    expect(dispatch).toHaveBeenCalledWith(changeMetricType({ id: '1', type: 'count', previousType: 'logs' }));
   });
 
   it('should return null when query has no metrics', () => {

@@ -24,7 +24,7 @@ export const QueryTypeSelector = () => {
   const queryType = metricAggregationConfig[firstMetric.type].impliedQueryType;
 
   const onChange = (newQueryType: QueryType) => {
-    dispatch(changeMetricType({ id: firstMetric.id, type: queryTypeToMetricType(newQueryType) }));
+    dispatch(changeMetricType({ id: firstMetric.id, type: queryTypeToMetricType(newQueryType), previousType: firstMetric.type }));
   };
 
   return (
