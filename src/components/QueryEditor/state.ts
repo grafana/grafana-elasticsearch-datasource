@@ -4,6 +4,7 @@ import { ElasticsearchDataQuery } from '../../dataquery.gen';
 import { QueryType } from '../../types';
 
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
+import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
 
 /**
  * When the `initQuery` Action is dispatched, the query gets populated with default values where values are not present.
@@ -38,9 +39,17 @@ export const queryReducer = (prevQuery: ElasticsearchDataQuery['query'], action:
     return '';
   }
 
-  // Clear query when switching metric types (e.g., from logs to metrics, or to raw_data)
+  // Clear the query only when switching between different query modes
+  // (e.g. metrics -> logs, or metrics -> raw_data). Switching between two
+  // metric aggregations (e.g. Average -> Max) keeps the same implied query
+  // type, so we preserve the existing query.
   if (changeMetricType.match(action)) {
-    return '';
+    const { type, previousType } = action.payload;
+    const impliedQueryTypeChanged =
+      previousType === undefined ||
+      metricAggregationConfig[type].impliedQueryType !== metricAggregationConfig[previousType].impliedQueryType;
+
+    return impliedQueryTypeChanged ? '' : prevQuery;
   }
 
   if (initQuery.match(action)) {

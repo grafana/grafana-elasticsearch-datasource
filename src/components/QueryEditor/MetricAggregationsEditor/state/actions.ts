@@ -8,9 +8,13 @@ export const addMetric = createAction<MetricAggregation['id']>('@metrics/add');
 export const removeMetric = createAction<MetricAggregation['id']>('@metrics/remove');
 export const toggleMetricVisibility = createAction<MetricAggregation['id']>('@metrics/toggle_visibility');
 export const changeMetricField = createAction<{ id: MetricAggregation['id']; field: string }>('@metrics/change_field');
-export const changeMetricType = createAction<{ id: MetricAggregation['id']; type: MetricAggregation['type'] }>(
-  '@metrics/change_type'
-);
+export const changeMetricType = createAction<{
+  id: MetricAggregation['id'];
+  type: MetricAggregation['type'];
+  // The type the metric had before this change. Used to decide whether the
+  // implied query type (metrics/logs/raw_data/raw_document) actually changed.
+  previousType?: MetricAggregation['type'];
+}>('@metrics/change_type');
 export const changeEditorType = createAction<{ id: MetricAggregation['id']; type: MetricAggregation['type'] }>(
   '@metrics/change_type'
 );

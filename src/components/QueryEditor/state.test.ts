@@ -90,7 +90,7 @@ describe('Query Reducer', () => {
 
       reducerTester<ElasticsearchDataQuery['query']>()
         .givenReducer(queryReducer, initialQuery)
-        .whenActionIsDispatched(changeMetricType({ id: '1', type: 'avg' }))
+        .whenActionIsDispatched(changeMetricType({ id: '1', type: 'avg', previousType: 'logs' }))
         .thenStateShouldEqual('');
     });
 
@@ -99,7 +99,25 @@ describe('Query Reducer', () => {
 
       reducerTester<ElasticsearchDataQuery['query']>()
         .givenReducer(queryReducer, initialQuery)
-        .whenActionIsDispatched(changeMetricType({ id: '1', type: 'raw_data' }))
+        .whenActionIsDispatched(changeMetricType({ id: '1', type: 'raw_data', previousType: 'avg' }))
+        .thenStateShouldEqual('');
+    });
+
+    it('Should preserve query when switching between metric aggregations (e.g. avg to max)', () => {
+      const initialQuery: ElasticsearchDataQuery['query'] = 'field:value';
+
+      reducerTester<ElasticsearchDataQuery['query']>()
+        .givenReducer(queryReducer, initialQuery)
+        .whenActionIsDispatched(changeMetricType({ id: '1', type: 'max', previousType: 'avg' }))
+        .thenStateShouldEqual(initialQuery);
+    });
+
+    it('Should clear query when switching from metrics to a non-metric mode (e.g. raw_document)', () => {
+      const initialQuery: ElasticsearchDataQuery['query'] = 'field:value';
+
+      reducerTester<ElasticsearchDataQuery['query']>()
+        .givenReducer(queryReducer, initialQuery)
+        .whenActionIsDispatched(changeMetricType({ id: '1', type: 'raw_document', previousType: 'avg' }))
         .thenStateShouldEqual('');
     });
   });
