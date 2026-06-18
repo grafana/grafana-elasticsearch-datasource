@@ -41,3 +41,17 @@ datasources:
     jsonData:
       index: infra
       timeField: '@timestamp'
+
+  - name: app_logs
+    uid: app-logs-e2e
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    orgId: 1
+    version: 1
+    editable: true
+    jsonData:
+      index: app_logs
+      timeField: '@timestamp'
+      logMessageField: message
+      logLevelField: level.keyword

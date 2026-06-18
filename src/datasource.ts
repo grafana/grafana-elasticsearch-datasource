@@ -710,6 +710,14 @@ export class ElasticDatasource
       return of(response);
     }
 
+    // The supplementary log-volume request has a terms-on-`logLevelField`
+    // bucket agg only when `logLevelField` is configured; when it isn't,
+    // the response is a single un-bucketed series whose `frame.name` is
+    // the metric type ("Count"), not a log level.
+    const shouldRelabelLogsVolume =
+      !!this.logLevelField &&
+      request.targets.some((t) => t.refId?.startsWith(REF_ID_STARTER_LOG_VOLUME));
+
     return super.query({ ...request, targets: validTargets }).pipe(
       map((response) =>
         frontendErrors.length
@@ -721,6 +729,9 @@ export class ElasticDatasource
         response.data.forEach((dataFrame) => {
           enhanceDataFrameWithDataLinks(dataFrame, this.dataLinks);
         });
+        if (shouldRelabelLogsVolume) {
+          response.data = response.data.map(attachLevelLabelToVolumeFrame);
+        }
         return response;
       })
     );
@@ -1348,6 +1359,24 @@ export class ElasticDatasource
     };
     return contextRequest;
   };
+}
+
+// The supplementary logs-volume query groups counts by `logLevelField`, but the
+// backend writes that bucket value into `frame.name` and strips field labels
+// (see field_namer.go::nameFields). Grafana's logs-volume panel expects a
+// `level` label on the value field to colour each series — without it every
+// frame collapses to "unknown". Re-attach the label from `frame.name`.
+// See https://github.com/grafana/grafana/issues/90436.
+export function attachLevelLabelToVolumeFrame(dataFrame: DataFrame): DataFrame {
+  if (!dataFrame.name) {
+    return dataFrame;
+  }
+  const valueField = dataFrame.fields.find((field) => field.name === 'Value');
+  if (!valueField) {
+    return dataFrame;
+  }
+  valueField.labels = { ...(valueField.labels ?? {}), level: dataFrame.name };
+  return dataFrame;
 }
 
 // Function to enhance the data frame with data links configured in the data source settings.
