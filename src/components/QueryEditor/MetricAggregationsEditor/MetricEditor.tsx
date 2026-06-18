@@ -95,7 +95,7 @@ export const MetricEditor = ({ value }: Props) => {
         <SegmentAsync
           className={cx(styles.color, segmentStyles)}
           loadOptions={() => getTypeOptionsAsync(previousMetrics)}
-          onChange={(e) => dispatch(changeMetricType({ id: value.id, type: e.value! }))}
+          onChange={(e) => dispatch(changeMetricType({ id: value.id, type: e.value!, previousType: value.type }))}
           value={toOption(value)}
         />
 
