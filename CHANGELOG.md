@@ -1,5 +1,13 @@
 # Changelog
 
+## 12.6.5
+
+- Fix: Preserve Lucene query when switching between metric aggregations [#328](https://github.com/grafana/grafana-elasticsearch-datasource/pull/328)
+- Fix: Make `grafanaDependency` prerelease-inclusive in plugin.json [#314](https://github.com/grafana/grafana-elasticsearch-datasource/pull/314)
+- Perf: Close idle HTTP connections when the datasource is disposed [#274](https://github.com/grafana/grafana-elasticsearch-datasource/pull/274)
+- Chore: Bump grafanaDependency floor to >=12.2.0 [#312](https://github.com/grafana/grafana-elasticsearch-datasource/pull/312)
+- Fix(deps): Update module github.com/grafana/grafana-plugin-sdk-go to v0.292.0 [#302](https://github.com/grafana/grafana-elasticsearch-datasource/pull/302)
+
 ## 12.6.4
 
 - Fix: Replace Slate-based QueryField with Input to resolve panel-editor crash on Grafana 13.1+ [#310](https://github.com/grafana/grafana-elasticsearch-datasource/pull/310)
