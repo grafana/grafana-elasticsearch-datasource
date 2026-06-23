@@ -13,13 +13,10 @@ import (
 )
 
 const (
-	esqlStatsCommand  = "STATS"  // processing command; can appear after any pipe
-	esqlPromQLCommand = "PROMQL" // source command; always the first token
+	esqlStatsCommand      = "STATS"
+	esqlPromQLCommand     = "PROMQL"
+	esqlCommandDelimiters = "|,;"
 )
-
-// esqlCommandDelimiters are the characters that can wrap a command token once
-// the query is split on whitespace (pipes, commas, semicolons).
-const esqlCommandDelimiters = "|,;"
 
 // processEsqlLogsResponse processes ES|QL response for logs queries
 // Similar to how logs are processed in logs_response_processor.go
