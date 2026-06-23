@@ -1,7 +1,7 @@
 {
   "type": "datasource",
-  "name": "Elasticsearch",
-  "id": "elasticsearch",
+  "name": "Query Index Elasticsearch",
+  "id": "query-index-elasticsearch",
   "executable": "gpx_grafana_elasticsearch_datasource",
   "category": "logging",
   "info": {

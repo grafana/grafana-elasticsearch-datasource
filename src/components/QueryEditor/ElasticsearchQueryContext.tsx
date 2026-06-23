@@ -8,7 +8,7 @@ import { ElasticDatasourceLike } from '../../types';
 
 import { createReducer as createBucketAggsReducer } from './BucketAggregationsEditor/state/reducer';
 import { reducer as metricsReducer } from './MetricAggregationsEditor/state/reducer';
-import { aliasPatternReducer, queryReducer, editorTypeReducer, initQuery, queryTypeReducer } from './state';
+import { aliasPatternReducer, queryReducer, editorTypeReducer, initQuery, queryTypeReducer, indexReducer } from './state';
 
 const DatasourceContext = createContext<ElasticDatasourceLike | undefined>(undefined);
 const QueryContext = createContext<ElasticsearchDataQuery | undefined>(undefined);
@@ -41,7 +41,7 @@ export const ElasticsearchProvider = ({
   );
 
   const reducer = combineReducers<
-    Pick<ElasticsearchDataQuery, 'query' | 'queryType' | 'alias' | 'editorType' | 'metrics' | 'bucketAggs'>
+    Pick<ElasticsearchDataQuery, 'query' | 'queryType' | 'alias' | 'editorType' | 'metrics' | 'bucketAggs'> & { index?: string }
   >({
     query: queryReducer,
     queryType: queryTypeReducer,
@@ -49,6 +49,7 @@ export const ElasticsearchProvider = ({
     editorType: editorTypeReducer,
     metrics: metricsReducer,
     bucketAggs: createBucketAggsReducer(datasource.timeField),
+    index: indexReducer,
   });
 
   const dispatch = useStatelessReducer(

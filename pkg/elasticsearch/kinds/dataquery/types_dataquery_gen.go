@@ -799,6 +799,8 @@ type ElasticsearchDataQuery struct {
 	// TODO find a better way to do this ^ that's friendly to schema
 	// TODO this shouldn't be unknown but DataSourceRef | null
 	Datasource any `json:"datasource,omitempty"`
+	// Index pattern to use for this specific query (overrides datasource-level index)
+	Index *string `json:"index,omitempty"`
 }
 
 // NewElasticsearchDataQuery creates a new ElasticsearchDataQuery object.
