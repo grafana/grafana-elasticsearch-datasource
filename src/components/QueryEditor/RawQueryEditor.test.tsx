@@ -18,20 +18,24 @@ jest.mock('@grafana/ui', () => {
   };
 });
 
+// Mirror the real monaco enum values so the two run shortcuts map to distinct keybindings.
+const KeyMod = { CtrlCmd: 2048, Shift: 1024 };
+const KeyCode = { Enter: 3 };
+
 describe('RawQueryEditor', () => {
   beforeEach(() => {
     capturedOnEditorDidMount = undefined;
   });
 
-  it('commits the current editor value before running on Ctrl/Cmd+Enter', () => {
+  function mountEditor() {
     const onChange = jest.fn();
     const onRunQuery = jest.fn();
     render(<RawQueryEditor value="old" language="esql" onChange={onChange} onRunQuery={onRunQuery} />);
 
-    let runCommand: (() => void) | undefined;
+    const commands = new Map<number, () => void>();
     const editor = {
-      addCommand: (_keybinding: number, cb: () => void) => {
-        runCommand = cb;
+      addCommand: (keybinding: number, cb: () => void) => {
+        commands.set(keybinding, cb);
       },
       onDidFocusEditorText: jest.fn(),
       onDidContentSizeChange: jest.fn(),
@@ -40,10 +44,20 @@ describe('RawQueryEditor', () => {
       getValue: () => 'edited but not blurred',
       getAction: () => ({ run: jest.fn() }),
     };
-    const monaco = { KeyMod: { CtrlCmd: 2048 }, KeyCode: { Enter: 3 } };
 
-    capturedOnEditorDidMount?.(editor, monaco);
-    runCommand?.();
+    capturedOnEditorDidMount?.(editor, { KeyMod, KeyCode });
+    return { onChange, onRunQuery, commands };
+  }
+
+  it.each([
+    ['Shift+Enter', KeyMod.Shift | KeyCode.Enter],
+    ['Ctrl/Cmd+Enter', KeyMod.CtrlCmd | KeyCode.Enter],
+  ])('commits the current editor value before running on %s', (_name, keybinding) => {
+    const { onChange, onRunQuery, commands } = mountEditor();
+
+    const runCommand = commands.get(keybinding);
+    expect(runCommand).toBeDefined();
+    runCommand!();
 
     expect(onChange).toHaveBeenCalledWith('edited but not blurred');
     expect(onRunQuery).toHaveBeenCalledTimes(1);
