@@ -288,6 +288,51 @@ describe('ElasticDatasource', () => {
         expect(sentQueries[0].refId).toBe('B');
       });
 
+      it('validates the interpolated query rather than the raw target', async () => {
+        // The raw target is invalid ES|QL, but applyTemplateVariables resolves it (e.g. a
+        // template variable) into a valid query - which is what the backend actually receives.
+        // Validation must run against that resolved query so it isn't a false positive.
+        jest.spyOn(ds, 'applyTemplateVariables').mockImplementation((target) => ({
+          ...target,
+          query: 'FROM logs | LIMIT 10',
+        }));
+        const fetchMock = jest.fn().mockReturnValue(
+          of(
+            createResponse({
+              results: { A: { frames: mockResponseFrames, refId: 'A', status: 200 } },
+            })
+          )
+        );
+        setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
+        const query = {
+          ...createElasticQuery(),
+          targets: [{ refId: 'A', queryType: 'esql', query: 'FROM $index | WHER broken' }],
+        };
+        await expect(ds.query(query)).toEmitValuesWith((received) => {
+          expect(received[0].errors ?? []).toHaveLength(0);
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('reports executed-query telemetry when every target fails validation', async () => {
+        jest.mocked(reportInteraction).mockClear();
+        const fetchMock = jest.fn().mockReturnValue(of({ data: { results: {} } }));
+        setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
+        const query = {
+          ...createElasticQuery(),
+          app: CoreApp.Explore,
+          targets: [{ refId: 'A', queryType: 'esql', query: 'FROM logs | WHER x > 1' }],
+        };
+        await expect(ds.query(query)).toEmitValuesWith((received) => {
+          expect(received[0].errors?.length).toBe(1);
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(reportInteraction).toHaveBeenCalledWith(
+          'grafana_elasticsearch_query_executed',
+          expect.objectContaining({ has_error: true })
+        );
+      });
+
       it('lets valid ES|QL queries through to the backend unchanged', async () => {
         const fetchMock = jest.fn().mockReturnValue(
           of(

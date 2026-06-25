@@ -32,9 +32,14 @@ export function RawQueryEditor({
   const styles = useStyles2(getStyles);
   const editorRef = useRef<monacoTypes.editor.IStandaloneCodeEditor | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const onChangeRef = useRef(onChange);
   const onRunQueryRef = useRef(onRunQuery);
   const onFocusPopulateRef = useRef(onFocusPopulate);
   const onEditorDidMountRef = useRef(onEditorDidMount);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     onRunQueryRef.current = onRunQuery;
@@ -54,6 +59,9 @@ export function RawQueryEditor({
 
       // Add keyboard shortcut for running query (Ctrl/Cmd+Enter)
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+        // Commit the current editor contents before running so keyboard submit validates and
+        // sends the same query text as the Run query button, which commits on blur first.
+        onChangeRef.current(editor.getValue());
         onRunQueryRef.current();
       });
 

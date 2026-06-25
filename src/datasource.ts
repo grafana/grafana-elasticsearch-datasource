@@ -700,10 +700,14 @@ export class ElasticDatasource
    */
   query(request: DataQueryRequest<ElasticsearchDataQuery>): Observable<DataQueryResponse> {
     const start = new Date();
-    const { validTargets, frontendErrors } = this.partitionTargets(request.targets);
+    const { validTargets, frontendErrors } = this.partitionTargets(request);
 
     if (validTargets.length === 0) {
-      return of({ data: [], errors: frontendErrors });
+      // Every target failed frontend validation, so we never reach the backend. Still report
+      // the query as executed-with-error so telemetry (e.g. in Explore) isn't silently dropped.
+      const response = { data: [], errors: frontendErrors };
+      trackQuery(response, request, start);
+      return of(response);
     }
 
     return super.query({ ...request, targets: validTargets }).pipe(
@@ -722,15 +726,20 @@ export class ElasticDatasource
     );
   }
 
-  private partitionTargets(targets: ElasticsearchDataQuery[]): {
+  private partitionTargets(request: DataQueryRequest<ElasticsearchDataQuery>): {
     validTargets: ElasticsearchDataQuery[];
     frontendErrors: DataQueryError[];
   } {
     const validTargets: ElasticsearchDataQuery[] = [];
     const frontendErrors: DataQueryError[] = [];
     const ctx = { timeField: this.timeField };
-    for (const target of targets) {
-      const errors = this.validators.validate(target, ctx);
+    for (const target of request.targets) {
+      // Validate the query string that will actually be sent to the backend - i.e. after
+      // time-range injection and template/scoped-var replacement performed by
+      // applyTemplateVariables() - so a query that is only valid once its variables are
+      // resolved isn't rejected, and errors introduced by replacement are still caught.
+      const interpolated = this.applyTemplateVariables(target, request.scopedVars, request.filters);
+      const errors = this.validators.validate(interpolated, ctx);
       if (errors.length === 0) {
         validTargets.push(target);
       } else {
