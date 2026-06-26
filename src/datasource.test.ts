@@ -3,10 +3,12 @@ import { of, throwError } from 'rxjs';
 
 import {
   CoreApp,
+  DataFrame,
   DataQueryRequest,
   DateTime,
   dateTime,
   Field,
+  FieldType,
   LoadingState,
   SupplementaryQueryType,
   TimeRange,
@@ -15,7 +17,7 @@ import {
 import { BackendSrv, config, FetchResponse, getBackendSrv, reportInteraction, setBackendSrv } from '@grafana/runtime';
 
 import { ElasticsearchDataQuery, Filters } from './dataquery.gen';
-import { ElasticDatasource } from './datasource';
+import { ElasticDatasource, REF_ID_STARTER_LOG_VOLUME, attachLevelLabelToVolumeFrame } from './datasource';
 import { createElasticDatasource, createElasticQuery, mockResponseFrames } from './mocks';
 
 const originalConsoleError = console.error;
@@ -242,6 +244,117 @@ describe('ElasticDatasource', () => {
       });
     });
 
+    describe('frontend validation', () => {
+      it('short-circuits an invalid ES|QL target with a per-refId error', async () => {
+        const fetchMock = jest.fn().mockReturnValue(of({ data: { results: {} } }));
+        setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
+        const query = {
+          ...createElasticQuery(),
+          targets: [{ refId: 'A', queryType: 'esql', query: 'FROM logs | WHER x > 1' }],
+        };
+        await expect(ds.query(query)).toEmitValuesWith((received) => {
+          expect(received[0].errors?.length).toBe(1);
+          expect(received[0].errors?.[0].refId).toBe('A');
+          expect(received[0].errors?.[0].message).toMatch(/\[\d+:\d+\]/);
+          expect(received[0].data).toEqual([]);
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+
+      it('sends valid targets to the backend while surfacing errors for invalid siblings', async () => {
+        const fetchMock = jest.fn().mockReturnValue(
+          of(
+            createResponse({
+              results: {
+                B: { frames: mockResponseFrames, refId: 'B', status: 200 },
+              },
+            })
+          )
+        );
+        setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
+        const query = {
+          ...createElasticQuery(),
+          targets: [
+            { refId: 'A', queryType: 'esql', query: 'FROM logs | WHER x > 1' },
+            { refId: 'B', queryType: 'lucene', query: 'foo:"bar"' },
+          ],
+        };
+        await expect(ds.query(query)).toEmitValuesWith((received) => {
+          expect(received[0].errors?.length).toBe(1);
+          expect(received[0].errors?.[0].refId).toBe('A');
+          expect(received[0].data.length).toBeGreaterThan(0);
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const sentQueries = fetchMock.mock.calls[0][0].data.queries;
+        expect(sentQueries).toHaveLength(1);
+        expect(sentQueries[0].refId).toBe('B');
+      });
+
+      it('validates the interpolated query rather than the raw target', async () => {
+        // The raw target is invalid ES|QL, but applyTemplateVariables resolves it (e.g. a
+        // template variable) into a valid query - which is what the backend actually receives.
+        // Validation must run against that resolved query so it isn't a false positive.
+        jest.spyOn(ds, 'applyTemplateVariables').mockImplementation((target) => ({
+          ...target,
+          query: 'FROM logs | LIMIT 10',
+        }));
+        const fetchMock = jest.fn().mockReturnValue(
+          of(
+            createResponse({
+              results: { A: { frames: mockResponseFrames, refId: 'A', status: 200 } },
+            })
+          )
+        );
+        setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
+        const query = {
+          ...createElasticQuery(),
+          targets: [{ refId: 'A', queryType: 'esql', query: 'FROM $index | WHER broken' }],
+        };
+        await expect(ds.query(query)).toEmitValuesWith((received) => {
+          expect(received[0].errors ?? []).toHaveLength(0);
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('reports executed-query telemetry when every target fails validation', async () => {
+        jest.mocked(reportInteraction).mockClear();
+        const fetchMock = jest.fn().mockReturnValue(of({ data: { results: {} } }));
+        setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
+        const query = {
+          ...createElasticQuery(),
+          app: CoreApp.Explore,
+          targets: [{ refId: 'A', queryType: 'esql', query: 'FROM logs | WHER x > 1' }],
+        };
+        await expect(ds.query(query)).toEmitValuesWith((received) => {
+          expect(received[0].errors?.length).toBe(1);
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(reportInteraction).toHaveBeenCalledWith(
+          'grafana_elasticsearch_query_executed',
+          expect.objectContaining({ has_error: true })
+        );
+      });
+
+      it('lets valid ES|QL queries through to the backend unchanged', async () => {
+        const fetchMock = jest.fn().mockReturnValue(
+          of(
+            createResponse({
+              results: { A: { frames: mockResponseFrames, refId: 'A', status: 200 } },
+            })
+          )
+        );
+        setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
+        const query = {
+          ...createElasticQuery(),
+          targets: [{ refId: 'A', queryType: 'esql', query: 'FROM logs | LIMIT 10' }],
+        };
+        await expect(ds.query(query)).toEmitValuesWith((received) => {
+          expect(received[0].errors ?? []).toHaveLength(0);
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+    });
+
     describe('reportInteraction', () => {
       it('should report metric query', async () => {
         const query = {
@@ -349,6 +462,117 @@ describe('ElasticDatasource', () => {
           expect(reportInteraction).not.toHaveBeenCalled();
         });
       });
+    });
+
+    // Regression for https://github.com/grafana/grafana/issues/90436:
+    // the backend strips field labels for non-alert queries and writes the
+    // terms bucket value into `frame.name`. Grafana's logs-volume panel
+    // reads the `level` label off the value field, so without re-attaching
+    // it every series collapses to "unknown".
+    describe('logs volume level relabel (issue #90436)', () => {
+      const buildVolumeFrames = () =>
+        [
+          { name: 'info', refId: 'log-volume-A' },
+          { name: 'warn', refId: 'log-volume-A' },
+        ].map(({ name, refId }) => ({
+          schema: {
+            name,
+            refId,
+            fields: [
+              { name: 'Time', type: FieldType.time },
+              { name: 'Value', type: FieldType.number },
+            ],
+          },
+          data: { values: [[1000], [5]] },
+        }));
+
+      const runVolumeQuery = (logLevelField?: string) => {
+        const dsWithLevel = createElasticDatasource(logLevelField ? { jsonData: { logLevelField } } : {});
+        setBackendSrv({
+          ...origBackendSrv,
+          fetch: jest.fn().mockReturnValue(
+            of(
+              createResponse({
+                results: {
+                  'log-volume-A': {
+                    frames: buildVolumeFrames(),
+                    refId: 'log-volume-A',
+                    status: 200,
+                  },
+                },
+              })
+            )
+          ),
+        });
+        const request: DataQueryRequest<ElasticsearchDataQuery> = {
+          ...createElasticQuery(),
+          targets: [
+            {
+              refId: `${REF_ID_STARTER_LOG_VOLUME}A`,
+              metrics: [{ type: 'count', id: '1' }],
+              query: '',
+            } as ElasticsearchDataQuery,
+          ],
+        };
+        return dsWithLevel.query(request);
+      };
+
+      it('attaches `level` label to value fields when logLevelField is configured', async () => {
+        await expect(runVolumeQuery('level')).toEmitValuesWith((received) => {
+          const frames = received[0].data;
+          expect(frames).toHaveLength(2);
+          const labels = frames.map((f: DataFrame) => f.fields.find((x: Field) => x.name === 'Value')?.labels);
+          expect(labels).toEqual([{ level: 'info' }, { level: 'warn' }]);
+        });
+      });
+
+      it('does not attach `level` label when logLevelField is not configured', async () => {
+        await expect(runVolumeQuery(undefined)).toEmitValuesWith((received) => {
+          const frames = received[0].data;
+          const labels = frames.map((f: DataFrame) => f.fields.find((x: Field) => x.name === 'Value')?.labels);
+          // Without logLevelField the backend produces a single un-bucketed
+          // series whose name is the metric type, not a level — relabeling
+          // would mis-tag it. Labels must remain untouched.
+          expect(labels).toEqual([undefined, undefined]);
+        });
+      });
+    });
+  });
+
+  describe('attachLevelLabelToVolumeFrame', () => {
+    const frame = (name: string | undefined, fields: Array<{ name: string; labels?: Record<string, string> }>) => ({
+      name,
+      fields: fields.map((f) => ({ ...f, type: FieldType.number, config: {}, values: [] })),
+      length: 0,
+    });
+
+    it('sets level label on the Value field using the frame name', () => {
+      const result = attachLevelLabelToVolumeFrame(frame('error', [{ name: 'Time' }, { name: 'Value' }]));
+      const value = result.fields.find((f) => f.name === 'Value');
+      expect(value?.labels).toEqual({ level: 'error' });
+    });
+
+    it('preserves existing labels on the Value field', () => {
+      const result = attachLevelLabelToVolumeFrame(
+        frame('warn', [
+          { name: 'Time' },
+          { name: 'Value', labels: { service: 'api' } },
+        ])
+      );
+      const value = result.fields.find((f) => f.name === 'Value');
+      expect(value?.labels).toEqual({ service: 'api', level: 'warn' });
+    });
+
+    it('returns the frame unchanged when there is no Value field', () => {
+      const f = frame('info', [{ name: 'Time' }, { name: 'Count' }]);
+      const result = attachLevelLabelToVolumeFrame(f);
+      expect(result.fields.find((x) => x.name === 'Count')?.labels).toBeUndefined();
+    });
+
+    it('returns the frame unchanged when the name is missing', () => {
+      const f = frame(undefined, [{ name: 'Time' }, { name: 'Value' }]);
+      const result = attachLevelLabelToVolumeFrame(f);
+      expect(result.fields.find((x) => x.name === 'Value')?.labels).toBeUndefined();
     });
   });
 

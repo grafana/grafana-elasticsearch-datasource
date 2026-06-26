@@ -121,6 +121,34 @@ describe('trackQuery', () => {
     );
   });
 
+  test('reports has_error when only response.errors is populated', () => {
+    const query: ElasticsearchDataQuery = {
+      refId: 'A',
+      query: 'test query',
+      metrics: [{ id: '1', type: 'count' }],
+      bucketAggs: [],
+    };
+
+    const request: DataQueryRequest<ElasticsearchDataQuery> & { targets: ElasticsearchDataQuery[] } = {
+      app: CoreApp.Explore,
+      targets: [query],
+    } as DataQueryRequest<ElasticsearchDataQuery>;
+
+    const response: DataQueryResponse = {
+      data: [],
+      errors: [{ refId: 'A', message: 'invalid query' }],
+    };
+
+    trackQuery(response, request, new Date());
+
+    expect(reportInteraction).toHaveBeenCalledWith(
+      'grafana_elasticsearch_query_executed',
+      expect.objectContaining({
+        has_error: true,
+      })
+    );
+  });
+
   test('defaults to builder when editor_type is not specified', () => {
     const query: ElasticsearchDataQuery = {
       refId: 'A',
