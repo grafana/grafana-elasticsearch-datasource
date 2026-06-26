@@ -209,6 +209,34 @@ test.describe('Variable query editor', () => {
       await valueCombobox.fill('host.keyword');
       await expect(page.getByText(/Use custom value/i)).toBeVisible();
     });
+
+    test('surfaces a query error in the field-mapping editor instead of an empty preview', async ({
+      variableEditPage,
+      page,
+    }) => {
+      // The preview query used to swallow errors, leaving an empty dropdown with no hint why
+      // (grafana/grafana-elasticsearch-datasource#319). A downstream error returns per-refId in
+      // the /api/ds/query body; the editor must surface its reason. Mocking the error keeps this
+      // deterministic and independent of the elasticsearchRawDSLQuery backend toggle (a real DSL
+      // syntax error otherwise depends on GF_FEATURE_TOGGLES_ENABLE on the Grafana process).
+      await variableEditPage.mockQueryDataResponse(
+        {
+          results: {
+            'ElasticsearchVariableQueryEditor-VariableQuery': {
+              status: 400,
+              error: 'failed to parse query',
+            },
+          },
+        },
+        200
+      );
+      await variableEditPage.setVariableType('Query');
+      await variableEditPage.datasource.set('elasticsearch');
+
+      const alert = page.getByRole('alert').filter({ hasText: 'Query error' });
+      await expect(alert).toBeVisible();
+      await expect(alert).toContainText('failed to parse query');
+    });
   });
 
   test.describe('legacy query migration (PR #231)', () => {
