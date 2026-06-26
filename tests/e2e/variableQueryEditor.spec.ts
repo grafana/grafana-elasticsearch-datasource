@@ -165,9 +165,12 @@ test.describe('Variable query editor', () => {
       variableEditPage,
       page,
     }) => {
-      await variableEditPage.setVariableType('Query');
-      // Mock must be registered before datasource selection because the preview
-      // query fires the moment the datasource is picked.
+      // elasticsearch is the provisioned default datasource (isDefault: true), so the
+      // FieldMapping preview query can fire the moment the editor mounts on
+      // setVariableType — before datasource.set re-selects it. Register the mock and
+      // attach the response listener FIRST so that initial query is both mocked and
+      // observed; otherwise the listener races the query (which re-selecting an
+      // already-selected datasource doesn't reliably re-fire) and waitForResponse times out.
       await variableEditPage.mockQueryDataResponse(
         mockVariablePreviewFrame([
           { name: 'key', values: ['GET', 'POST'] },
@@ -175,6 +178,7 @@ test.describe('Variable query editor', () => {
         ])
       );
       const responsePromise = waitForFieldMappingResponse(page);
+      await variableEditPage.setVariableType('Query');
       await variableEditPage.datasource.set('elasticsearch');
       await responsePromise;
 
@@ -189,11 +193,14 @@ test.describe('Variable query editor', () => {
     });
 
     test('allows typing a custom value when no options are returned', async ({ variableEditPage, page }) => {
-      await variableEditPage.setVariableType('Query');
       // Empty frame ⇒ no auto-populated options. createCustomValue is enabled on the
-      // Combobox so the user can still enter a field name manually.
+      // Combobox so the user can still enter a field name manually. As above, register
+      // the mock and attach the listener before setVariableType so the preview query
+      // (which fires on editor mount with the default elasticsearch datasource) is
+      // mocked and observed rather than racing waitForResponse.
       await variableEditPage.mockQueryDataResponse(mockVariablePreviewFrame([]));
       const responsePromise = waitForFieldMappingResponse(page);
+      await variableEditPage.setVariableType('Query');
       await variableEditPage.datasource.set('elasticsearch');
       await responsePromise;
 
