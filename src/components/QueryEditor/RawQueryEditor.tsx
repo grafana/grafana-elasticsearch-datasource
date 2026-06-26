@@ -32,9 +32,14 @@ export function RawQueryEditor({
   const styles = useStyles2(getStyles);
   const editorRef = useRef<monacoTypes.editor.IStandaloneCodeEditor | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const onChangeRef = useRef(onChange);
   const onRunQueryRef = useRef(onRunQuery);
   const onFocusPopulateRef = useRef(onFocusPopulate);
   const onEditorDidMountRef = useRef(onEditorDidMount);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     onRunQueryRef.current = onRunQuery;
@@ -52,10 +57,17 @@ export function RawQueryEditor({
     (editor: monacoTypes.editor.IStandaloneCodeEditor, monaco: Monaco) => {
       editorRef.current = editor;
 
-      // Add keyboard shortcut for running query (Ctrl/Cmd+Enter)
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+      // Keyboard shortcut for running the query. Shift+Enter is the Grafana-wide convention for
+      // Monaco query editors (Loki, CloudWatch, Prometheus, ...); Ctrl/Cmd+Enter is also bound to
+      // match the SQL query editors. Both commit the current editor contents before running so
+      // keyboard submit validates and sends the same query text as the Run query button, which
+      // commits on blur first.
+      const runQuery = () => {
+        onChangeRef.current(editor.getValue());
         onRunQueryRef.current();
-      });
+      };
+      editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, runQuery);
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runQuery);
 
       editor.onDidFocusEditorText(() => {
         const currentValue = editor.getValue();
