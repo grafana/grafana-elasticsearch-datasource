@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-import { DataQueryRequest, dateTime, Field } from '@grafana/data';
+import { DataQueryRequest, dateTime, Field, LoadingState } from '@grafana/data';
 import { EditorField, EditorRow, EditorRows } from '@grafana/plugin-ui';
 import { Alert, Combobox, ComboboxOption, Input, Text } from '@grafana/ui';
 
@@ -76,6 +76,11 @@ const toComboboxValue = (value: string | undefined): ComboboxOption | null =>
 const FieldMapping = (props: FieldMappingProps) => {
   const { query, datasource, onChange } = props;
   const [choices, setChoices] = useState<ComboboxOption[]>([]);
+  // Surfaces query errors (e.g. invalid raw DSL) so the user can discover syntax issues
+  // while editing instead of seeing a silently empty preview. We only render the message
+  // the backend already extracts and classifies as a downstream error
+  // (getErrorFromElasticResponse → DownstreamError), never the raw Elasticsearch payload.
+  const [error, setError] = useState<string | undefined>(undefined);
 
   // Track the actual query content to avoid re-querying when only meta changes
   const queryRef = useRef(query);
@@ -117,13 +122,23 @@ const FieldMapping = (props: FieldMappingProps) => {
         if (!isActive) {
           return;
         }
+        // A downstream query error (e.g. invalid DSL) arrives here as response.errors,
+        // not via the error callback, so it must be checked on the success channel too.
+        const queryError = response.errors?.[0]?.message;
+        if (queryError || response.state === LoadingState.Error) {
+          setError(queryError ?? 'Query failed');
+          setChoices([]);
+          return;
+        }
+        setError(undefined);
         const fieldNames = (response.data[0] || { fields: [] }).fields
           .filter((f: Field) => f.name !== refId)
           .map((f: Field) => f.name);
         setChoices(fieldNames.map((f: string) => ({ value: f, label: f })));
       },
-      error: () => {
+      error: (err) => {
         if (isActive) {
+          setError(err?.message || 'Query failed');
           setChoices([]);
         }
       },
@@ -146,6 +161,13 @@ const FieldMapping = (props: FieldMappingProps) => {
 
   return (
     <EditorRows>
+      {error && (
+        <EditorRow>
+          <Alert severity="error" title="Query error">
+            {error}
+          </Alert>
+        </EditorRow>
+      )}
       {isRawDocumentQuery && (
         <EditorRow>
           <Text color="secondary" variant="bodySmall">
