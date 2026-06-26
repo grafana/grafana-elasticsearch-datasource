@@ -2,7 +2,7 @@ import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { of } from 'rxjs';
 
-import { dateTime, FieldType } from '@grafana/data';
+import { dateTime, FieldType, LoadingState } from '@grafana/data';
 
 import { ElasticsearchVariableEditor } from './ElasticsearchVariableEditor';
 import { ElasticQueryEditorProps, QueryEditor } from './components/QueryEditor';
@@ -123,6 +123,59 @@ describe('ElasticsearchVariableEditor', () => {
     });
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it('should display a query error returned in the response', async () => {
+    const datasourceWithError = {
+      ...defaultProps.datasource,
+      query: jest.fn().mockReturnValue(
+        of({ data: [], state: LoadingState.Error, errors: [{ message: 'failed to parse query' }] })
+      ),
+    } as unknown as ElasticDatasource;
+
+    render(<ElasticsearchVariableEditor {...{ ...defaultProps, datasource: datasourceWithError }} />);
+
+    expect(await screen.findByText('failed to parse query')).toBeInTheDocument();
+  });
+
+  it('should display a transport-level query error', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const errorObservable = {
+      subscribe: (observer: { error?: (err: Error) => void }) => {
+        setTimeout(() => observer.error?.(new Error('connection refused')), 0);
+        return { unsubscribe: jest.fn() };
+      },
+    };
+    const datasourceWithError = {
+      ...defaultProps.datasource,
+      query: jest.fn().mockReturnValue(errorObservable),
+    } as unknown as ElasticDatasource;
+
+    render(<ElasticsearchVariableEditor {...{ ...defaultProps, datasource: datasourceWithError }} />);
+
+    expect(await screen.findByText('connection refused')).toBeInTheDocument();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('should clear the error once a subsequent query succeeds', async () => {
+    const query = jest
+      .fn()
+      .mockReturnValueOnce(of({ data: [], state: LoadingState.Error, errors: [{ message: 'boom' }] }))
+      .mockReturnValue(
+        of({
+          data: [{ fields: [{ name: 'name', type: FieldType.string, config: {}, values: ['a'] }] }],
+        })
+      );
+    const ds = { ...defaultProps.datasource, query } as unknown as ElasticDatasource;
+
+    const { rerender } = render(<ElasticsearchVariableEditor {...{ ...defaultProps, datasource: ds }} />);
+    expect(await screen.findByText('boom')).toBeInTheDocument();
+
+    // Changing the query content re-runs the preview; the success response must clear the banner.
+    rerender(
+      <ElasticsearchVariableEditor {...{ ...defaultProps, datasource: ds, query: { ...defaultProps.query, query: 'changed' } }} />
+    );
+    await waitFor(() => expect(screen.queryByText('boom')).not.toBeInTheDocument());
   });
 
   it('should update query only when query content changes, not meta', () => {
