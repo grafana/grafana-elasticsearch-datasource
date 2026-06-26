@@ -3,10 +3,12 @@ import { of, throwError } from 'rxjs';
 
 import {
   CoreApp,
+  DataFrame,
   DataQueryRequest,
   DateTime,
   dateTime,
   Field,
+  FieldType,
   LoadingState,
   SupplementaryQueryType,
   TimeRange,
@@ -15,7 +17,7 @@ import {
 import { BackendSrv, config, FetchResponse, getBackendSrv, reportInteraction, setBackendSrv } from '@grafana/runtime';
 
 import { ElasticsearchDataQuery, Filters } from './dataquery.gen';
-import { ElasticDatasource } from './datasource';
+import { ElasticDatasource, REF_ID_STARTER_LOG_VOLUME, attachLevelLabelToVolumeFrame } from './datasource';
 import { createElasticDatasource, createElasticQuery, mockResponseFrames } from './mocks';
 
 const originalConsoleError = console.error;
@@ -460,6 +462,117 @@ describe('ElasticDatasource', () => {
           expect(reportInteraction).not.toHaveBeenCalled();
         });
       });
+    });
+
+    // Regression for https://github.com/grafana/grafana/issues/90436:
+    // the backend strips field labels for non-alert queries and writes the
+    // terms bucket value into `frame.name`. Grafana's logs-volume panel
+    // reads the `level` label off the value field, so without re-attaching
+    // it every series collapses to "unknown".
+    describe('logs volume level relabel (issue #90436)', () => {
+      const buildVolumeFrames = () =>
+        [
+          { name: 'info', refId: 'log-volume-A' },
+          { name: 'warn', refId: 'log-volume-A' },
+        ].map(({ name, refId }) => ({
+          schema: {
+            name,
+            refId,
+            fields: [
+              { name: 'Time', type: FieldType.time },
+              { name: 'Value', type: FieldType.number },
+            ],
+          },
+          data: { values: [[1000], [5]] },
+        }));
+
+      const runVolumeQuery = (logLevelField?: string) => {
+        const dsWithLevel = createElasticDatasource(logLevelField ? { jsonData: { logLevelField } } : {});
+        setBackendSrv({
+          ...origBackendSrv,
+          fetch: jest.fn().mockReturnValue(
+            of(
+              createResponse({
+                results: {
+                  'log-volume-A': {
+                    frames: buildVolumeFrames(),
+                    refId: 'log-volume-A',
+                    status: 200,
+                  },
+                },
+              })
+            )
+          ),
+        });
+        const request: DataQueryRequest<ElasticsearchDataQuery> = {
+          ...createElasticQuery(),
+          targets: [
+            {
+              refId: `${REF_ID_STARTER_LOG_VOLUME}A`,
+              metrics: [{ type: 'count', id: '1' }],
+              query: '',
+            } as ElasticsearchDataQuery,
+          ],
+        };
+        return dsWithLevel.query(request);
+      };
+
+      it('attaches `level` label to value fields when logLevelField is configured', async () => {
+        await expect(runVolumeQuery('level')).toEmitValuesWith((received) => {
+          const frames = received[0].data;
+          expect(frames).toHaveLength(2);
+          const labels = frames.map((f: DataFrame) => f.fields.find((x: Field) => x.name === 'Value')?.labels);
+          expect(labels).toEqual([{ level: 'info' }, { level: 'warn' }]);
+        });
+      });
+
+      it('does not attach `level` label when logLevelField is not configured', async () => {
+        await expect(runVolumeQuery(undefined)).toEmitValuesWith((received) => {
+          const frames = received[0].data;
+          const labels = frames.map((f: DataFrame) => f.fields.find((x: Field) => x.name === 'Value')?.labels);
+          // Without logLevelField the backend produces a single un-bucketed
+          // series whose name is the metric type, not a level — relabeling
+          // would mis-tag it. Labels must remain untouched.
+          expect(labels).toEqual([undefined, undefined]);
+        });
+      });
+    });
+  });
+
+  describe('attachLevelLabelToVolumeFrame', () => {
+    const frame = (name: string | undefined, fields: Array<{ name: string; labels?: Record<string, string> }>) => ({
+      name,
+      fields: fields.map((f) => ({ ...f, type: FieldType.number, config: {}, values: [] })),
+      length: 0,
+    });
+
+    it('sets level label on the Value field using the frame name', () => {
+      const result = attachLevelLabelToVolumeFrame(frame('error', [{ name: 'Time' }, { name: 'Value' }]));
+      const value = result.fields.find((f) => f.name === 'Value');
+      expect(value?.labels).toEqual({ level: 'error' });
+    });
+
+    it('preserves existing labels on the Value field', () => {
+      const result = attachLevelLabelToVolumeFrame(
+        frame('warn', [
+          { name: 'Time' },
+          { name: 'Value', labels: { service: 'api' } },
+        ])
+      );
+      const value = result.fields.find((f) => f.name === 'Value');
+      expect(value?.labels).toEqual({ service: 'api', level: 'warn' });
+    });
+
+    it('returns the frame unchanged when there is no Value field', () => {
+      const f = frame('info', [{ name: 'Time' }, { name: 'Count' }]);
+      const result = attachLevelLabelToVolumeFrame(f);
+      expect(result.fields.find((x) => x.name === 'Count')?.labels).toBeUndefined();
+    });
+
+    it('returns the frame unchanged when the name is missing', () => {
+      const f = frame(undefined, [{ name: 'Time' }, { name: 'Value' }]);
+      const result = attachLevelLabelToVolumeFrame(f);
+      expect(result.fields.find((x) => x.name === 'Value')?.labels).toBeUndefined();
     });
   });
 
