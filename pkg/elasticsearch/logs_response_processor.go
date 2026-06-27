@@ -118,21 +118,15 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 }
 
 // setLogsCustomMeta sets custom metadata for logs frames
-func setLogsCustomMeta(frame *data.Frame, searchWords map[string]bool, limit int, total int) {
-	i := 0
-	searchWordsList := make([]string, len(searchWords))
+func setLogsCustomMeta(frame *data.Frame, searchWords map[string]bool, limit, total int) {
+	searchWordsList := make([]string, 0, len(searchWords))
 	for searchWord := range searchWords {
-		searchWordsList[i] = searchWord
-		i++
+		searchWordsList = append(searchWordsList, searchWord)
 	}
 	sort.Strings(searchWordsList)
 
 	if frame.Meta == nil {
 		frame.Meta = &data.FrameMeta{}
-	}
-
-	if frame.Meta.Custom == nil {
-		frame.Meta.Custom = map[string]interface{}{}
 	}
 
 	frame.Meta.Custom = map[string]interface{}{
