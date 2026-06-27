@@ -36,7 +36,7 @@ export const ElasticsearchVariableEditor = (props: ElasticsearchVariableQueryEdi
   return (
     <>
       <QueryEditor {...props} query={query} onChange={handleQueryChange} />
-      <FieldMapping datasource={props.datasource} query={query} onChange={props.onChange} />
+      <FieldMapping datasource={props.datasource} query={query} onChange={props.onChange} range={props.range} />
     </>
   );
 };
@@ -65,6 +65,7 @@ interface FieldMappingProps {
   datasource: ElasticsearchVariableQueryEditorProps['datasource'];
   query: ElasticsearchVariableQuery;
   onChange: ElasticsearchVariableQueryEditorProps['onChange'];
+  range: ElasticsearchVariableQueryEditorProps['range'];
 }
 
 // Grafana UI's <Combobox> will not render a scalar string `value` that isn't in `options`
@@ -74,7 +75,7 @@ const toComboboxValue = (value: string | undefined): ComboboxOption | null =>
   value ? { value, label: value } : null;
 
 const FieldMapping = (props: FieldMappingProps) => {
-  const { query, datasource, onChange } = props;
+  const { query, datasource, onChange, range } = props;
   const [choices, setChoices] = useState<ComboboxOption[]>([]);
   // Surfaces query errors (e.g. invalid raw DSL) so the user can discover syntax issues
   // while editing instead of seeing a silently empty preview. We only render the message
@@ -86,6 +87,13 @@ const FieldMapping = (props: FieldMappingProps) => {
   const queryRef = useRef(query);
   useEffect(() => {
     queryRef.current = query;
+  });
+
+  // Track the latest editor time range without forcing the preview to re-run on every
+  // range change — it is re-applied whenever the query content changes (queryKey).
+  const rangeRef = useRef(range);
+  useEffect(() => {
+    rangeRef.current = range;
   });
 
   // Only re-run the query when the query content changes, not when meta (valueField/textField) changes
@@ -107,7 +115,9 @@ const FieldMapping = (props: FieldMappingProps) => {
       requestId: 'variable-field-fetch',
       interval: '1s',
       intervalMs: 1000,
-      range: {
+      // Use the editor's time range so the preview matches the data the variable query will
+      // see; fall back to the last hour when the editor doesn't supply one.
+      range: rangeRef.current ?? {
         from: dateTime(Date.now() - 3600000),
         to: dateTime(Date.now()),
         raw: { from: 'now-1h', to: 'now' },
