@@ -7,6 +7,16 @@ import (
 	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/simplejson"
 )
 
+// metricIdRegex matches a leading metric id (e.g. "1" in "1[95.0]") in an orderBy value.
+// Compiled once at package load to avoid recompiling on every aggregation.
+var metricIdRegex = regexp.MustCompile(`^(\d+)`)
+
+// calendarIntervals is the set of interval strings Elasticsearch treats as calendar
+// intervals (as opposed to fixed intervals).
+var calendarIntervals = map[string]struct{}{
+	"1w": {}, "1M": {}, "1q": {}, "1y": {},
+}
+
 // addDateHistogramAgg adds a date histogram aggregation to the aggregation builder
 func addDateHistogramAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, timeFrom, timeTo int64, timeField string) es.AggBuilder {
 	// If no field is specified, use the time field
@@ -93,7 +103,6 @@ func addTermsAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, metrics []*Metr
 			   The format for extended stats and percentiles is {metricId}[bucket_path]
 			   for everything else it's just {metricId}, _count, _term, or _key
 			*/
-			metricIdRegex := regexp.MustCompile(`^(\d+)`)
 			metricId := metricIdRegex.FindString(orderBy)
 
 			if len(metricId) > 0 {
@@ -130,8 +139,9 @@ func addNestedAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg) es.AggBuilder 
 
 // addFiltersAgg adds a filters aggregation to the aggregation builder
 func addFiltersAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg) es.AggBuilder {
-	filters := make(map[string]any)
-	for _, filter := range bucketAgg.Settings.Get("filters").MustArray() {
+	rawFilters := bucketAgg.Settings.Get("filters").MustArray()
+	filters := make(map[string]any, len(rawFilters))
+	for _, filter := range rawFilters {
 		json := simplejson.NewFromAny(filter)
 		query := json.Get("query").MustString()
 		label := json.Get("label").MustString()
@@ -163,11 +173,6 @@ func addGeoHashGridAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg) es.AggBui
 
 // isCalendarInterval checks if the interval is a calendar interval
 func isCalendarInterval(interval string) bool {
-	calendarIntervals := []string{"1w", "1M", "1q", "1y"}
-	for _, ci := range calendarIntervals {
-		if interval == ci {
-			return true
-		}
-	}
-	return false
+	_, ok := calendarIntervals[interval]
+	return ok
 }
