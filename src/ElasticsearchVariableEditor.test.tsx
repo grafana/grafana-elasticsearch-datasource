@@ -178,6 +178,22 @@ describe('ElasticsearchVariableEditor', () => {
     await waitFor(() => expect(screen.queryByText('boom')).not.toBeInTheDocument());
   });
 
+  it('should run the field-mapping preview over the editor time range, not a hardcoded hour', async () => {
+    const customRange = {
+      from: dateTime('2020-06-01'),
+      to: dateTime('2020-06-08'),
+      raw: { from: 'now-7d', to: 'now' },
+    };
+    const query = jest.fn().mockReturnValue(of({ data: [{ fields: [] }] }));
+    const ds = { ...defaultProps.datasource, query } as unknown as ElasticDatasource;
+
+    render(<ElasticsearchVariableEditor {...{ ...defaultProps, datasource: ds, range: customRange }} />);
+
+    await waitFor(() => expect(query).toHaveBeenCalled());
+    const request = query.mock.calls[0][0];
+    expect(request.range.raw).toEqual({ from: 'now-7d', to: 'now' });
+  });
+
   it('should update query only when query content changes, not meta', () => {
     const { rerender } = render(<ElasticsearchVariableEditor {...defaultProps} />);
 
