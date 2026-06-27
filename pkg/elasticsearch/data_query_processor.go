@@ -91,15 +91,15 @@ func processLogsQuery(q *Query, b *es.SearchRequestBuilder, from, to int64, defa
 
 	// For log query, we add a date histogram aggregation
 	aggBuilder := b.Agg()
-	q.BucketAggs = append(q.BucketAggs, &BucketAgg{
+	bucketAgg := &BucketAgg{
 		Type:  dateHistType,
 		Field: defaultTimeField,
 		ID:    "1",
 		Settings: simplejson.NewFromAny(map[string]any{
 			"interval": "auto",
 		}),
-	})
-	bucketAgg := q.BucketAggs[0]
+	}
+	q.BucketAggs = append(q.BucketAggs, bucketAgg)
 	bucketAgg.Settings = simplejson.NewFromAny(
 		bucketAgg.generateSettingsForDSL(),
 	)
@@ -160,7 +160,7 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 		if isPipelineAgg(m.Type) {
 			if isPipelineAggWithMultipleBucketPaths(m.Type) {
 				if len(m.PipelineVariables) > 0 {
-					bucketPaths := map[string]any{}
+					bucketPaths := make(map[string]any, len(m.PipelineVariables))
 					for name, pipelineAgg := range m.PipelineVariables {
 						if _, err := strconv.Atoi(pipelineAgg); err == nil {
 							var appliedAgg *MetricAgg
@@ -178,6 +178,13 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 								}
 							}
 						}
+					}
+
+					// Skip emitting the pipeline aggregation when none of the
+					// variables resolved to a real metric: an empty buckets_path
+					// would produce an invalid Elasticsearch query.
+					if len(bucketPaths) == 0 {
+						continue
 					}
 
 					aggBuilder.Pipeline(m.ID, m.Type, bucketPaths, func(a *es.PipelineAggregation) {

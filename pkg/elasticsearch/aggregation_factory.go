@@ -88,7 +88,7 @@ func addTermsAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, metrics []*Metr
 			a.Missing = &missing
 		}
 
-		if orderBy, err := bucketAgg.Settings.Get("orderBy").String(); err == nil {
+		if orderBy, err := bucketAgg.Settings.Get("orderBy").String(); err == nil && orderBy != "" {
 			/*
 			   The format for extended stats and percentiles is {metricId}[bucket_path]
 			   for everything else it's just {metricId}, _count, _term, or _key
