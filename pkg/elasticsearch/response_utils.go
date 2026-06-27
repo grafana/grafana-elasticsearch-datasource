@@ -51,7 +51,7 @@ func sortPropNames(propNames map[string]bool, configuredFields es.ConfiguredFiel
 	hasTimeField := false
 	hasLogMessageField := false
 
-	var sortedPropNames []string
+	sortedPropNames := make([]string, 0, len(propNames))
 	for k := range propNames {
 		if configuredFields.TimeField != "" && k == configuredFields.TimeField {
 			hasTimeField = true
