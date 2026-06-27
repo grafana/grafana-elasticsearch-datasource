@@ -58,7 +58,7 @@ func (p *metricsResponseProcessor) processBuckets(aggs map[string]interface{}, t
 		} else {
 			for _, b := range esAgg.Get("buckets").MustArray() {
 				bucket := simplejson.NewFromAny(b)
-				newProps := make(map[string]string)
+				newProps := make(map[string]string, len(props))
 
 				for k, v := range props {
 					newProps[k] = v
@@ -88,7 +88,7 @@ func (p *metricsResponseProcessor) processBuckets(aggs map[string]interface{}, t
 
 			for _, bucketKey := range bucketKeys {
 				bucket := simplejson.NewFromAny(buckets[bucketKey])
-				newProps := make(map[string]string)
+				newProps := make(map[string]string, len(props))
 
 				for k, v := range props {
 					newProps[k] = v
