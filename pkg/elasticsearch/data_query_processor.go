@@ -265,17 +265,28 @@ func (e *elasticsearchDataQuery) processRawDSLQuery(q *Query, b *es.SearchReques
 				return backend.DownstreamError(fmt.Errorf("failed to parse aggregations: %w", err))
 			}
 
-			// If there is no metric agg in the query, it is a count agg
-			if len(metricAggs) == 0 {
-				metricAggs = append(metricAggs, &MetricAgg{Type: "count"})
+			// Only adopt the aggregations parsed from the raw body when it actually defines its
+			// own. When it doesn't, keep the aggregations the frontend already supplied: this is
+			// the case for the Explore logs-volume supplementary query, which carries a
+			// Grafana-synthesized date_histogram (and optional per-level terms agg) in BucketAggs
+			// even though the raw DSL body only contains a `query` clause. Overwriting them here
+			// is what made the logs view fail to load log volume in the raw query editor.
+			// See https://github.com/grafana/grafana-elasticsearch-datasource/issues/112
+			if len(bucketAggs) > 0 || len(metricAggs) > 0 {
+				// If there is no metric agg in the query, it is a count agg
+				if len(metricAggs) == 0 {
+					metricAggs = append(metricAggs, &MetricAgg{Type: "count"})
+				}
+
+				q.BucketAggs = bucketAggs
+				q.Metrics = metricAggs
 			}
 
-			q.BucketAggs = bucketAggs
-			q.Metrics = metricAggs
-
+			// Apply the user's `query` clause as a bool filter so the aggregation respects it.
+			// The date-range filter has already been added by the caller, and Bool()/Filter()
+			// reuse that same filter builder.
 			if queryPart, ok := queryBody["query"].(map[string]any); ok {
-				queryJSON, _ := json.Marshal(queryPart)
-				q.RawQuery = string(queryJSON)
+				b.Query().Bool().Filter().AddRawFilter(queryPart)
 			}
 			return nil
 		}
