@@ -86,6 +86,9 @@ func processDocsToDataFrameFields(docs []map[string]interface{}, propNames []str
 // findTheFirstNonNilDocValueForPropName finds the first non-nil value for propName in docs.
 // If none of the values are non-nil, it returns the value of propName in the first doc.
 func findTheFirstNonNilDocValueForPropName(docs []map[string]interface{}, propName string) interface{} {
+	if len(docs) == 0 {
+		return nil
+	}
 	for _, doc := range docs {
 		if doc[propName] != nil {
 			return doc[propName]

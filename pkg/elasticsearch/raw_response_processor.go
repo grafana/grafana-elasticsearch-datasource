@@ -29,8 +29,8 @@ func (p *rawResponseProcessor) processRawDataResponse(res *es.SearchResponse, ta
 
 	for hitIdx, hit := range res.Hits.Hits {
 		var flattened map[string]interface{}
-		if hit["_source"] != nil {
-			flattened = flatten(hit["_source"].(map[string]interface{}), 10)
+		if source, ok := hit["_source"].(map[string]interface{}); ok {
+			flattened = flatten(source, 10)
 		}
 
 		doc := map[string]interface{}{
