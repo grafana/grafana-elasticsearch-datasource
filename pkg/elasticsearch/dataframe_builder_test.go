@@ -27,3 +27,14 @@ func TestFindTheFirstNonNilDocValueForPropName(t *testing.T) {
 		require.Nil(t, findTheFirstNonNilDocValueForPropName(docs, "field"))
 	})
 }
+
+func TestCreatePropKeys(t *testing.T) {
+	t.Run("returns keys sorted alphabetically", func(t *testing.T) {
+		props := map[string]string{"zeta": "1", "alpha": "2", "mike": "3"}
+		require.Equal(t, []string{"alpha", "mike", "zeta"}, createPropKeys(props))
+	})
+
+	t.Run("returns an empty slice for an empty map", func(t *testing.T) {
+		require.Empty(t, createPropKeys(map[string]string{}))
+	})
+}
