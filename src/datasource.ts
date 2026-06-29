@@ -1218,8 +1218,9 @@ export class ElasticDatasource
           ? this.addAdHocFilters(
               // Interpolate template variables *before* parsing for time-range injection. A bare
               // variable (e.g. `${foo}s`) is invalid ES|QL, so parsing the raw query would fail and
-              // silently skip the WHERE filter — see issue #339. The injected `${__from}`/`${__to}`
-              // placeholders are resolved by the final templateSrv.replace pass below.
+              // silently skip the WHERE filter — see issue #339. The injected
+              // `${__from:date:iso}`/`${__to:date:iso}` placeholders are resolved by the final
+              // templateSrv.replace pass below.
               this.addTimeRangeToEsqlQuery(this.interpolateEsqlQuery(query.query || '', scopedVars)),
               filters
             )

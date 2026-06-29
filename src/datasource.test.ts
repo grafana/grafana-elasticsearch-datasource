@@ -1817,7 +1817,8 @@ describe('ElasticDatasource', () => {
           }
           let result = text.replace(/\$\{__from:date:iso\}/g, fromISO).replace(/\$\{__to:date:iso\}/g, toISO);
           for (const [name, value] of Object.entries(extraVars)) {
-            result = result.replace(new RegExp(`\\$\\{${name}\\}`, 'g'), value);
+            // split/join with literal strings avoids regex-metacharacter and `$`-replacement pitfalls
+            result = result.split(`\${${name}}`).join(value);
           }
           return result;
         },
