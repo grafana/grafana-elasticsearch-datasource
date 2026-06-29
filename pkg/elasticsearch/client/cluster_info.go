@@ -1,9 +1,13 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 type VersionInfo struct {
@@ -22,24 +26,27 @@ const (
 
 // GetClusterInfo fetches cluster information from the Elasticsearch root endpoint.
 // It returns the cluster build flavor which is used to determine if the cluster is serverless.
-func GetClusterInfo(httpCli *http.Client, url string) (clusterInfo ClusterInfo, err error) {
-	resp, err := httpCli.Get(url)
+func GetClusterInfo(ctx context.Context, esClient *elasticsearch.Client) (clusterInfo ClusterInfo, err error) {
+	if esClient == nil {
+		return ClusterInfo{}, fmt.Errorf("elasticsearch client is required to get cluster info")
+	}
+
+	req := esapi.InfoRequest{}
+	res, err := req.Do(ctx, esClient)
 	if err != nil {
 		return ClusterInfo{}, fmt.Errorf("error getting ES cluster info: %w", err)
 	}
-
-	if resp.StatusCode != http.StatusOK {
-		return ClusterInfo{}, fmt.Errorf("unexpected status code %d getting ES cluster info", resp.StatusCode)
-	}
-
 	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil && err == nil {
+		if closeErr := res.Body.Close(); closeErr != nil && err == nil {
 			err = fmt.Errorf("error closing response body: %w", closeErr)
 		}
 	}()
 
-	err = json.NewDecoder(resp.Body).Decode(&clusterInfo)
-	if err != nil {
+	if res.StatusCode != http.StatusOK {
+		return ClusterInfo{}, fmt.Errorf("unexpected status code %d getting ES cluster info", res.StatusCode)
+	}
+
+	if err = json.NewDecoder(res.Body).Decode(&clusterInfo); err != nil {
 		return ClusterInfo{}, fmt.Errorf("error decoding ES cluster info: %w", err)
 	}
 
