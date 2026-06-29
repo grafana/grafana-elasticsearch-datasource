@@ -1778,7 +1778,7 @@ describe('ElasticDatasource', () => {
     const fromISO = '2024-03-23T00:00:00.000Z';
     const toISO = '2024-03-24T00:00:00.000Z';
 
-    function createDsWithTimeRange() {
+    function createDsWithTimeRange(extraVars: Record<string, string> = {}) {
       const instanceSettings = {
         meta: {
           id: 'id',
@@ -1815,7 +1815,12 @@ describe('ElasticDatasource', () => {
           if (!text) {
             return '';
           }
-          return text.replace(/\$\{__from:date:iso\}/g, fromISO).replace(/\$\{__to:date:iso\}/g, toISO);
+          let result = text.replace(/\$\{__from:date:iso\}/g, fromISO).replace(/\$\{__to:date:iso\}/g, toISO);
+          for (const [name, value] of Object.entries(extraVars)) {
+            // split/join with literal strings avoids regex-metacharacter and `$`-replacement pitfalls
+            result = result.split(`\${${name}}`).join(value);
+          }
+          return result;
         },
         containsTemplate: (text?: string) => text?.includes('$') ?? false,
         updateTimeRange: () => {},
@@ -1896,6 +1901,25 @@ describe('ElasticDatasource', () => {
       const result = testDs.applyTemplateVariables({ refId: 'A', query, queryType: 'esql' }, {});
       expect(result.query).toContain('/* my comment */');
       expect(result.query).toContain('WHERE @timestamp >=');
+    });
+
+    it('should add time filter when a template variable sits in a bare (non-string) token', () => {
+      // Regression test for https://github.com/grafana/grafana-elasticsearch-datasource/issues/339
+      // A bare variable like ${foo}s is invalid ES|QL before substitution, so the time-range
+      // injection must run *after* interpolation, otherwise the parser fails and the filter is skipped.
+      const testDs = createDsWithTimeRange({ foo: '30' });
+      const result = testDs.applyTemplateVariables(
+        {
+          refId: 'A',
+          query: 'FROM test-index | STATS total = SUM(Value) BY period = BUCKET(@timestamp, ${foo}s) | LIMIT 10',
+          queryType: 'esql',
+        },
+        {}
+      );
+      expect(result.query).toContain('WHERE @timestamp >=');
+      expect(result.query).toContain('AND @timestamp <=');
+      // the variable was still substituted correctly
+      expect(result.query).toContain('BUCKET(@timestamp, 30s)');
     });
 
     it('should return empty query unchanged', () => {
