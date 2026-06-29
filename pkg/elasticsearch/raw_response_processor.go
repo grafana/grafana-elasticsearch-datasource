@@ -64,11 +64,8 @@ func (p *rawResponseProcessor) processRawDataResponse(res *es.SearchResponse, ta
 	sortedPropNames := sortPropNames(propNames, configuredFields, false)
 	fields := processDocsToDataFrameFields(docs, sortedPropNames, configuredFields)
 
-	frames := data.Frames{}
 	frame := data.NewFrame("", fields...)
-
-	frames = append(frames, frame)
-	queryRes.Frames = frames
+	queryRes.Frames = data.Frames{frame}
 
 	p.logger.Debug("Processed raw data query response", "fieldsLength", len(frame.Fields))
 	return nil
@@ -123,11 +120,9 @@ func (p *rawResponseProcessor) processRawDocumentResponse(res *es.SearchResponse
 	field := data.NewField(target.RefID, nil, fieldVector)
 	field.Config = &data.FieldConfig{Filterable: &isFilterable}
 
-	frames := data.Frames{}
 	frame := data.NewFrame(target.RefID, field)
-	frames = append(frames, frame)
+	queryRes.Frames = data.Frames{frame}
 
-	queryRes.Frames = frames
 	p.logger.Debug("Processed raw document query response", "fieldsLength", len(frame.Fields))
 	return nil
 }

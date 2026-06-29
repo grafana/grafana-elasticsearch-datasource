@@ -62,26 +62,22 @@ func (bucketAgg BucketAgg) generateSettingsForDSL() map[string]any {
 
 // stringToIntWithDefaultValue converts a string to int with a default fallback value
 func stringToIntWithDefaultValue(valueStr string, defaultValue int) int {
+	// In our case, 0 is not a valid value, so an unparseable or zero value both
+	// fall back to the default.
 	value, err := strconv.Atoi(valueStr)
-	if err != nil {
-		value = defaultValue
-	}
-	// In our case, 0 is not a valid value and in this case we default to defaultValue
-	if value == 0 {
-		value = defaultValue
+	if err != nil || value == 0 {
+		return defaultValue
 	}
 	return value
 }
 
 // stringToFloatWithDefaultValue converts a string to float64 with a default fallback value
 func stringToFloatWithDefaultValue(valueStr string, defaultValue float64) float64 {
+	// In our case, 0 is not a valid value, so an unparseable or zero value both
+	// fall back to the default.
 	value, err := strconv.ParseFloat(valueStr, 64)
-	if err != nil {
-		value = defaultValue
-	}
-	// In our case, 0 is not a valid value and in this case we default to defaultValue
-	if value == 0 {
-		value = defaultValue
+	if err != nil || value == 0 {
+		return defaultValue
 	}
 	return value
 }
