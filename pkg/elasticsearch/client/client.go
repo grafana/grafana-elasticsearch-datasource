@@ -17,6 +17,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
+	"github.com/grafana/grafana-plugin-sdk-go/config"
 )
 
 // Used in logging to mark a stage
@@ -287,7 +288,7 @@ func (c *baseClientImpl) ExecuteEsql(query string) (*EsqlResponse, error) {
 }
 
 func isFeatureEnabled(ctx context.Context, feature string) bool {
-	return backend.GrafanaConfigFromContext(ctx).FeatureToggles().IsEnabled(feature)
+	return config.GrafanaConfigFromContext(ctx).FeatureToggles().IsEnabled(feature)
 }
 
 // StreamMultiSearchResponse processes the JSON response in a streaming fashion

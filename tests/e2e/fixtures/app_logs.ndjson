@@ -1,0 +1,30 @@
+{"index":{}}
+{"@timestamp":"2026-03-17T21:30:00.000Z","level":"info","message":"server started","service":"api"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:31:00.000Z","level":"info","message":"request processed","service":"api"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:32:00.000Z","level":"warn","message":"slow query","service":"api"}
+{"index":{}}
+{"@timestamp":"2026-03-17T21:33:00.000Z","level":"error","message":"upstream timeout","service":"api"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:00:00.000Z","level":"info","message":"healthcheck ok","service":"api"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:15:00.000Z","level":"warn","message":"retrying","service":"worker"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:30:00.000Z","level":"error","message":"connection refused","service":"worker"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:45:00.000Z","level":"info","message":"job completed","service":"worker"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:00:00.000Z","level":"debug","message":"polling","service":"worker"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:15:00.000Z","level":"info","message":"request processed","service":"api"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:30:00.000Z","level":"warn","message":"deprecated endpoint","service":"api"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:45:00.000Z","level":"info","message":"server stopped","service":"api"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:00:00.000Z","level":"info","message":"server restarted","service":"api"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:15:00.000Z","level":"error","message":"db pool exhausted","service":"api"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:30:00.000Z","level":"info","message":"recovered","service":"api"}

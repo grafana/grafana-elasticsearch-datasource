@@ -581,3 +581,94 @@ func TestProcessEsqlMetricsResponse_ReturnsEmptySuccessWhenNoStatsCommand(t *tes
 	require.NoError(t, err)
 	require.Empty(t, res.Frames)
 }
+
+func TestProcessEsqlMetricsResponse_ReturnsTimeSeriesForPromqlQuery(t *testing.T) {
+	// PROMQL responses carry a numeric value column plus a `step` date column,
+	// even though they never contain a STATS command.
+	response := &es.EsqlResponse{
+		Columns: []es.EsqlColumn{
+			{Name: "avg(metrics.system.cpu.logical.count)", Type: "double"},
+			{Name: "step", Type: "date"},
+		},
+		Values: [][]interface{}{
+			{6.2, "2026-05-21T14:00:00.000Z"},
+			{6.6, "2026-05-21T14:01:00.000Z"},
+			{5.8, "2026-05-21T14:02:00.000Z"},
+		},
+	}
+
+	target := &Query{
+		RefID:    "A",
+		RawQuery: "PROMQL index=metrics-* step=1m avg(metrics.system.cpu.logical.count)",
+		Metrics: []*MetricAgg{
+			{Type: countType},
+		},
+	}
+
+	res, err := processEsqlMetricsResponse(response, target)
+	require.NoError(t, err)
+	require.Len(t, res.Frames, 1)
+
+	frame := res.Frames[0]
+	require.NotNil(t, frame.Meta)
+	require.Equal(t, data.FrameTypeTimeSeriesMulti, frame.Meta.Type)
+	require.Len(t, frame.Fields, 2)
+	require.Equal(t, data.TimeSeriesTimeFieldName, frame.Fields[0].Name)
+	require.Equal(t, data.TimeSeriesValueFieldName, frame.Fields[1].Name)
+
+	require.Equal(t, 3, frame.Fields[0].Len())
+	require.Equal(t, 3, frame.Fields[1].Len())
+
+	ts1, ok := frame.Fields[0].At(0).(time.Time)
+	require.True(t, ok)
+	require.Equal(t, time.Date(2026, 5, 21, 14, 0, 0, 0, time.UTC), ts1)
+
+	v1, ok := frame.Fields[1].At(0).(*float64)
+	require.True(t, ok)
+	require.NotNil(t, v1)
+	require.Equal(t, 6.2, *v1)
+}
+
+func TestProcessEsqlMetricsResponse_GroupsByBreakdownFieldsForPromqlQuery(t *testing.T) {
+	response := &es.EsqlResponse{
+		Columns: []es.EsqlColumn{
+			{Name: "avg(metrics.system.cpu.logical.count)", Type: "double"},
+			{Name: "step", Type: "date"},
+			{Name: "host.name", Type: "keyword"},
+		},
+		Values: [][]interface{}{
+			{6.2, "2026-05-21T14:00:00.000Z", "host-a"},
+			{4.5, "2026-05-21T14:00:00.000Z", "host-b"},
+			{6.6, "2026-05-21T14:01:00.000Z", "host-a"},
+			{5.0, "2026-05-21T14:01:00.000Z", "host-b"},
+		},
+	}
+
+	target := &Query{
+		RefID:    "A",
+		RawQuery: "PROMQL index=metrics-* step=1m avg by (host.name) (metrics.system.cpu.logical.count)",
+		Metrics: []*MetricAgg{
+			{Type: countType},
+		},
+	}
+
+	res, err := processEsqlMetricsResponse(response, target)
+	require.NoError(t, err)
+	require.Len(t, res.Frames, 2, "should create one frame per unique host.name")
+
+	frameA := res.Frames[0]
+	require.Equal(t, data.FrameTypeTimeSeriesMulti, frameA.Meta.Type)
+	require.Equal(t, 2, frameA.Fields[0].Len())
+	require.Equal(t, "host-a", frameA.Fields[1].Labels["host.name"])
+
+	va0, ok := frameA.Fields[1].At(0).(*float64)
+	require.True(t, ok)
+	require.Equal(t, 6.2, *va0)
+
+	frameB := res.Frames[1]
+	require.Equal(t, "host-b", frameB.Fields[1].Labels["host.name"])
+
+	vb0, ok := frameB.Fields[1].At(0).(*float64)
+	require.True(t, ok)
+	require.Equal(t, 4.5, *vb0)
+}

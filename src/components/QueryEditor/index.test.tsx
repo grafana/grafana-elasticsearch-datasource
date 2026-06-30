@@ -10,7 +10,7 @@ const noop = () => void 0;
 const datasourceMock = {
   getDatabaseVersion: () => Promise.resolve(null),
   getIndices: () => Promise.resolve([]),
-} as ElasticDatasource;
+} as unknown as ElasticDatasource;
 
 describe('QueryEditor', () => {
   describe('Alias Field', () => {

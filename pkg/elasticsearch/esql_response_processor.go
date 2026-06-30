@@ -12,6 +12,12 @@ import (
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
 
+const (
+	esqlStatsCommand      = "STATS"
+	esqlPromQLCommand     = "PROMQL"
+	esqlCommandDelimiters = "|,;"
+)
+
 // processEsqlLogsResponse processes ES|QL response for logs queries
 // Similar to how logs are processed in logs_response_processor.go
 func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configuredFields es.ConfiguredFields) (*backend.DataResponse, error) {
@@ -241,7 +247,7 @@ func buildEsqlMultiSeriesFrames(response *es.EsqlResponse, layout esqlColumnLayo
 // When breakdown columns are present (columns that are neither time nor numeric),
 // rows are grouped by unique breakdown values and separate frames are created.
 func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query) (*backend.DataResponse, error) {
-	if !hasEsqlStatsCommand(target.RawQuery) {
+	if !hasEsqlMetricsCommand(target.RawQuery) {
 		return &backend.DataResponse{}, nil
 	}
 
@@ -281,12 +287,24 @@ func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query) (*back
 	}, nil
 }
 
-func hasEsqlStatsCommand(query string) bool {
-	for _, token := range strings.Fields(strings.ToUpper(query)) {
-		if strings.Trim(token, "|,;") == "STATS" {
+// hasEsqlMetricsCommand reports whether an ES|QL query contains a command that
+// produces aggregated metric time series: the PROMQL source command or a STATS
+// processing command.
+func hasEsqlMetricsCommand(query string) bool {
+	tokens := strings.Fields(strings.ToUpper(query))
+
+	// PROMQL is a source command, so it can only appear as the first token.
+	if len(tokens) > 0 && strings.Trim(tokens[0], esqlCommandDelimiters) == esqlPromQLCommand {
+		return true
+	}
+
+	// STATS is a processing command and can appear anywhere in the pipeline.
+	for _, token := range tokens {
+		if strings.Trim(token, esqlCommandDelimiters) == esqlStatsCommand {
 			return true
 		}
 	}
+
 	return false
 }
 

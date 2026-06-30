@@ -5,6 +5,8 @@ import { QueryType } from '../../types';
 
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
 
+import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
+
 /**
  * When the `initQuery` Action is dispatched, the query gets populated with default values where values are not present.
  * This means it won't override any existing value in place, but just ensure the query is in a "runnable" state.
@@ -40,9 +42,21 @@ export const queryReducer = (prevQuery: ElasticsearchDataQuery['query'], action:
     return '';
   }
 
-  // Clear query when switching metric types (e.g., from logs to metrics, or to raw_data)
+  // Clear the query only when the metric change alters the implied query type
+  // (e.g. metrics -> logs, or -> raw_data). Switching between aggregations that
+  // share the same implied query type (e.g. count -> avg) preserves the query.
+  // See https://github.com/grafana/grafana-elasticsearch-datasource/issues/309
   if (changeMetricType.match(action)) {
-    return '';
+    const { previousType, type } = action.payload;
+    const previousImpliedQueryType = previousType ? metricAggregationConfig[previousType].impliedQueryType : undefined;
+    const nextImpliedQueryType = metricAggregationConfig[type].impliedQueryType;
+
+    // only wipe the query when the *kind* of query changed (e.g. metrics -> logs)
+    if (previousImpliedQueryType !== nextImpliedQueryType) {
+      return '';
+    }
+
+    return prevQuery;
   }
 
   if (initQuery.match(action)) {

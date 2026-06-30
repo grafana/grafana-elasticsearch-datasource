@@ -8,7 +8,7 @@ import { MetricAggregation, MetricAggregationType } from '../../../dataquery.gen
 import { useFields } from '../../../hooks/useFields';
 import { useDispatch } from '../../../hooks/useStatelessReducer';
 import { MetricPicker } from '../../MetricPicker';
-import { useDatasource, useQuery } from '../ElasticsearchQueryContext';
+import { useQuery } from '../ElasticsearchQueryContext';
 import { segmentStyles } from '../styles';
 
 import { SettingsEditor } from './SettingsEditor';
@@ -58,7 +58,6 @@ const getTypeOptions = (previousMetrics: MetricAggregation[]): Array<SelectableV
 
 export const MetricEditor = ({ value }: Props) => {
   const styles = getStyles(useTheme2(), !!value.hide);
-  const datasource = useDatasource();
   const query = useQuery();
   const dispatch = useDispatch();
   const getFields = useFields(value.type);

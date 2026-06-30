@@ -131,7 +131,7 @@ export function trackQuery(
       editor_type: query.editorType || 'builder',
       grafana_version: config.buildInfo.version,
       has_data: response.data.some((frame) => frame.length > 0),
-      has_error: response.error !== undefined,
+      has_error: response.error !== undefined || (response.errors?.length ?? 0) > 0,
       line_limit: getLineLimit(query),
       query_language: query.queryType,
       query_type: getQueryType(query),

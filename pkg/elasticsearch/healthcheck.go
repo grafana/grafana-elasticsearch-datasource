@@ -13,6 +13,7 @@ import (
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/config"
 )
 
 const ErrorBodyMaxSize = 200
@@ -118,7 +119,7 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 	indexWarningMessage := ""
 
 	// validate index and time field
-	cfg := backend.GrafanaConfigFromContext(ctx)
+	cfg := config.GrafanaConfigFromContext(ctx)
 	crossClusterSearchEnabled := cfg.FeatureToggles().IsEnabled("elasticsearchCrossClusterSearch")
 
 	if crossClusterSearchEnabled {

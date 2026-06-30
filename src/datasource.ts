@@ -87,6 +87,7 @@ import {
   isElasticsearchResponseWithHits,
 } from './types';
 import { getScriptValue, isTimeSeriesQuery } from './utils';
+import { QueryValidatorRegistry, esqlValidator, toDataQueryError } from './validation';
 
 export const REF_ID_STARTER_LOG_VOLUME = 'log-volume-';
 export const REF_ID_STARTER_LOG_SAMPLE = 'log-sample-';
@@ -132,6 +133,7 @@ export class ElasticDatasource
   isProxyAccess: boolean;
   databaseVersion: SemVer | null;
   defaultQueryMode?: QueryType;
+  validators: QueryValidatorRegistry;
 
   constructor(
     instanceSettings: DataSourceInstanceSettings<ElasticsearchOptions>,
@@ -169,6 +171,8 @@ export class ElasticDatasource
     }
     this.languageProvider = new LanguageProvider(this);
     this.variables = new ElasticsearchVariableSupport(this, ElasticsearchVariableEditor);
+    this.validators = new QueryValidatorRegistry();
+    this.validators.register('esql', esqlValidator);
   }
 
   getResourceRequest(path: string, params?: BackendSrvRequest['params'], options?: Partial<BackendSrvRequest>) {
@@ -696,15 +700,64 @@ export class ElasticDatasource
    */
   query(request: DataQueryRequest<ElasticsearchDataQuery>): Observable<DataQueryResponse> {
     const start = new Date();
-    return super.query(request).pipe(
+    const { validTargets, frontendErrors } = this.partitionTargets(request);
+
+    if (validTargets.length === 0) {
+      // Every target failed frontend validation, so we never reach the backend. Still report
+      // the query as executed-with-error so telemetry (e.g. in Explore) isn't silently dropped.
+      const response = { data: [], errors: frontendErrors };
+      trackQuery(response, request, start);
+      return of(response);
+    }
+
+    // The supplementary log-volume request has a terms-on-`logLevelField`
+    // bucket agg only when `logLevelField` is configured; when it isn't,
+    // the response is a single un-bucketed series whose `frame.name` is
+    // the metric type ("Count"), not a log level.
+    const shouldRelabelLogsVolume =
+      !!this.logLevelField &&
+      request.targets.some((t) => t.refId?.startsWith(REF_ID_STARTER_LOG_VOLUME));
+
+    return super.query({ ...request, targets: validTargets }).pipe(
+      map((response) =>
+        frontendErrors.length
+          ? { ...response, errors: [...(response.errors ?? []), ...frontendErrors] }
+          : response
+      ),
       tap((response) => trackQuery(response, request, start)),
       map((response) => {
         response.data.forEach((dataFrame) => {
           enhanceDataFrameWithDataLinks(dataFrame, this.dataLinks);
         });
+        if (shouldRelabelLogsVolume) {
+          response.data = response.data.map(attachLevelLabelToVolumeFrame);
+        }
         return response;
       })
     );
+  }
+
+  private partitionTargets(request: DataQueryRequest<ElasticsearchDataQuery>): {
+    validTargets: ElasticsearchDataQuery[];
+    frontendErrors: DataQueryError[];
+  } {
+    const validTargets: ElasticsearchDataQuery[] = [];
+    const frontendErrors: DataQueryError[] = [];
+    const ctx = { timeField: this.timeField };
+    for (const target of request.targets) {
+      // Validate the query string that will actually be sent to the backend - i.e. after
+      // time-range injection and template/scoped-var replacement performed by
+      // applyTemplateVariables() - so a query that is only valid once its variables are
+      // resolved isn't rejected, and errors introduced by replacement are still caught.
+      const interpolated = this.applyTemplateVariables(target, request.scopedVars, request.filters);
+      const errors = this.validators.validate(interpolated, ctx);
+      if (errors.length === 0) {
+        validTargets.push(target);
+      } else {
+        frontendErrors.push(toDataQueryError(target.refId, errors));
+      }
+    }
+    return { validTargets, frontendErrors };
   }
 
   /**
@@ -1211,7 +1264,12 @@ export class ElasticDatasource
       query:
         query.queryType === 'esql'
           ? this.addAdHocFilters(
-              this.interpolateEsqlQuery(this.addTimeRangeToEsqlQuery(query.query || ''), scopedVars),
+              // Interpolate template variables *before* parsing for time-range injection. A bare
+              // variable (e.g. `${foo}s`) is invalid ES|QL, so parsing the raw query would fail and
+              // silently skip the WHERE filter — see issue #339. The injected
+              // `${__from:date:iso}`/`${__to:date:iso}` placeholders are resolved by the final
+              // templateSrv.replace pass below.
+              this.addTimeRangeToEsqlQuery(this.interpolateEsqlQuery(query.query || '', scopedVars)),
               filters
             )
           : this.addAdHocFilters(this.interpolateLuceneQuery(query.query || '', scopedVars), filters),
@@ -1232,11 +1290,9 @@ export class ElasticDatasource
     }
 
     try {
-      const { root, errors } = Parser.parse(esqlQuery, { withFormatting: true });
-
-      if (errors.length) {
-        return esqlQuery;
-      }
+      // Parse errors are caught upfront by esqlValidator; this call should always
+      // succeed here. The try/catch remains as a defense-in-depth fallback.
+      const { root } = Parser.parse(esqlQuery, { withFormatting: true });
 
       const whereCommands = Walker.matchAll(root, {
         type: 'command',
@@ -1356,6 +1412,24 @@ export class ElasticDatasource
     };
     return contextRequest;
   };
+}
+
+// The supplementary logs-volume query groups counts by `logLevelField`, but the
+// backend writes that bucket value into `frame.name` and strips field labels
+// (see field_namer.go::nameFields). Grafana's logs-volume panel expects a
+// `level` label on the value field to colour each series — without it every
+// frame collapses to "unknown". Re-attach the label from `frame.name`.
+// See https://github.com/grafana/grafana/issues/90436.
+export function attachLevelLabelToVolumeFrame(dataFrame: DataFrame): DataFrame {
+  if (!dataFrame.name) {
+    return dataFrame;
+  }
+  const valueField = dataFrame.fields.find((field) => field.name === 'Value');
+  if (!valueField) {
+    return dataFrame;
+  }
+  valueField.labels = { ...(valueField.labels ?? {}), level: dataFrame.name };
+  return dataFrame;
 }
 
 // Function to enhance the data frame with data links configured in the data source settings.

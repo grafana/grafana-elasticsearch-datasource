@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/config"
 	"github.com/grafana/grafana-plugin-sdk-go/experimental/featuretoggles"
 	schemas "github.com/grafana/schemads"
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,7 @@ func TestNormalizeGrafanaSQLRequest_PassthroughWithoutToggle(t *testing.T) {
 	raw := []byte(`{"refId":"A","query":"*","grafanaSql":true,"table":"my-index"}`)
 	req := &backend.QueryDataRequest{
 		PluginContext: backend.PluginContext{
-			GrafanaConfig: backend.NewGrafanaCfg(map[string]string{
+			GrafanaConfig: config.NewGrafanaCfg(map[string]string{
 				featuretoggles.EnabledFeatures: "",
 			}),
 		},
@@ -50,7 +51,7 @@ func TestNormalizeGrafanaSQLRequest_IndexTable(t *testing.T) {
 	require.NoError(t, err)
 	req := &backend.QueryDataRequest{
 		PluginContext: backend.PluginContext{
-			GrafanaConfig: backend.NewGrafanaCfg(map[string]string{
+			GrafanaConfig: config.NewGrafanaCfg(map[string]string{
 				featuretoggles.EnabledFeatures: dsAbstractionAppFeature,
 			}),
 		},
@@ -87,7 +88,7 @@ func TestNormalizeGrafanaSQLRequest_FallbackTable(t *testing.T) {
 	require.NoError(t, err)
 	req := &backend.QueryDataRequest{
 		PluginContext: backend.PluginContext{
-			GrafanaConfig: backend.NewGrafanaCfg(map[string]string{
+			GrafanaConfig: config.NewGrafanaCfg(map[string]string{
 				featuretoggles.EnabledFeatures: dsAbstractionAppFeature,
 			}),
 		},
@@ -129,7 +130,7 @@ func TestNormalizeGrafanaSQLRequest_MissingIndexIsRejected(t *testing.T) {
 	require.NoError(t, err)
 	req := &backend.QueryDataRequest{
 		PluginContext: backend.PluginContext{
-			GrafanaConfig: backend.NewGrafanaCfg(map[string]string{
+			GrafanaConfig: config.NewGrafanaCfg(map[string]string{
 				featuretoggles.EnabledFeatures: dsAbstractionAppFeature,
 			}),
 		},
@@ -333,7 +334,7 @@ func TestNormalizeGrafanaSQLRequest_LuceneBoolFilters(t *testing.T) {
 	require.NoError(t, err)
 	req := &backend.QueryDataRequest{
 		PluginContext: backend.PluginContext{
-			GrafanaConfig: backend.NewGrafanaCfg(map[string]string{
+			GrafanaConfig: config.NewGrafanaCfg(map[string]string{
 				featuretoggles.EnabledFeatures: dsAbstractionAppFeature,
 			}),
 		},
