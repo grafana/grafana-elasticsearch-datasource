@@ -1910,6 +1910,68 @@ type fakeClient struct {
 	executedEsqlQuery   string
 }
 
+func TestExecuteElasticsearchDataQuery_EdgeCases(t *testing.T) {
+	from := time.Date(2018, 5, 15, 17, 50, 0, 0, time.UTC)
+	to := time.Date(2018, 5, 15, 17, 55, 0, 0, time.UTC)
+
+	t.Run("terms agg with an empty orderBy does not set an empty sort key", func(t *testing.T) {
+		c := newFakeClient()
+		_, err := executeElasticsearchDataQuery(c, `{
+			"bucketAggs": [
+				{ "type": "terms", "field": "@host", "id": "2", "settings": { "order": "desc", "orderBy": "" } },
+				{ "type": "date_histogram", "field": "@timestamp", "id": "3" }
+			],
+			"metrics": [{ "type": "count", "id": "1" }]
+		}`, from, to)
+		require.NoError(t, err)
+
+		sr := c.multisearchRequests[0].Requests[0]
+		termsAgg := sr.Aggs[0].Aggregation.Aggregation.(*es.TermsAggregation)
+		require.NotContains(t, termsAgg.Order, "", "empty orderBy must not be set as a sort key")
+	})
+
+	t.Run("logs query date histogram uses the configured time field, not a stale bucketAgg", func(t *testing.T) {
+		c := newFakeClient()
+		// A logs query is not expected to carry frontend bucket aggs, but if it does,
+		// the appended date histogram must still be the one applied to the request.
+		_, err := executeElasticsearchDataQuery(c, `{
+			"bucketAggs": [{ "type": "terms", "field": "@host", "id": "9" }],
+			"metrics": [{ "type": "logs", "id": "1" }]
+		}`, from, to)
+		require.NoError(t, err)
+
+		sr := c.multisearchRequests[0].Requests[0]
+		dateHist := sr.Aggs[0].Aggregation.Aggregation.(*es.DateHistogramAgg)
+		require.Equal(t, c.configuredFields.TimeField, dateHist.Field,
+			"logs date histogram must use the configured time field, not a stale frontend bucketAgg")
+	})
+
+	t.Run("bucket_script with no resolvable pipeline variables is skipped", func(t *testing.T) {
+		c := newFakeClient()
+		_, err := executeElasticsearchDataQuery(c, `{
+			"bucketAggs": [{ "type": "date_histogram", "field": "@timestamp", "id": "2" }],
+			"metrics": [
+				{ "id": "1", "type": "sum", "field": "@value" },
+				{
+					"id": "4",
+					"type": "bucket_script",
+					"pipelineVariables": [{ "name": "var1", "pipelineAgg": "999" }],
+					"settings": { "script": "params.var1 * 2" }
+				}
+			]
+		}`, from, to)
+		require.NoError(t, err)
+
+		sr := c.multisearchRequests[0].Requests[0]
+		dateHist := sr.Aggs[0]
+		require.Equal(t, "date_histogram", dateHist.Aggregation.Type)
+		for _, sub := range dateHist.Aggregation.Aggs {
+			require.NotEqual(t, "4", sub.Key,
+				"bucket_script with no resolvable pipeline variables must not be emitted")
+		}
+	})
+}
+
 func newFakeClient() *fakeClient {
 	configuredFields := es.ConfiguredFields{
 		TimeField:       "@timestamp",
