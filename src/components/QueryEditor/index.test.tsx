@@ -12,6 +12,42 @@ const datasourceMock = {
 } as ElasticDatasource;
 
 describe('QueryEditor', () => {
+  describe('Lucene Query Field', () => {
+    const buildQuery = (query: string): ElasticsearchDataQuery => ({
+      refId: 'A',
+      query,
+      metrics: [{ id: '1', type: 'count' }],
+      bucketAggs: [{ id: '2', type: 'date_histogram' }],
+    });
+
+    it('renders as a textarea so long queries can word-wrap instead of scrolling horizontally', () => {
+      render(<QueryEditor query={buildQuery('')} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />);
+
+      const queryField = screen.getByPlaceholderText('Enter a lucene query');
+      expect(queryField.tagName).toBe('TEXTAREA');
+    });
+
+    it('calls onChange with the new value as the user types', () => {
+      const onChange = jest.fn<void, [ElasticsearchDataQuery]>();
+      render(<QueryEditor query={buildQuery('')} datasource={datasourceMock} onChange={onChange} onRunQuery={noop} />);
+
+      const queryField = screen.getByPlaceholderText('Enter a lucene query');
+      fireEvent.change(queryField, { target: { value: 'status:200' } });
+
+      expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ query: 'status:200' }));
+    });
+
+    it('prevents Enter from inserting a literal newline into the query', () => {
+      render(<QueryEditor query={buildQuery('status:200')} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />);
+
+      const queryField = screen.getByPlaceholderText('Enter a lucene query');
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+      const wasCancelled = !fireEvent(queryField, event);
+
+      expect(wasCancelled).toBe(true);
+    });
+  });
+
   describe('Alias Field', () => {
     it('Should correctly render and trigger changes on blur', () => {
       const alias = '{{metric}}';
