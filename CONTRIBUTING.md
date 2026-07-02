@@ -1,5 +1,10 @@
 # Contributing
 
+## Signed commits are required
+
+> [!IMPORTANT]
+> All commits must be [signed](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits) (GPG, SSH, or S/MIME) to be merged into this repository. Pull requests with unsigned commits will need to be re-committed with signatures before they can be merged.
+
 Thank you for your interest in contributing to the Elasticsearch data source for Grafana! We welcome contributions from the community.
 
 Feel free to [browse open issues](https://github.com/grafana/grafana-elasticsearch-datasource/issues) or open a new one. For more general guidance, see [Grafana's Contributing Guide](https://github.com/grafana/grafana/blob/main/CONTRIBUTING.md).
