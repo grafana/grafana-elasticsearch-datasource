@@ -68,6 +68,35 @@ describe('IndexPattern', () => {
         expect(pattern.getIndexList(from, to)).toEqual(expected);
       });
     });
+
+    // Regression coverage for https://github.com/grafana/grafana/issues/123095:
+    // hourly patterns with a 12-hour `hh` token must resolve against UTC,
+    // regardless of the host or browser timezone. A panel time range covering
+    // UTC midnight on Apr 20 (which is 08:00 of Apr 21 in UTC+8) must produce
+    // `2026.04.20.12` (UTC midnight in 12-hour clock), not `2026.04.21.12`
+    // (the local-time date).
+    describe('hourly', () => {
+      it('resolves index date to UTC when the pattern uses 12-hour `hh` (issue #123095)', () => {
+        const pattern = new IndexPattern('[nginx_access-]YYYY.MM.DD.hh', 'Hourly');
+        const from = dateTime('2026-04-20T00:00:00Z');
+        const to = dateTime('2026-04-20T00:01:00Z');
+
+        expect(pattern.getIndexList(from, to)).toEqual(['nginx_access-2026.04.20.12']);
+      });
+
+      it('resolves index date to UTC when the pattern uses 24-hour `HH`', () => {
+        const pattern = new IndexPattern('[nginx_access-]YYYY.MM.DD.HH', 'Hourly');
+        const from = dateTime('2026-04-20T00:00:00Z');
+        const to = dateTime('2026-04-20T03:00:00Z');
+
+        expect(pattern.getIndexList(from, to)).toEqual([
+          'nginx_access-2026.04.20.00',
+          'nginx_access-2026.04.20.01',
+          'nginx_access-2026.04.20.02',
+          'nginx_access-2026.04.20.03',
+        ]);
+      });
+    });
   });
 
   describe('when getting index list from single date', () => {
