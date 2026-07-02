@@ -1,0 +1,16 @@
+{"index":{}}
+{"@timestamp":"2026-03-17T21:30:00.000Z","user":"alice","success":true,"sourceIP":"10.0.0.1","method":"password"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:00:00.000Z","user":"bob","success":false,"sourceIP":"10.0.0.2","method":"password"}
+{"index":{}}
+{"@timestamp":"2026-03-17T22:30:00.000Z","user":"alice","success":true,"sourceIP":"10.0.0.1","method":"mfa"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:00:00.000Z","user":"carol","success":true,"sourceIP":"10.0.0.3","method":"sso"}
+{"index":{}}
+{"@timestamp":"2026-03-17T23:30:00.000Z","user":"dave","success":false,"sourceIP":"10.0.0.4","method":"password"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:00:00.000Z","user":"bob","success":true,"sourceIP":"10.0.0.2","method":"mfa"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:30:00.000Z","user":"erin","success":false,"sourceIP":"10.0.0.5","method":"password"}
+{"index":{}}
+{"@timestamp":"2026-03-18T00:45:00.000Z","user":"carol","success":true,"sourceIP":"10.0.0.3","method":"mfa"}

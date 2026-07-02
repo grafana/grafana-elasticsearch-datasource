@@ -960,10 +960,13 @@ export class ElasticDatasource
         const buckets = res.responses[0].aggregations['1'].buckets;
         return _map(buckets, (bucket) => {
           const keyString = String(bucket.key);
-          return {
-            text: bucket.key_as_string || keyString,
-            value: isTagValueQuery ? keyString : bucket.key,
-          };
+          // Elasticsearch returns `key_as_string` for typed fields (boolean, date, ip)
+          // alongside the raw `key`. For a boolean `true`, `key === 1` and
+          // `key_as_string === "true"`. Use the human-readable form for both text and
+          // value so variable substitution doesn't produce literals like `1,true`.
+          const text = bucket.key_as_string || keyString;
+          const value = bucket.key_as_string ?? (isTagValueQuery ? keyString : bucket.key);
+          return { text, value };
         });
       })
     );
