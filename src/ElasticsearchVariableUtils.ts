@@ -6,6 +6,29 @@ export const refId = 'ElasticsearchVariableQueryEditor-VariableQuery';
 
 export type ElasticsearchVariableQuery = ElasticsearchDataQuery;
 
+// Shape of the old Grafana-syntax variable query, e.g. {"find":"terms","field":"Platform.keyword"}
+export interface LegacyFindQuery {
+  find: 'terms' | 'fields';
+  field?: string;
+  query?: string;
+  size?: number;
+  order?: 'asc' | 'desc';
+  orderBy?: string;
+  type?: string;
+}
+
+const isLegacyFindQuery = (v: unknown): v is LegacyFindQuery =>
+  v !== null && typeof v === 'object' && 'find' in v && (v.find === 'terms' || v.find === 'fields');
+
+export const parseLegacyFindQuery = (raw: string): LegacyFindQuery | null => {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isLegacyFindQuery(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 export const migrateVariableQuery = (rawQuery: string | ElasticsearchDataQuery): ElasticsearchVariableQuery => {
   if (typeof rawQuery !== 'string') {
     return {
@@ -15,7 +38,38 @@ export const migrateVariableQuery = (rawQuery: string | ElasticsearchDataQuery):
       meta: rawQuery.meta,
     };
   }
-  // Legacy string-based query
+
+  // Legacy Grafana-syntax query: {"find":"terms","field":"..."} or {"find":"fields",...}
+  // Before ElasticsearchVariableSupport existed, these were handled by metricFindQuery().
+  // Convert to raw DSL to avoid introducing a spurious count metric and to stay one-to-one
+  // with the original getTermsQuery() output.
+  const legacy = parseLegacyFindQuery(rawQuery);
+  if (legacy?.find === 'terms' && legacy.field) {
+    const orderByKey = legacy.orderBy === 'doc_count' ? '_count' : '_key';
+    const dslBody: Record<string, unknown> = {
+      size: 0,
+      aggs: {
+        '1': {
+          terms: {
+            field: legacy.field,
+            size: legacy.size ?? 500,
+            order: { [orderByKey]: legacy.order ?? 'asc' },
+          },
+        },
+      },
+    };
+    if (legacy.query) {
+      dslBody.query = { bool: { filter: [{ query_string: { analyze_wildcard: true, query: legacy.query } }] } };
+    }
+    return {
+      refId,
+      queryType: 'dsl',
+      editorType: 'code',
+      query: JSON.stringify(dslBody),
+    };
+  }
+
+  // Legacy string-based Lucene query (plain text or unrecognised JSON)
   return {
     refId,
     query: rawQuery,

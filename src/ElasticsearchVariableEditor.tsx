@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-import { DataQueryRequest, dateTime, Field } from '@grafana/data';
+import { DataQueryRequest, dateTime, Field, LoadingState } from '@grafana/data';
 import { EditorField, EditorRow, EditorRows } from '@grafana/plugin-ui';
 import { Alert, Combobox, ComboboxOption, Input, Text } from '@grafana/ui';
 
@@ -20,9 +20,12 @@ export const ElasticsearchVariableEditor = (props: ElasticsearchVariableQueryEdi
   const handleQueryChange = (newQuery: ElasticsearchDataQuery) => {
     // Clear field mapping when the query structure changes significantly — the available fields
     // may be completely different (e.g. switching between Raw Document and Metrics tabs, or
-    // switching between Lucene and DSL query types).
-    const metricTypeChanged = newQuery.metrics?.[0]?.type !== query.metrics?.[0]?.type;
-    const queryTypeChanged = newQuery.queryType !== query.queryType;
+    // switching between Lucene and DSL query types). `undefined → defined` is the init reducer
+    // populating defaults on mount, not a real user change — don't clear meta then.
+    const prevMetricType = query.metrics?.[0]?.type;
+    const newMetricType = newQuery.metrics?.[0]?.type;
+    const metricTypeChanged = prevMetricType !== undefined && prevMetricType !== newMetricType;
+    const queryTypeChanged = query.queryType !== undefined && query.queryType !== newQuery.queryType;
     if (metricTypeChanged || queryTypeChanged) {
       props.onChange({ ...newQuery, meta: undefined });
     } else {
@@ -33,7 +36,7 @@ export const ElasticsearchVariableEditor = (props: ElasticsearchVariableQueryEdi
   return (
     <>
       <QueryEditor {...props} query={query} onChange={handleQueryChange} />
-      <FieldMapping datasource={props.datasource} query={query} onChange={props.onChange} />
+      <FieldMapping datasource={props.datasource} query={query} onChange={props.onChange} range={props.range} />
     </>
   );
 };
@@ -62,16 +65,35 @@ interface FieldMappingProps {
   datasource: ElasticsearchVariableQueryEditorProps['datasource'];
   query: ElasticsearchVariableQuery;
   onChange: ElasticsearchVariableQueryEditorProps['onChange'];
+  range: ElasticsearchVariableQueryEditorProps['range'];
 }
 
+// Grafana UI's <Combobox> will not render a scalar string `value` that isn't in `options`
+// on older @grafana/ui versions (fixed upstream by grafana/grafana#95407, but we ship
+// against 11.6+). Passing the value as a ComboboxOption guarantees it renders regardless.
+const toComboboxValue = (value: string | undefined): ComboboxOption | null =>
+  value ? { value, label: value } : null;
+
 const FieldMapping = (props: FieldMappingProps) => {
-  const { query, datasource, onChange } = props;
+  const { query, datasource, onChange, range } = props;
   const [choices, setChoices] = useState<ComboboxOption[]>([]);
+  // Surfaces query errors (e.g. invalid raw DSL) so the user can discover syntax issues
+  // while editing instead of seeing a silently empty preview. We only render the message
+  // the backend already extracts and classifies as a downstream error
+  // (getErrorFromElasticResponse → DownstreamError), never the raw Elasticsearch payload.
+  const [error, setError] = useState<string | undefined>(undefined);
 
   // Track the actual query content to avoid re-querying when only meta changes
   const queryRef = useRef(query);
   useEffect(() => {
     queryRef.current = query;
+  });
+
+  // Track the latest editor time range without forcing the preview to re-run on every
+  // range change — it is re-applied whenever the query content changes (queryKey).
+  const rangeRef = useRef(range);
+  useEffect(() => {
+    rangeRef.current = range;
   });
 
   // Only re-run the query when the query content changes, not when meta (valueField/textField) changes
@@ -93,7 +115,9 @@ const FieldMapping = (props: FieldMappingProps) => {
       requestId: 'variable-field-fetch',
       interval: '1s',
       intervalMs: 1000,
-      range: {
+      // Use the editor's time range so the preview matches the data the variable query will
+      // see; fall back to the last hour when the editor doesn't supply one.
+      range: rangeRef.current ?? {
         from: dateTime(Date.now() - 3600000),
         to: dateTime(Date.now()),
         raw: { from: 'now-1h', to: 'now' },
@@ -108,13 +132,23 @@ const FieldMapping = (props: FieldMappingProps) => {
         if (!isActive) {
           return;
         }
+        // A downstream query error (e.g. invalid DSL) arrives here as response.errors,
+        // not via the error callback, so it must be checked on the success channel too.
+        const queryError = response.errors?.[0]?.message;
+        if (queryError || response.state === LoadingState.Error) {
+          setError(queryError ?? 'Query failed');
+          setChoices([]);
+          return;
+        }
+        setError(undefined);
         const fieldNames = (response.data[0] || { fields: [] }).fields
           .filter((f: Field) => f.name !== refId)
           .map((f: Field) => f.name);
         setChoices(fieldNames.map((f: string) => ({ value: f, label: f })));
       },
-      error: () => {
+      error: (err) => {
         if (isActive) {
+          setError(err?.message || 'Query failed');
           setChoices([]);
         }
       },
@@ -137,6 +171,13 @@ const FieldMapping = (props: FieldMappingProps) => {
 
   return (
     <EditorRows>
+      {error && (
+        <EditorRow>
+          <Alert severity="error" title="Query error">
+            {error}
+          </Alert>
+        </EditorRow>
+      )}
       {isRawDocumentQuery && (
         <EditorRow>
           <Text color="secondary" variant="bodySmall">
@@ -150,7 +191,7 @@ const FieldMapping = (props: FieldMappingProps) => {
           <Combobox
             isClearable
             createCustomValue
-            value={query.meta?.valueField}
+            value={toComboboxValue(query.meta?.valueField)}
             onChange={(e) => onMetaPropChange('valueField', e?.value)}
             width={40}
             options={choices}
@@ -160,7 +201,7 @@ const FieldMapping = (props: FieldMappingProps) => {
           <Combobox
             isClearable
             createCustomValue
-            value={query.meta?.textField}
+            value={toComboboxValue(query.meta?.textField)}
             onChange={(e) => onMetaPropChange('textField', e?.value)}
             width={40}
             options={choices}
