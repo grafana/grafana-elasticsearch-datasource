@@ -114,13 +114,12 @@ export const metricAggregationConfig: MetricsConfiguration = {
     defaults: {},
   },
   moving_avg: {
-    // deprecated in 6.4.0, removed in 8.0.0,
-    // recommended replacement is moving_fn
-    label: 'Moving Average',
+    // Removed from ES 8.0.0 - kept for backwards compatibility with existing queries
+    // Use moving_fn instead
+    label: 'Moving Average (deprecated)',
     impliedQueryType: 'metrics',
     requiresField: true,
     isPipelineAgg: true,
-    versionRange: '<8.0.0',
     supportsMissing: false,
     supportsMultipleBucketPaths: false,
     hasSettings: true,

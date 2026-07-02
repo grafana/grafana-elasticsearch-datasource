@@ -248,6 +248,14 @@ func isFieldCaps(url string) bool {
 
 func (ds *DataSource) callResourcePassthrough(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
 	logger := ds.logger.FromContext(ctx)
+	logger.Debug("Resource request received", "path", req.Path, "method", req.Method)
+
+	// Handle _indices resource endpoint for listing available indices and data streams
+	if req.Path == "_indices" {
+		logger.Debug("Handling _indices request")
+		return ds.handleListIndices(ctx, req, sender)
+	}
+
 	// allowed paths for resource calls:
 	// - empty string for fetching db version
 	// - /_mapping for fetching index mapping, e.g. requests going to `index/_mapping`
@@ -255,8 +263,10 @@ func (ds *DataSource) callResourcePassthrough(ctx context.Context, req *backend.
 	// - _msearch for executing getTerms queries
 	// - _mapping for fetching "root" index mappings
 	// - _field_caps for fetching "root" field capabilities
+	// - _resolve/index/* for listing indices, aliases, and data streams
 	if req.Path != "" && !isFieldCaps(req.Path) && req.Path != "_msearch" &&
-		!strings.HasSuffix(req.Path, "/_mapping") && req.Path != "_mapping" {
+		!strings.HasSuffix(req.Path, "/_mapping") && req.Path != "_mapping" &&
+		!strings.HasPrefix(req.Path, "_resolve/") {
 		logger.Error("Invalid resource path", "path", req.Path)
 		return fmt.Errorf("invalid resource URL: %s", req.Path)
 	}
@@ -342,4 +352,49 @@ func createElasticsearchURL(req *backend.CallResourceRequest, ds *es.DatasourceI
 		return esUrl.String() + "/", nil
 	}
 	return esUrlString, nil
+}
+
+// handleListIndices handles requests to list available indices, aliases, and data streams
+func (ds *DataSource) handleListIndices(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
+	logger := ds.logger.FromContext(ctx)
+	logger.Debug("Listing available indices and data streams")
+
+	// Try using _resolve/index/* first (ES 7.9+), which returns indices, aliases, and data streams
+	indices, err := listIndicesViaResolve(ctx, ds.info, &schemaSettings{})
+	if err != nil {
+		// Fall back to _cat/indices if _resolve is not available
+		logger.Debug("Failed to list indices via _resolve, falling back to _cat", "error", err)
+		indices, err = listIndicesViaCat(ctx, ds.info, &schemaSettings{})
+		if err != nil {
+			logger.Error("Failed to list indices", "error", err)
+			return sender.Send(&backend.CallResourceResponse{
+				Status: http.StatusInternalServerError,
+				Body:   []byte(fmt.Sprintf(`{"error": "Failed to list indices: %s"}`, err.Error())),
+			})
+		}
+	}
+
+	// Convert to JSON response
+	response := struct {
+		Indices []string `json:"indices"`
+	}{
+		Indices: indices,
+	}
+
+	body, err := json.Marshal(response)
+	if err != nil {
+		logger.Error("Failed to marshal indices response", "error", err)
+		return sender.Send(&backend.CallResourceResponse{
+			Status: http.StatusInternalServerError,
+			Body:   []byte(fmt.Sprintf(`{"error": "Failed to marshal response: %s"}`, err.Error())),
+		})
+	}
+
+	return sender.Send(&backend.CallResourceResponse{
+		Status: http.StatusOK,
+		Headers: map[string][]string{
+			"Content-Type": {"application/json"},
+		},
+		Body: body,
+	})
 }

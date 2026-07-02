@@ -16,6 +16,11 @@
 - Chore: Auto-audit hygiene fixes — Node `>=24` engines, supply-chain-hardened `.npmrc`, plugin scaffolding refresh [#308](https://github.com/grafana/grafana-elasticsearch-datasource/pull/308)
 - CI: Bump plugin-ci-workflows to v8.0.1 (GATB token migration) [#292](https://github.com/grafana/grafana-elasticsearch-datasource/pull/292)
 - Chore: Run externalised plugin in place of core in docker compose [#275](https://github.com/grafana/grafana-elasticsearch-datasource/pull/275)
+## Unreleased
+
+- BREAKING: Minimum supported Elasticsearch version is now 8.0.0 (removed support for ES 7.x)
+- Removed: `moving_avg` metric aggregation (deprecated in ES 6.4, removed in ES 8.0) - use `moving_fn` instead
+- Simplified version checking logic by removing version range support
 
 ## 12.6.3
 

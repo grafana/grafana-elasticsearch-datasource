@@ -422,6 +422,10 @@ export interface ElasticsearchDataQuery extends common.DataQuery {
    * Name of time field
    */
   timeField?: string;
+  /**
+   * Index pattern to use for this specific query (overrides datasource-level index)
+   */
+  index?: string;
 }
 
 export const defaultElasticsearchDataQuery: Partial<ElasticsearchDataQuery> = {

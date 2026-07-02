@@ -19,6 +19,8 @@ export const changeQueryType = createAction<ElasticsearchDataQuery['queryType']>
 
 export const changeAliasPattern = createAction<ElasticsearchDataQuery['alias']>('change_alias_pattern');
 
+export const changeIndex = createAction<string | undefined>('change_index');
+
 export const changeEditorType = createAction<ElasticsearchDataQuery['editorType']>('change_editor_type');
 
 export const changeEditorTypeAndResetQuery = createAction<{
@@ -117,4 +119,20 @@ export const editorTypeReducer = (prevEditorType: ElasticsearchDataQuery['editor
   }
 
   return prevEditorType;
+};
+
+export const indexReducer = (prevIndex: string | undefined, action: Action) => {
+  if (changeIndex.match(action)) {
+    return action.payload;
+  }
+
+  if (changeEditorTypeAndResetQuery.match(action)) {
+    return '';
+  }
+
+  if (initQuery.match(action)) {
+    return prevIndex || '';
+  }
+
+  return prevIndex;
 };

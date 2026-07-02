@@ -1024,6 +1024,54 @@ export class ElasticDatasource
   }
 
   /**
+   * Retrieves the list of available indices, aliases, and data streams from Elasticsearch.
+   * @returns A Promise that resolves to an array of index names.
+   */
+  async getIndices(): Promise<string[]> {
+    try {
+      // Try _resolve/index/* API (ES 7.9+) which lists indices, aliases, and data streams
+      const response = await this.getResourceRequest('_resolve/index/*');
+
+      if (response && typeof response === 'object') {
+        const indices: string[] = [];
+
+        // Add concrete indices (excluding data stream backing indices)
+        if (response.indices && Array.isArray(response.indices)) {
+          response.indices.forEach((idx: any) => {
+            if (!idx.data_stream && !idx.name.startsWith('.')) {
+              indices.push(idx.name);
+            }
+          });
+        }
+
+        // Add aliases
+        if (response.aliases && Array.isArray(response.aliases)) {
+          response.aliases.forEach((alias: any) => {
+            if (!alias.name.startsWith('.')) {
+              indices.push(alias.name);
+            }
+          });
+        }
+
+        // Add data streams
+        if (response.data_streams && Array.isArray(response.data_streams)) {
+          response.data_streams.forEach((ds: any) => {
+            if (!ds.name.startsWith('.')) {
+              indices.push(ds.name);
+            }
+          });
+        }
+
+        return indices.sort();
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to fetch indices:', error);
+      return [];
+    }
+  }
+
+  /**
    * Implemented as part of the DataSourceAPI.
    * Used by alerting to check if query contains template variables.
    */

@@ -59,6 +59,14 @@ export interface MovingAverage<T extends MovingAverageModel = MovingAverageModel
 
 export type Interval = 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Yearly';
 
+// Extend ElasticsearchDataQuery to add index field for query-time index pattern override
+export interface ExtendedElasticsearchDataQuery extends ElasticsearchDataQuery {
+  /**
+   * Index pattern to use for this specific query (overrides datasource-level index)
+   */
+  index?: string;
+}
+
 export interface ElasticsearchOptions extends DataSourceJsonData {
   timeField: string;
   // we used to have a field named `esVersion` in the past,
@@ -90,11 +98,6 @@ interface MetricConfiguration<T extends MetricAggregationType> {
   supportsInlineScript: boolean;
   supportsMissing: boolean;
   isPipelineAgg: boolean;
-  /**
-   * A valid semver range for which the metric is known to be available.
-   * If omitted defaults to '*'.
-   */
-  versionRange?: string;
   supportsMultipleBucketPaths: boolean;
   impliedQueryType: QueryType;
   hasSettings: boolean;
@@ -211,6 +214,7 @@ export interface ElasticDatasourceLike extends DataSourceApi<ElasticsearchDataQu
   query(request: DataQueryRequest<ElasticsearchDataQuery>): Observable<DataQueryResponse>;
   getDatabaseVersion(useCachedData?: boolean): Promise<SemVer | null>;
   getFields(type?: string[], range?: TimeRange): Observable<MetricFindValue[]>;
+  getIndices(): Promise<string[]>;
   index?: string;
 }
 
