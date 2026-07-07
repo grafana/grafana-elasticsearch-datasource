@@ -72,7 +72,7 @@
     "npm": ">=11.12.1"
   },
   "dependencies": {
-    "@elastic/esql": "^1.4.1",
+    "@elastic/esql": "^4.0.0",
     "@elastic/monaco-esql": "^3.2.2",
     "@emotion/css": "11.13.5",
     "@grafana/aws-sdk": "^0.10.0",
