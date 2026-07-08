@@ -15,9 +15,7 @@ func nameFields(queryResult backend.DataResponse, target *Query, keepLabelsInRes
 	for _, v := range frames {
 		for _, vv := range v.Fields {
 			if metricType, exists := vv.Labels["metric"]; exists {
-				if _, ok := set[metricType]; !ok {
-					set[metricType] = struct{}{}
-				}
+				set[metricType] = struct{}{}
 			}
 		}
 	}
@@ -67,7 +65,7 @@ func getFieldName(dataField data.Field, target *Query, metricTypeCount int) stri
 				group = subMatch[1]
 			}
 
-			if strings.Index(group, "term ") == 0 {
+			if strings.HasPrefix(group, "term ") {
 				frameName = strings.Replace(frameName, subMatch[0], dataField.Labels[group[5:]], 1)
 			}
 			if v, ok := dataField.Labels[group]; ok {
