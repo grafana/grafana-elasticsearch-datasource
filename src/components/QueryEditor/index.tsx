@@ -94,16 +94,42 @@ export const ElasticSearchQueryField = ({ value, onChange }: { value?: string; o
   const styles = useStyles2(getStyles);
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Grow the textarea to fit its content so long queries word-wrap onto extra
-  // lines instead of overflowing/scrolling horizontally like a single-line input.
-  useLayoutEffect(() => {
+  const adjustHeight = useCallback(() => {
     const textArea = textAreaRef.current;
     if (!textArea) {
       return;
     }
     textArea.style.height = 'auto';
-    textArea.style.height = `${textArea.scrollHeight}px`;
-  }, [value]);
+    // scrollHeight excludes the element's border, but height is set on a
+    // border-box element, so add the border back in or the last line gets clipped.
+    const borderHeight = textArea.offsetHeight - textArea.clientHeight;
+    textArea.style.height = `${textArea.scrollHeight + borderHeight}px`;
+  }, []);
+
+  // Grow the textarea to fit its content so long queries word-wrap onto extra
+  // lines instead of overflowing/scrolling horizontally like a single-line input.
+  useLayoutEffect(() => {
+    adjustHeight();
+  }, [value, adjustHeight]);
+
+  // Wrap points also change when the available width changes (Explore split-pane
+  // drag, panel resize, sidebar toggle). Only react to width changes, not height
+  // changes, to avoid a feedback loop with the height updates above.
+  useEffect(() => {
+    const textArea = textAreaRef.current;
+    if (!textArea || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    let lastWidth: number | null = null;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width !== lastWidth) {
+        lastWidth = entry.contentRect.width;
+        adjustHeight();
+      }
+    });
+    observer.observe(textArea);
+    return () => observer.disconnect();
+  }, [adjustHeight]);
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // A Lucene query is a single logical line: prevent Enter from inserting a
