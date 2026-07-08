@@ -37,14 +37,18 @@ describe('QueryEditor', () => {
       expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ query: 'status:200' }));
     });
 
-    it('prevents Enter from inserting a literal newline into the query', () => {
-      render(<QueryEditor query={buildQuery('status:200')} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />);
+    it('strips newlines from the query regardless of input path (typing Enter, paste, drag-and-drop)', () => {
+      const onChange = jest.fn<void, [ElasticsearchDataQuery]>();
+      render(<QueryEditor query={buildQuery('')} datasource={datasourceMock} onChange={onChange} onRunQuery={noop} />);
 
       const queryField = screen.getByPlaceholderText('Enter a lucene query');
-      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
-      const wasCancelled = !fireEvent(queryField, event);
+      // A textarea preserves embedded newlines in its value on change, no matter how
+      // they got there — paste and drag-and-drop surface exactly like this.
+      fireEvent.change(queryField, { target: { value: 'status:200\nAND level:error\nAND host:foo' } });
 
-      expect(wasCancelled).toBe(true);
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ query: 'status:200 AND level:error AND host:foo' })
+      );
     });
 
     it('accounts for the textarea border when growing to fit content, so the last line is not clipped', () => {

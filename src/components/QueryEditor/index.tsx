@@ -131,14 +131,6 @@ export const ElasticSearchQueryField = ({ value, onChange }: { value?: string; o
     return () => observer.disconnect();
   }, [adjustHeight]);
 
-  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // A Lucene query is a single logical line: prevent Enter from inserting a
-    // literal newline, so the field only grows because of word-wrap.
-    if (event.key === 'Enter') {
-      event.preventDefault();
-    }
-  }, []);
-
   return (
     <div className={styles.queryItem}>
       <TextArea
@@ -146,8 +138,7 @@ export const ElasticSearchQueryField = ({ value, onChange }: { value?: string; o
         className={styles.queryTextArea}
         rows={1}
         value={value ?? ''}
-        onChange={(e) => onChange(e.currentTarget.value)}
-        onKeyDown={handleKeyDown}
+        onChange={(e) => onChange(e.currentTarget.value.replace(/\n/g, ' '))}
         placeholder="Enter a lucene query"
       />
     </div>
