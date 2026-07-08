@@ -1,10 +1,10 @@
 import { css } from '@emotion/css';
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { SemVer } from 'semver';
 
 import { getDefaultTimeRange, GrafanaTheme2, QueryEditorProps } from '@grafana/data';
 import { config } from '@grafana/runtime';
-import { Alert, ConfirmModal, InlineField, InlineLabel, Input, useStyles2 } from '@grafana/ui';
+import { Alert, ConfirmModal, InlineField, InlineLabel, Input, TextArea, useStyles2 } from '@grafana/ui';
 
 import { ElasticsearchDataQuery, QueryType } from '../../dataquery.gen';
 import { useNextId } from '../../hooks/useNextId';
@@ -79,6 +79,11 @@ const getStyles = (theme: GrafanaTheme2) => ({
     flexGrow: 1,
     margin: theme.spacing(0, 0.5, 0.5, 0),
   }),
+  queryTextArea: css({
+    resize: 'none',
+    overflow: 'hidden',
+    minHeight: theme.spacing(theme.components.height.md),
+  }),
 });
 
 interface Props {
@@ -87,12 +92,53 @@ interface Props {
 
 export const ElasticSearchQueryField = ({ value, onChange }: { value?: string; onChange: (v: string) => void }) => {
   const styles = useStyles2(getStyles);
+  const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const adjustHeight = useCallback(() => {
+    const textArea = textAreaRef.current;
+    if (!textArea) {
+      return;
+    }
+    textArea.style.height = 'auto';
+    // scrollHeight excludes the element's border, but height is set on a
+    // border-box element, so add the border back in or the last line gets clipped.
+    const borderHeight = textArea.offsetHeight - textArea.clientHeight;
+    textArea.style.height = `${textArea.scrollHeight + borderHeight}px`;
+  }, []);
+
+  // Grow the textarea to fit its content so long queries word-wrap onto extra
+  // lines instead of overflowing/scrolling horizontally like a single-line input.
+  useLayoutEffect(() => {
+    adjustHeight();
+  }, [value, adjustHeight]);
+
+  // Wrap points also change when the available width changes (Explore split-pane
+  // drag, panel resize, sidebar toggle). Only react to width changes, not height
+  // changes, to avoid a feedback loop with the height updates above.
+  useEffect(() => {
+    const textArea = textAreaRef.current;
+    if (!textArea || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    let lastWidth: number | null = null;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width !== lastWidth) {
+        lastWidth = entry.contentRect.width;
+        adjustHeight();
+      }
+    });
+    observer.observe(textArea);
+    return () => observer.disconnect();
+  }, [adjustHeight]);
 
   return (
     <div className={styles.queryItem}>
-      <Input
+      <TextArea
+        ref={textAreaRef}
+        className={styles.queryTextArea}
+        rows={1}
         value={value ?? ''}
-        onChange={(e) => onChange(e.currentTarget.value)}
+        onChange={(e) => onChange(e.currentTarget.value.replace(/\n/g, ' '))}
         placeholder="Enter a lucene query"
       />
     </div>
