@@ -28,6 +28,16 @@ export default defineConfig<PluginOptions>({
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env.GRAFANA_URL || 'http://localhost:3000',
 
+    /*
+     * Grafana >= 13.2.0 enables the `grafana.dashboardSettingsRedesign` OpenFeature flag,
+     * which replaces the dashboard settings Variables/Annotations tabs with an alert pointing
+     * to the sidebar, breaking plugin-e2e's VariableEditPage/AnnotationEditPage. Disable it via
+     * plugin-e2e's OFREP interception (no effect on versions that don't know the flag). This is
+     * the default in @grafana/plugin-e2e >= 3.9.2; set it explicitly until we're on that version.
+     * See https://github.com/grafana/grafana-elasticsearch-datasource/issues/356
+     */
+    openFeature: { flags: { 'grafana.dashboardSettingsRedesign': false } },
+
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
   },
