@@ -68,7 +68,28 @@ async function externalPluginIsLoaded(page: import('@playwright/test').Page): Pr
   return typeof settings.module === 'string' && settings.module.startsWith('public/plugins/');
 }
 
+// Grafana's scenes-based dashboard migration (>= 13.2.0, currently the nightly build)
+// changed how dashboard template variables render and sync to the URL, so this test's
+// variable no longer resolves in time and var-success stays empty. plugin-e2e's
+// grafanaVersion fixture strips the pre-release suffix, so nightly ("13.2.0-<build>")
+// reports as "13.2.0". Skip until the E2E tooling supports the new dashboard variables.
+// Tracked in https://github.com/grafana/grafana-elasticsearch-datasource/issues/356
+const SCENES_DASHBOARD_MIN_VERSION = '13.2.0';
+function isGrafanaAtLeast(version: string, target: string): boolean {
+  const toParts = (v: string) => v.split('.').map((p) => parseInt(p, 10) || 0);
+  const [vMajor, vMinor, vPatch] = toParts(version);
+  const [tMajor, tMinor, tPatch] = toParts(target);
+  if (vMajor !== tMajor) return vMajor > tMajor;
+  if (vMinor !== tMinor) return vMinor > tMinor;
+  return vPatch >= tPatch;
+}
+
 test.describe('Legacy Query variable on boolean field', () => {
+  test.skip(
+    ({ grafanaVersion }) => isGrafanaAtLeast(grafanaVersion, SCENES_DASHBOARD_MIN_VERSION),
+    'Dashboard variables changed by the scenes migration (Grafana >= 13.2.0). See #356'
+  );
+
   test(
     'aligns value with text so the URL uses "true"/"false", not "1"/"0" (issue #106053)',
     async ({ page }) => {
