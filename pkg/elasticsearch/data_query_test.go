@@ -2102,5 +2102,72 @@ func TestRawDSLQuery(t *testing.T) {
 			require.NotNil(t, response.Responses["A"].Error)
 			require.Contains(t, response.Responses["A"].Error.Error(), "invalid raw DSL query JSON")
 		})
+
+		// Reproduces https://github.com/grafana/grafana-elasticsearch-datasource/issues/112
+		// In the Code (DSL) editor with the Logs query type, Explore fires a separate logs-volume
+		// supplementary query. It is synthesized builder-style (a count metric plus a date_histogram
+		// bucket agg) but inherits queryType:"dsl" from the source query, while the raw body itself
+		// has no aggs. The backend must (a) keep the Grafana-supplied date_histogram instead of
+		// overwriting it with the empty parse result, and (b) apply the user's raw DSL `query` clause
+		// as a filter, otherwise the volume counts every document in range and the response cannot be
+		// parsed into a logs-volume frame.
+		t.Run("Logs-volume supplementary query keeps the date_histogram and applies the user's filter", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQueryWithContext(c, `{
+				"refId": "A",
+				"queryType": "dsl",
+				"editorType": "code",
+				"query": "{\"query\":{\"term\":{\"app\":{\"value\":\"tempo\"}}}}",
+				"metrics": [{ "type": "count", "id": "1" }],
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "3", "settings": { "interval": "auto", "min_doc_count": "0", "trimEdges": "0" } }
+				]
+			}`, from, to, ctx)
+			require.NoError(t, err)
+			require.Len(t, c.multisearchRequests, 1)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			// The Grafana-synthesized date_histogram must survive (not be wiped by the raw-DSL agg parser).
+			require.Len(t, sr.Aggs, 1)
+			require.Equal(t, "3", sr.Aggs[0].Key)
+			dateHistogramAgg, ok := sr.Aggs[0].Aggregation.Aggregation.(*es.DateHistogramAgg)
+			require.True(t, ok)
+			require.Equal(t, "@timestamp", dateHistogramAgg.Field)
+
+			// The user's raw DSL `query` clause must be applied as a filter so the volume respects it.
+			body, err := json.Marshal(sr)
+			require.NoError(t, err)
+			require.Contains(t, string(body), `"term"`)
+			require.Contains(t, string(body), "tempo")
+		})
+
+		// A genuine DSL aggregation query (aggs defined in the raw body, with a metric set so it
+		// takes the aggregation-parsing branch) must adopt the body's aggregations and still apply
+		// its own `query` clause as a filter. Before the #112 fix this branch dropped the filter.
+		t.Run("DSL aggregation query adopts the body's aggregations and applies its query filter", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQueryWithContext(c, `{
+				"refId": "A",
+				"queryType": "dsl",
+				"editorType": "code",
+				"query": "{\"query\":{\"term\":{\"app\":{\"value\":\"tempo\"}}},\"aggs\":{\"2\":{\"date_histogram\":{\"field\":\"@timestamp\",\"fixed_interval\":\"1m\"}}}}",
+				"metrics": [{ "type": "count", "id": "1" }]
+			}`, from, to, ctx)
+			require.NoError(t, err)
+			require.Len(t, c.multisearchRequests, 1)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			// Aggregations come from the raw body.
+			require.Len(t, sr.Aggs, 1)
+			require.Equal(t, "2", sr.Aggs[0].Key)
+			_, ok := sr.Aggs[0].Aggregation.Aggregation.(*es.DateHistogramAgg)
+			require.True(t, ok)
+
+			// The user's query clause is applied as a filter.
+			body, err := json.Marshal(sr)
+			require.NoError(t, err)
+			require.Contains(t, string(body), `"term"`)
+			require.Contains(t, string(body), "tempo")
+		})
 	})
 }

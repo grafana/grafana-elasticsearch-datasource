@@ -135,6 +135,20 @@ func (f *QueryStringFilter) MarshalJSON() ([]byte, error) {
 	return json.Marshal(root)
 }
 
+// RawFilter represents a raw Elasticsearch Query DSL clause supplied verbatim.
+// It is used to apply the `query` part of a raw DSL query as a bool filter so
+// that Grafana-supplied aggregations (e.g. the Explore logs-volume date_histogram)
+// still respect the user's query.
+type RawFilter struct {
+	Filter
+	Raw map[string]any
+}
+
+// MarshalJSON returns the JSON encoding of the raw filter.
+func (f *RawFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(f.Raw)
+}
+
 // RangeFilter represents a range search filter
 type RangeFilter struct {
 	Filter
