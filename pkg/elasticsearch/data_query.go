@@ -12,7 +12,6 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-plugin-sdk-go/config"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
@@ -82,24 +81,13 @@ func (e *elasticsearchDataQuery) execute() (*backend.QueryDataResponse, error) {
 	}
 
 	// Execute ES|QL queries individually (each requires a separate HTTP call to /_query)
-	if len(esqlQueries) > 0 {
-		cfg := config.GrafanaConfigFromContext(e.ctx)
-		if !cfg.FeatureToggles().IsEnabled("elasticsearchESQLQuery") {
-			for _, q := range esqlQueries {
-				response.Responses[q.RefID] = backend.ErrorResponseWithErrorSource(
-					backend.DownstreamError(fmt.Errorf("ES|QL query feature is disabled. Enable the elasticsearchESQLQuery feature toggle to use this query type")),
-				)
-			}
-		} else {
-			for _, q := range esqlQueries {
-				esqlResponse, err := e.executeEsqlQuery(q)
-				if err != nil {
-					response.Responses[q.RefID] = backend.ErrorResponseWithErrorSource(err)
-					continue
-				}
-				response.Responses[q.RefID] = *esqlResponse
-			}
+	for _, q := range esqlQueries {
+		esqlResponse, err := e.executeEsqlQuery(q)
+		if err != nil {
+			response.Responses[q.RefID] = backend.ErrorResponseWithErrorSource(err)
+			continue
 		}
+		response.Responses[q.RefID] = *esqlResponse
 	}
 
 	// Execute regular queries as a batch via /_msearch

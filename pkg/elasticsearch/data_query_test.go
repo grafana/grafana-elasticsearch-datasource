@@ -8,8 +8,6 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-plugin-sdk-go/config"
-	"github.com/grafana/grafana-plugin-sdk-go/experimental/featuretoggles"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -2001,12 +1999,7 @@ func TestExecuteElasticsearchDataQuery_ReplacesEsqlIndexPlaceholder(t *testing.T
 		},
 	}
 
-	cfg := config.NewGrafanaCfg(map[string]string{
-		featuretoggles.EnabledFeatures: "elasticsearchESQLQuery",
-	})
-	ctx := config.WithGrafanaConfig(context.Background(), cfg)
-
-	query := newElasticsearchDataQuery(ctx, c, &dataRequest, log.New(), "logs-*")
+	query := newElasticsearchDataQuery(context.Background(), c, &dataRequest, log.New(), "logs-*")
 	_, err := query.execute()
 	require.NoError(t, err)
 
@@ -2017,19 +2010,13 @@ func TestRawDSLQuery(t *testing.T) {
 	from := time.Date(2018, 5, 15, 17, 50, 0, 0, time.UTC)
 	to := time.Date(2018, 5, 15, 17, 55, 0, 0, time.UTC)
 
-	// Create context with raw DSL query feature toggle enabled
-	cfg := config.NewGrafanaCfg(map[string]string{
-		featuretoggles.EnabledFeatures: "elasticsearchRawDSLQuery",
-	})
-	ctx := config.WithGrafanaConfig(context.Background(), cfg)
-
 	t.Run("With raw DSL query", func(t *testing.T) {
 		t.Run("Basic raw DSL query with aggregations", func(t *testing.T) {
 			c := newFakeClient()
-			_, err := executeElasticsearchDataQueryWithContext(c, `{
+			_, err := executeElasticsearchDataQuery(c, `{
 				"queryType": "dsl",
 				"query": "{\"query\":{\"bool\":{\"filter\":[{\"range\":{\"@timestamp\":{\"gte\":1526405400000,\"lte\":1526405700000,\"format\":\"epoch_millis\"}}}]}},\"aggs\":{\"date_histogram\":{\"date_histogram\":{\"field\":\"@timestamp\",\"interval\":\"1m\"}}},\"size\":0}"
-			}`, from, to, ctx)
+			}`, from, to)
 			require.NoError(t, err)
 			require.Len(t, c.multisearchRequests, 1)
 			require.Len(t, c.multisearchRequests[0].Requests, 1)
@@ -2048,10 +2035,10 @@ func TestRawDSLQuery(t *testing.T) {
 
 		t.Run("Raw DSL query with query_string", func(t *testing.T) {
 			c := newFakeClient()
-			_, err := executeElasticsearchDataQueryWithContext(c, `{
+			_, err := executeElasticsearchDataQuery(c, `{
 				"queryType": "dsl",
 				"query": "{\"query\":{\"query_string\":{\"query\":\"status:200\",\"analyze_wildcard\":true}},\"size\":100}"
-			}`, from, to, ctx)
+			}`, from, to)
 			require.NoError(t, err)
 			require.Len(t, c.multisearchRequests, 1)
 			sr := c.multisearchRequests[0].Requests[0]
@@ -2073,10 +2060,10 @@ func TestRawDSLQuery(t *testing.T) {
 
 		t.Run("Raw DSL query with sort", func(t *testing.T) {
 			c := newFakeClient()
-			_, err := executeElasticsearchDataQueryWithContext(c, `{
+			_, err := executeElasticsearchDataQuery(c, `{
 				"queryType": "dsl",
 				"query": "{\"query\":{\"match_all\":{}},\"sort\":[{\"@timestamp\":{\"order\":\"desc\"}}],\"size\":50}"
-			}`, from, to, ctx)
+			}`, from, to)
 			require.NoError(t, err)
 			require.Len(t, c.multisearchRequests, 1)
 			sr := c.multisearchRequests[0].Requests[0]
@@ -2094,10 +2081,10 @@ func TestRawDSLQuery(t *testing.T) {
 
 		t.Run("Invalid JSON in raw DSL query returns error", func(t *testing.T) {
 			c := newFakeClient()
-			response, err := executeElasticsearchDataQueryWithContext(c, `{
+			response, err := executeElasticsearchDataQuery(c, `{
 				"queryType": "dsl",
 				"query": "{ invalid json }"
-			}`, from, to, ctx)
+			}`, from, to)
 			require.NoError(t, err)
 			require.NotNil(t, response.Responses["A"].Error)
 			require.Contains(t, response.Responses["A"].Error.Error(), "invalid raw DSL query JSON")
@@ -2113,7 +2100,7 @@ func TestRawDSLQuery(t *testing.T) {
 		// parsed into a logs-volume frame.
 		t.Run("Logs-volume supplementary query keeps the date_histogram and applies the user's filter", func(t *testing.T) {
 			c := newFakeClient()
-			_, err := executeElasticsearchDataQueryWithContext(c, `{
+			_, err := executeElasticsearchDataQuery(c, `{
 				"refId": "A",
 				"queryType": "dsl",
 				"editorType": "code",
@@ -2122,7 +2109,7 @@ func TestRawDSLQuery(t *testing.T) {
 				"bucketAggs": [
 					{ "type": "date_histogram", "field": "@timestamp", "id": "3", "settings": { "interval": "auto", "min_doc_count": "0", "trimEdges": "0" } }
 				]
-			}`, from, to, ctx)
+			}`, from, to)
 			require.NoError(t, err)
 			require.Len(t, c.multisearchRequests, 1)
 			sr := c.multisearchRequests[0].Requests[0]
@@ -2146,13 +2133,13 @@ func TestRawDSLQuery(t *testing.T) {
 		// its own `query` clause as a filter. Before the #112 fix this branch dropped the filter.
 		t.Run("DSL aggregation query adopts the body's aggregations and applies its query filter", func(t *testing.T) {
 			c := newFakeClient()
-			_, err := executeElasticsearchDataQueryWithContext(c, `{
+			_, err := executeElasticsearchDataQuery(c, `{
 				"refId": "A",
 				"queryType": "dsl",
 				"editorType": "code",
 				"query": "{\"query\":{\"term\":{\"app\":{\"value\":\"tempo\"}}},\"aggs\":{\"2\":{\"date_histogram\":{\"field\":\"@timestamp\",\"fixed_interval\":\"1m\"}}}}",
 				"metrics": [{ "type": "count", "id": "1" }]
-			}`, from, to, ctx)
+			}`, from, to)
 			require.NoError(t, err)
 			require.Len(t, c.multisearchRequests, 1)
 			sr := c.multisearchRequests[0].Requests[0]
