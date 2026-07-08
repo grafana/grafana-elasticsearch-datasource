@@ -72,29 +72,25 @@ describe('ElasticsearchVariableUtils', () => {
       expect(result.query).toBe('');
     });
 
-    it('should convert legacy {"find":"terms"} query to raw DSL', () => {
-      const result = migrateVariableQuery('{"find":"terms","field":"Platform.keyword"}');
+    it('should route legacy {"find":"terms"} query through the legacy metricFindQuery path', () => {
+      // {"find":"terms"} resolves via metricFindQuery() -> getTerms() (grafana/grafana#120836),
+      // not a raw DSL conversion, so it needs no feature toggle and keeps the boolean fix (#106053).
+      const rawQuery = '{"find":"terms","field":"Platform.keyword"}';
+      const result = migrateVariableQuery(rawQuery);
 
-      expect(result.queryType).toBe('dsl');
-      expect(result.editorType).toBe('code');
-      const dsl = JSON.parse(result.query!);
-      expect(dsl.aggs['1'].terms.field).toBe('Platform.keyword');
-      expect(dsl.aggs['1'].terms.size).toBe(500);
-      expect(dsl.aggs['1'].terms.order).toEqual({ _key: 'asc' });
-      expect(dsl.query).toBeUndefined();
+      expect(result.queryType).toBe('legacy_variable');
+      expect(result.query).toBe(rawQuery);
+      expect(result.metrics).toEqual([{ type: 'raw_document', id: '1' }]);
     });
 
-    it('should preserve query filter from legacy {"find":"terms"} query in DSL', () => {
-      const result = migrateVariableQuery(
-        '{"find":"terms","field":"env","query":"region:eu-*","size":100,"order":"desc"}'
-      );
+    it('should preserve the raw {"find":"terms"} string verbatim (incl. query filter/size/order)', () => {
+      const rawQuery = '{"find":"terms","field":"env","query":"region:eu-*","size":100,"order":"desc"}';
+      const result = migrateVariableQuery(rawQuery);
 
-      expect(result.queryType).toBe('dsl');
-      const dsl = JSON.parse(result.query!);
-      expect(dsl.aggs['1'].terms.field).toBe('env');
-      expect(dsl.aggs['1'].terms.size).toBe(100);
-      expect(dsl.aggs['1'].terms.order).toEqual({ _key: 'desc' });
-      expect(dsl.query.bool.filter[0].query_string.query).toBe('region:eu-*');
+      // The original string is passed to metricFindQuery() untouched, so getTerms() receives the
+      // exact same payload it did before externalisation.
+      expect(result.queryType).toBe('legacy_variable');
+      expect(result.query).toBe(rawQuery);
     });
 
     it('should fall through to raw_document for unrecognised JSON', () => {

@@ -244,7 +244,7 @@ test.describe('Variable query editor', () => {
     // pre-externalisation legacy format, then opens the variable editor. That
     // triggers migrateVariableQuery(), which determines which UI is rendered:
     //
-    //   {"find":"terms","field":"X"} → dsl/code ⇒ Monaco editor visible, no legacy banner
+    //   {"find":"terms","field":"X"} → legacy_variable ⇒ Alert banner + raw string preserved
     //   {"find":"fields",...}         → legacy_variable ⇒ Alert banner + raw string preserved
     //   plain Lucene string           → legacy_variable ⇒ Alert banner + raw string preserved
     //
@@ -260,7 +260,12 @@ test.describe('Variable query editor', () => {
       }
     });
 
-    test('migrates {"find":"terms","field":"..."} to the DSL code editor', async ({ page, request }) => {
+    test('shows legacy banner for {"find":"terms",...} and preserves the raw string', async ({ page, request }) => {
+      // {"find":"terms"} routes through legacy_variable -> metricFindQuery -> getTerms (core
+      // grafana/grafana#120836), which resolves values with no elasticsearchRawDSLQuery toggle
+      // and keeps the boolean key_as_string fix (#106053). The editor shows the legacy banner and
+      // preserves the exact original string so metricFindQuery receives the same payload.
+      const rawQuery = '{"find":"terms","field":"method.keyword"}';
       const { uid, url } = await createDashboard(request, {
         title: `E2E legacy terms ${Date.now()}`,
         variables: [
@@ -268,7 +273,7 @@ test.describe('Variable query editor', () => {
             name: 'legacy_terms',
             type: 'query',
             datasource: { type: 'elasticsearch', uid: HTTPLOGS_DS_UID },
-            query: '{"find":"terms","field":"method.keyword"}',
+            query: rawQuery,
             refresh: 1,
           },
         ],
@@ -277,14 +282,8 @@ test.describe('Variable query editor', () => {
 
       await page.goto(variableEditUrl(url, 0));
 
-      // The legacy-variable Alert must NOT appear; this path routes straight to the
-      // new editor in dsl/code mode.
-      await expect(page.getByRole('alert').filter({ hasText: 'Legacy variable query' })).not.toBeVisible();
-
-      // dsl/code mode renders the Monaco editor (RawQueryEditor → @grafana/ui CodeEditor
-      // → Monaco). The tokenised content isn't stable to assert on, so just assert the
-      // Monaco container is present — it's only mounted in code mode.
-      await expect(page.locator('.monaco-editor').first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('alert').filter({ hasText: 'Legacy variable query' })).toBeVisible();
+      await expect(page.locator(`input[value='${rawQuery.replace(/'/g, "\\'")}']`)).toBeVisible();
     });
 
     test('shows legacy banner for {"find":"fields",...} and preserves the raw string', async ({
