@@ -117,18 +117,20 @@ export const ElasticDetails = ({ value, onChange }: Props) => {
           placeholder="10s"
         />
       </InlineField>
-      <InlineField
-        label="Include Frozen Indices"
-        htmlFor="es_config_frozenIndices"
-        labelWidth={29}
-        tooltip="Include frozen indices in searches."
-      >
-        <InlineSwitch
-          id="es_config_frozenIndices"
-          value={value.jsonData.includeFrozen ?? false}
-          onChange={jsonDataSwitchChangeHandler('includeFrozen', value, onChange)}
-        />
-      </InlineField>
+      {value.jsonData.includeFrozen && (
+        <InlineField
+          label="Include Frozen Indices (deprecated)"
+          htmlFor="es_config_frozenIndices"
+          labelWidth={29}
+          tooltip="Deprecated. Only affects indices frozen on Elasticsearch 7.x, has no effect on Elasticsearch 9 or later, and will be removed in a future release."
+        >
+          <InlineSwitch
+            id="es_config_frozenIndices"
+            value={value.jsonData.includeFrozen ?? false}
+            onChange={jsonDataSwitchChangeHandler('includeFrozen', value, onChange)}
+          />
+        </InlineField>
+      )}
 
       <InlineField
         label="Default query mode"
