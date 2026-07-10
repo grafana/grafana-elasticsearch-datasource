@@ -33,8 +33,8 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 	for hitIdx, hit := range res.Hits.Hits {
 		var flattened map[string]interface{}
 		var sourceString string
-		if hit["_source"] != nil {
-			flattened = flatten(hit["_source"].(map[string]interface{}), 10)
+		if source, ok := hit["_source"].(map[string]interface{}); ok {
+			flattened = flatten(source, 10)
 			sourceMarshalled, err := json.Marshal(flattened)
 			if err != nil {
 				return err
