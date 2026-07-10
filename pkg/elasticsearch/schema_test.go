@@ -179,7 +179,7 @@ func TestListAllIndexNames_FallsBackToCatWhenResolveFails(t *testing.T) {
 		switch r.URL.Path {
 		case "/_resolve/index/*":
 			atomic.AddInt32(&resolveCalls, 1)
-			http.Error(w, "no such handler", http.StatusNotFound) // simulate ES < 7.9
+			http.Error(w, "no such handler", http.StatusNotFound) // simulate a cluster where _resolve is unavailable
 		case "/_cat/indices":
 			atomic.AddInt32(&catCalls, 1)
 			_, _ = w.Write([]byte(`[{"index": "logs"}, {"index": "metrics"}]`))

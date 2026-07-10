@@ -77,7 +77,7 @@ func listIndicesViaCat(ctx context.Context, info *es.DatasourceInfo, s *schemaSe
 	return filterAndSortIndices(names, s), nil
 }
 
-// listIndicesViaResolve uses _resolve/index/* (ES 7.9+) to enumerate concrete
+// listIndicesViaResolve uses _resolve/index/* to enumerate concrete
 // indices, aliases and data streams in a single lightweight call.
 //
 // The response contains three top-level arrays that we combine:

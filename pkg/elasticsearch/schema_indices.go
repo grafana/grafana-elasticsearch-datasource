@@ -29,10 +29,9 @@ type catIndexRow struct {
 // required by _cat/indices on many managed clusters), and surfaces user-facing
 // data stream names rather than their hidden .ds-* backing indices.
 //
-// Falls back to _cat/indices on any error from _resolve. The most common reason
-// for resolve to fail is the API not existing on Elasticsearch versions older
-// than 7.9; the fallback also covers transient errors and atypical permission
-// configurations where cat is allowed but resolve is not.
+// Falls back to _cat/indices on any error from _resolve, which covers transient
+// errors and atypical permission configurations where cat is allowed but
+// resolve is not.
 func listAllIndexNames(ctx context.Context, info *es.DatasourceInfo, s *schemaSettings) ([]string, error) {
 	timeout := s.IndicesTimeout
 	if timeout == 0 {
