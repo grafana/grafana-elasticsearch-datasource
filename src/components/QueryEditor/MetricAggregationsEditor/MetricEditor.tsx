@@ -24,7 +24,7 @@ import { getStyles } from './styles';
 import { metricAggregationConfig } from './utils';
 
 const toOption = (metric: MetricAggregation) => ({
-  label: metricAggregationConfig[metric.type].label,
+  label: metricAggregationConfig[metric.type]?.label ?? `${metric.type} (removed)`,
   value: metric.type,
 });
 
@@ -36,7 +36,7 @@ interface Props {
 // it doesn't make sense to show it in the type picker when there is no non-pipeline-aggregation previously selected
 // as they work on the outputs produced from other aggregations rather than from documents or fields.
 // This means we should filter them out from the type picker if there's no other "basic" aggregation before the current one.
-const isBasicAggregation = (metric: MetricAggregation) => !metricAggregationConfig[metric.type].isPipelineAgg;
+const isBasicAggregation = (metric: MetricAggregation) => !metricAggregationConfig[metric.type]?.isPipelineAgg;
 
 const getTypeOptions = (previousMetrics: MetricAggregation[]): Array<SelectableValue<MetricAggregationType>> => {
   // we'll include Pipeline Aggregations only if at least one previous metric is a "Basic" one

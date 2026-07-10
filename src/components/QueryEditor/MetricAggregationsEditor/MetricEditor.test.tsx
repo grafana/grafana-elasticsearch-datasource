@@ -5,7 +5,7 @@ import { from } from 'rxjs';
 
 import { getDefaultTimeRange } from '@grafana/data';
 
-import { Average, Count, ElasticsearchDataQuery, UniqueCount } from '../../../dataquery.gen';
+import { Average, Count, ElasticsearchDataQuery, MetricAggregation, UniqueCount } from '../../../dataquery.gen';
 import { ElasticDatasource } from '../../../datasource';
 import { defaultBucketAgg } from '../../../queryDef';
 import { ElasticsearchProvider } from '../ElasticsearchQueryContext';
@@ -123,5 +123,32 @@ describe('Metric Editor', () => {
     expect(screen.queryByText('Logs')).toBeNull();
     expect(screen.queryByText('Raw Data')).toBeNull();
     expect(screen.queryByText('Raw Document (deprecated)')).toBeNull();
+  });
+
+  it('Should render a removed-type row for saved moving_avg queries without crashing', async () => {
+    const movingAvg = { id: '2', type: 'moving_avg', field: '1' } as unknown as MetricAggregation;
+
+    const query: ElasticsearchDataQuery = {
+      refId: 'A',
+      query: '',
+      metrics: [{ id: '1', type: 'count' }, movingAvg],
+      bucketAggs: [defaultBucketAgg('3')],
+    };
+
+    const wrapper = ({ children }: PropsWithChildren<{}>) => (
+      <ElasticsearchProvider
+        datasource={{} as ElasticDatasource}
+        query={query}
+        range={getDefaultTimeRange()}
+        onChange={() => {}}
+        onRunQuery={() => {}}
+      >
+        {children}
+      </ElasticsearchProvider>
+    );
+
+    render(<MetricEditor value={movingAvg} />, { wrapper });
+
+    expect(await screen.findByText('moving_avg (removed)')).toBeInTheDocument();
   });
 });
