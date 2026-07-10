@@ -346,7 +346,7 @@ describe('ElasticQueryBuilder', () => {
     expect(query.size).toBe(1337);
   });
 
-  it('with moving average', () => {
+  it('with moving function', () => {
     const query = builder.build({
       refId: 'A',
       metrics: [
@@ -371,7 +371,7 @@ describe('ElasticQueryBuilder', () => {
     expect(firstLevel.aggs['2'].moving_fn.buckets_path).toBe('3');
   });
 
-  it('with moving average doc count', () => {
+  it('with moving function doc count', () => {
     const query = builder.build({
       refId: 'A',
       metrics: [
@@ -395,7 +395,7 @@ describe('ElasticQueryBuilder', () => {
     expect(firstLevel.aggs['2'].moving_fn.buckets_path).toBe('_count');
   });
 
-  it('with broken moving average', () => {
+  it('with broken moving function', () => {
     const query = builder.build({
       refId: 'A',
       metrics: [

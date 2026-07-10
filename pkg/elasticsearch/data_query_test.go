@@ -774,7 +774,7 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, ghGridAgg.Precision, 3)
 		})
 
-		t.Run("With moving average (from frontend tests)", func(t *testing.T) {
+		t.Run("With moving function (from frontend tests)", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
@@ -808,7 +808,7 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, pl.BucketPath, "3")
 		})
 
-		t.Run("With moving average", func(t *testing.T) {
+		t.Run("With moving function", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
@@ -845,7 +845,7 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, pl.BucketPath, "3")
 		})
 
-		t.Run("With moving average doc count (from frontend tests)", func(t *testing.T) {
+		t.Run("With moving function doc count (from frontend tests)", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
@@ -875,7 +875,7 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, pl.BucketPath, "_count")
 		})
 
-		t.Run("With moving average doc count", func(t *testing.T) {
+		t.Run("With moving function doc count", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
@@ -906,7 +906,7 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, pl.BucketPath, "_count")
 		})
 
-		t.Run("With broken moving average (from frontend tests)", func(t *testing.T) {
+		t.Run("With broken moving function (from frontend tests)", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
@@ -941,7 +941,7 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, plAgg.BucketPath, "3")
 		})
 
-		t.Run("With broken moving average", func(t *testing.T) {
+		t.Run("With broken moving function", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
