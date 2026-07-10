@@ -451,6 +451,25 @@ func TestStreamMultiSearchResponse_InvalidHitElement(t *testing.T) {
 	}
 }
 
+func TestStreamMultiSearchResponse_LegacyIntegerTotal(t *testing.T) {
+	// hits.total as a bare integer is a pre-ES-7.0 shape (or rest_total_hits_as_int,
+	// which this client never sends). It must be skipped, not parsed, and must not
+	// break parsing of the rest of the stream.
+	jsonBody := `
+    {
+        "responses": [
+            { "hits": { "hits": [], "total": 4656 } }
+        ]
+    }`
+
+	msr := &MultiSearchResponse{}
+	err := StreamMultiSearchResponse(strings.NewReader(jsonBody), msr)
+
+	require.NoError(t, err)
+	require.Len(t, msr.Responses, 1)
+	require.Nil(t, msr.Responses[0].Hits.Total)
+}
+
 func TestStreamMultiSearchResponse_ErrorHandling(t *testing.T) {
 	t.Run("Given invalid elasticsearch responses", func(t *testing.T) {
 		t.Run("When response is invalid JSON", func(t *testing.T) {
