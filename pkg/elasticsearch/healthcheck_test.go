@@ -11,12 +11,8 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-plugin-sdk-go/config"
-	"github.com/grafana/grafana-plugin-sdk-go/experimental/featuretoggles"
 	"github.com/stretchr/testify/assert"
 )
-
-var mockedCfg = config.WithGrafanaConfig(context.Background(), config.NewGrafanaCfg(map[string]string{featuretoggles.EnabledFeatures: "elasticsearchCrossClusterSearch"}))
 
 func Test_Healthcheck_OK(t *testing.T) {
 	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
@@ -50,7 +46,7 @@ func Test_Healthcheck_Error(t *testing.T) {
 
 func Test_validateIndex_Warning_ErrorValidatingIndex(t *testing.T) {
 	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"error":{"reason":"index_not_found"}}`)
-	res, _ := service.CheckHealth(mockedCfg, &backend.CheckHealthRequest{
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
 	})
@@ -60,7 +56,7 @@ func Test_validateIndex_Warning_ErrorValidatingIndex(t *testing.T) {
 
 func Test_validateIndex_Warning_ErrorValidatingIndex2(t *testing.T) {
 	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"error":"not a map"}`)
-	res, _ := service.CheckHealth(mockedCfg, &backend.CheckHealthRequest{
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
 	})
@@ -70,25 +66,25 @@ func Test_validateIndex_Warning_ErrorValidatingIndex2(t *testing.T) {
 
 func Test_validateIndex_Warning_WrongTimestampType(t *testing.T) {
 	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"float":{"metadata_field":true}}}}`)
-	res, _ := service.CheckHealth(mockedCfg, &backend.CheckHealthRequest{
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
 	})
 	assert.Equal(t, backend.HealthStatusOk, res.Status)
 	assert.Equal(t, "Elasticsearch data source is healthy. Warning: Could not find time field 'timestamp' with type date in index", res.Message)
 }
-func Test_validateIndex_Error_FailedToUnmarshalValidateResponse(t *testing.T) {
+func Test_validateIndex_Warning_FailedToUnmarshalValidateResponse(t *testing.T) {
 	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `\\\///{"fields":null}"`)
-	res, _ := service.CheckHealth(mockedCfg, &backend.CheckHealthRequest{
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
 	})
-	assert.Equal(t, backend.HealthStatusError, res.Status)
-	assert.Equal(t, "Failed to unmarshal field capabilities response", res.Message)
+	assert.Equal(t, backend.HealthStatusOk, res.Status)
+	assert.Equal(t, "Elasticsearch data source is healthy. Warning: Failed to unmarshal field capabilities response", res.Message)
 }
 func Test_validateIndex_Success_SuccessValidatingIndex(t *testing.T) {
 	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
-	res, _ := service.CheckHealth(mockedCfg, &backend.CheckHealthRequest{
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
 		PluginContext: backend.PluginContext{},
 		Headers:       nil,
 	})

@@ -13,7 +13,6 @@ import (
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/config"
 )
 
 const ErrorBodyMaxSize = 200
@@ -118,21 +117,13 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 	successMessage := "Elasticsearch data source is healthy."
 	indexWarningMessage := ""
 
-	// validate index and time field
-	cfg := config.GrafanaConfigFromContext(ctx)
-	crossClusterSearchEnabled := cfg.FeatureToggles().IsEnabled("elasticsearchCrossClusterSearch")
-
-	if crossClusterSearchEnabled {
-		message, level := validateIndex(ctx, ds.info)
-		if level == "warning" {
-			indexWarningMessage = message
-		}
-		if level == "error" {
-			return &backend.CheckHealthResult{
-				Status:  backend.HealthStatusError,
-				Message: message,
-			}, nil
-		}
+	// validate index and time field. A failed validation is reported as a
+	// warning, not a failure: the cluster health check above is the pass/fail
+	// signal, and datasources that never enabled index validation (it was
+	// gated behind the elasticsearchCrossClusterSearch feature toggle) must
+	// not start failing "Save & test" over index metadata.
+	if message, level := validateIndex(ctx, ds.info); level != "" && message != "" {
+		indexWarningMessage = message
 	}
 
 	if indexWarningMessage != "" {

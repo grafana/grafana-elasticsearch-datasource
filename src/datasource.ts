@@ -1,5 +1,5 @@
 import { mutate, Parser, Walker, WrappingPrettyPrinter } from '@elastic/esql';
-import { map as _map, cloneDeep, isNumber, isObject, isString } from 'lodash';
+import { map as _map, cloneDeep, isNumber, isString } from 'lodash';
 import { Observable, from, generate, lastValueFrom, of } from 'rxjs';
 import { catchError, first, map, mergeMap, skipWhile, tap, throwIfEmpty } from 'rxjs/operators';
 import { SemVer } from 'semver';
@@ -45,7 +45,6 @@ import {
   BackendSrvRequest,
   DataSourceWithBackend,
   TemplateSrv,
-  config,
   getDataSourceSrv,
   getTemplateSrv,
 } from '@grafana/runtime';
@@ -91,20 +90,6 @@ import { QueryValidatorRegistry, esqlValidator, toDataQueryError } from './valid
 
 export const REF_ID_STARTER_LOG_VOLUME = 'log-volume-';
 export const REF_ID_STARTER_LOG_SAMPLE = 'log-sample-';
-
-// Those are metadata fields as defined in https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-fields.html#_identity_metadata_fields.
-// custom fields can start with underscores, therefore is not safe to exclude anything that starts with one.
-const ELASTIC_META_FIELDS = [
-  '_index',
-  '_type',
-  '_id',
-  '_source',
-  '_size',
-  '_field_names',
-  '_ignored',
-  '_routing',
-  '_meta',
-];
 
 export class ElasticDatasource
   extends DataSourceWithBackend<ElasticsearchDataQuery, ElasticsearchOptions>
@@ -208,7 +193,7 @@ export class ElasticDatasource
       indexList = [this.indexPattern.getIndexForToday()];
     }
 
-    const url = config.featureToggles.elasticsearchCrossClusterSearch ? '_field_caps' : '_mapping';
+    const url = '_field_caps';
 
     const indexUrlList = indexList.map((index) => {
       // make sure `index` does not end with a slash
@@ -778,11 +763,6 @@ export class ElasticDatasource
     return true;
   }
 
-  // Private method used in the `getFields` to check if a field is a metadata field.
-  private isMetadataField(fieldName: string) {
-    return ELASTIC_META_FIELDS.includes(fieldName);
-  }
-
   /**
    * Get the list of the fields to display in query editor or used for example in getTagKeys.
    * @todo instead of being a string, this could be a custom type representing all the elastic types
@@ -790,88 +770,7 @@ export class ElasticDatasource
    * or fix the implementation.
    */
   getFields(type?: string[], range?: TimeRange): Observable<MetricFindValue[]> {
-    if (config.featureToggles.elasticsearchCrossClusterSearch) {
-      return this.getFieldsCrossCluster(type, range);
-    }
-
-    const typeMap: Record<string, string> = {
-      float: 'number',
-      double: 'number',
-      integer: 'number',
-      long: 'number',
-      date: 'date',
-      date_nanos: 'date',
-      string: 'string',
-      text: 'string',
-      scaled_float: 'number',
-      nested: 'nested',
-      histogram: 'number',
-    };
-    return this.requestAllIndices(range).pipe(
-      map((result) => {
-        const shouldAddField = (obj: any, key: string) => {
-          if (this.isMetadataField(key)) {
-            return false;
-          }
-
-          if (!type || type.length === 0) {
-            return true;
-          }
-
-          // equal query type filter, or via type map translation
-          return type.includes(obj.type) || type.includes(typeMap[obj.type]);
-        };
-
-        // Store subfield names: [system, process, cpu, total] -> system.process.cpu.total
-        const fieldNameParts: string[] = [];
-        const fields: Record<string, { text: string; type: string }> = {};
-
-        function getFieldsRecursively(obj: any) {
-          for (const key in obj) {
-            const subObj = obj[key];
-
-            // Check mapping field for nested fields
-            if (isObject(subObj.properties)) {
-              fieldNameParts.push(key);
-              getFieldsRecursively(subObj.properties);
-            }
-
-            if (isObject(subObj.fields)) {
-              fieldNameParts.push(key);
-              getFieldsRecursively(subObj.fields);
-            }
-
-            if (isString(subObj.type)) {
-              const fieldName = fieldNameParts.concat(key).join('.');
-
-              // Hide meta-fields and check field type
-              if (shouldAddField(subObj, key)) {
-                fields[fieldName] = {
-                  text: fieldName,
-                  type: subObj.type,
-                };
-              }
-            }
-          }
-          fieldNameParts.pop();
-        }
-
-        for (const indexName in result) {
-          const index = result[indexName];
-          if (index && index.mappings) {
-            const mappings = index.mappings;
-
-            const properties = mappings.properties;
-            getFieldsRecursively(properties);
-          }
-        }
-
-        // transform to array
-        return _map(fields, (value) => {
-          return value;
-        });
-      })
-    );
+    return this.getFieldsCrossCluster(type, range);
   }
 
   getFieldsCrossCluster(type?: string[], range?: TimeRange): Observable<MetricFindValue[]> {
