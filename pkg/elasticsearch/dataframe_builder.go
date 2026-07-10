@@ -86,6 +86,9 @@ func processDocsToDataFrameFields(docs []map[string]interface{}, propNames []str
 // findTheFirstNonNilDocValueForPropName finds the first non-nil value for propName in docs.
 // If none of the values are non-nil, it returns the value of propName in the first doc.
 func findTheFirstNonNilDocValueForPropName(docs []map[string]interface{}, propName string) interface{} {
+	if len(docs) == 0 {
+		return nil
+	}
 	for _, doc := range docs {
 		if doc[propName] != nil {
 			return doc[propName]
@@ -134,7 +137,7 @@ func createFields(frames data.Frames, propKeys []string) []*data.Field {
 
 // createPropKeys creates a sorted list of property keys from a map
 func createPropKeys(props map[string]string) []string {
-	propKeys := make([]string, 0)
+	propKeys := make([]string, 0, len(props))
 	for k := range props {
 		propKeys = append(propKeys, k)
 	}
