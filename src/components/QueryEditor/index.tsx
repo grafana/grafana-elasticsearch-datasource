@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState
 import { SemVer } from 'semver';
 
 import { getDefaultTimeRange, GrafanaTheme2, QueryEditorProps } from '@grafana/data';
-import { config } from '@grafana/runtime';
 import { Alert, ConfirmModal, InlineField, InlineLabel, Input, TextArea, useStyles2 } from '@grafana/ui';
 
 import { ElasticsearchDataQuery, QueryType } from '../../dataquery.gen';
@@ -170,12 +169,6 @@ const QueryEditorForm = ({
 
   const isCodeEditor = value.editorType === 'code';
 
-  // Once the runtime package with the toggle has been published the any can be removed
-  const rawDSLFeatureEnabled = Boolean(config.featureToggles.elasticsearchRawDSLQuery);
-  const esqlFeatureEnabled = Boolean(config.featureToggles.elasticsearchESQLQuery);
-  const codeEditorFeatureEnabled = rawDSLFeatureEnabled || esqlFeatureEnabled;
-  const queryLanguageSelectorEnabled = rawDSLFeatureEnabled && esqlFeatureEnabled;
-
   const queryType: QueryType = value.queryType === 'esql' ? 'esql' : value.queryType === 'dsl' ? 'dsl' : 'lucene';
 
   // Default to 'builder' if editorType is empty
@@ -200,13 +193,13 @@ const QueryEditorForm = ({
       dispatch(
         changeEditorTypeAndResetQuery({
           editorType: pendingEditorType,
-          queryType: pendingEditorType === 'builder' ? 'lucene' : rawDSLFeatureEnabled ? 'dsl' : 'esql',
+          queryType: pendingEditorType === 'builder' ? 'lucene' : 'dsl',
         })
       );
     }
     setSwitchModalOpen(false);
     setPendingEditorType(null);
-  }, [dispatch, pendingEditorType, rawDSLFeatureEnabled]);
+  }, [dispatch, pendingEditorType]);
 
   const cancelEditorTypeChange = useCallback(() => {
     setSwitchModalOpen(false);
@@ -228,18 +221,16 @@ const QueryEditorForm = ({
         <div className={styles.queryItem}>
           <QueryTypeSelector />
         </div>
-        {codeEditorFeatureEnabled && (
-          <div style={{ marginLeft: 'auto' }}>
-            <EditorTypeSelector value={currentEditorType} onChange={onEditorTypeChange} />
-          </div>
-        )}
+        <div style={{ marginLeft: 'auto' }}>
+          <EditorTypeSelector value={currentEditorType} onChange={onEditorTypeChange} />
+        </div>
       </div>
 
-      {isCodeEditor && codeEditorFeatureEnabled && (
+      {isCodeEditor && (
         <CodeEditorSection
           value={value}
           queryType={queryType}
-          showQueryLanguageSelector={queryLanguageSelectorEnabled}
+          showQueryLanguageSelector={true}
           onRunQuery={onRunQuery}
           onFormatReady={onFormatReady}
         />
@@ -273,7 +264,7 @@ const QueryEditorForm = ({
         </>
       )}
       <ElasticsearchQueryOptions
-        onFormat={isCodeEditor && rawDSLFeatureEnabled ? handleFormat : undefined}
+        onFormat={isCodeEditor ? handleFormat : undefined}
         onChange={onChange}
         onRunQuery={onRunQuery}
       />

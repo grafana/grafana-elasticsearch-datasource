@@ -40,19 +40,6 @@ async function externalPluginIsLoaded(page: import('@playwright/test').Page): Pr
   return typeof settings.module === 'string' && settings.module.startsWith('public/plugins/');
 }
 
-// The raw DSL "Code" editor (and its backend processing) is gated behind the
-// `elasticsearchRawDSLQuery` feature toggle. The E2E grafana.ini enables it (see
-// docker-compose.yaml), but skip rather than fail if the test runs against an env
-// where it is off.
-async function rawDslFeatureEnabled(page: import('@playwright/test').Page): Promise<boolean> {
-  const resp = await page.request.get('/api/frontend/settings');
-  if (!resp.ok()) {
-    return false;
-  }
-  const settings = (await resp.json()) as { featureToggles?: Record<string, boolean> };
-  return Boolean(settings.featureToggles?.elasticsearchRawDSLQuery);
-}
-
 const exploreUrl = (query: Record<string, unknown>): string => {
   const panes = JSON.stringify({
     explore: {
@@ -139,17 +126,13 @@ test.describe('Logs volume on a datasource with logLevelField', () => {
   // This drives the exact scenario through the Explore URL (no Monaco interaction) and
   // asserts the volume renders the same per-level breakdown as the builder path, with
   // no failure alert. The fix lives in the backend, so it only applies to the
-  // externalised plugin (and needs the elasticsearchRawDSLQuery toggle).
+  // externalised plugin.
   test('renders logs volume for a raw DSL (Code editor) logs query (issue #112)', { tag: '@plugins' }, async ({
     page,
   }) => {
     test.skip(
       !(await externalPluginIsLoaded(page)),
       'Externalised plugin not loaded; the raw-DSL logs-volume fix lives in this repo only'
-    );
-    test.skip(
-      !(await rawDslFeatureEnabled(page)),
-      'elasticsearchRawDSLQuery feature toggle is disabled; the raw DSL editor is unavailable'
     );
 
     await page.goto(exploreUrl(dslLogsQuery));
