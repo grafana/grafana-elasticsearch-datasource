@@ -3,8 +3,8 @@ import type { QueryType } from './types';
 
 describe('ElasticQueryDef', () => {
   describe('isPipelineMetric', () => {
-    describe('moving_avg', () => {
-      const result = isPipelineAgg('moving_avg');
+    describe('moving_fn', () => {
+      const result = isPipelineAgg('moving_fn');
 
       test('is pipe line metric', () => {
         expect(result).toBe(true);
@@ -29,8 +29,8 @@ describe('ElasticQueryDef', () => {
       });
     });
 
-    describe('moving_avg', () => {
-      const result = isPipelineAggWithMultipleBucketPaths('moving_avg');
+    describe('moving_fn', () => {
+      const result = isPipelineAggWithMultipleBucketPaths('moving_fn');
 
       test('should not have multiple bucket paths support', () => {
         expect(result).toBe(false);

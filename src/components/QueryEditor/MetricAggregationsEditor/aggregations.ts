@@ -8,24 +8,9 @@ import {
   PipelineMetricAggregation,
   PipelineMetricAggregationWithMultipleBucketPaths,
 } from '../../../dataquery.gen';
-import { MetricAggregationWithMeta, MovingAverage } from '../../../types';
+import { MetricAggregationWithMeta } from '../../../types';
 
 import { metricAggregationConfig } from './utils';
-
-export const isEWMAMovingAverage = (metric: MovingAverage | MovingAverage<'ewma'>): metric is MovingAverage<'ewma'> =>
-  metric.settings?.model === 'ewma';
-
-export const isHoltMovingAverage = (metric: MovingAverage | MovingAverage<'holt'>): metric is MovingAverage<'holt'> =>
-  metric.settings?.model === 'holt';
-
-export const isHoltWintersMovingAverage = (
-  metric: MovingAverage | MovingAverage<'holt_winters'>
-): metric is MovingAverage<'holt_winters'> => metric.settings?.model === 'holt_winters';
-
-export const isMovingAverageWithModelSettings = (
-  metric: MovingAverage
-): metric is MovingAverage<'ewma'> | MovingAverage<'holt'> | MovingAverage<'holt_winters'> =>
-  ['holt', 'ewma', 'holt_winters'].includes(metric.settings?.model || '');
 
 // Guards
 // Given the structure of the aggregations (ie. `settings` field being always optional) we cannot
@@ -77,7 +62,6 @@ export const METRIC_AGGREGATION_TYPES: MetricAggregationType[] = [
   'raw_document',
   'raw_data',
   'logs',
-  'moving_avg',
   'moving_fn',
   'derivative',
   'serial_diff',
