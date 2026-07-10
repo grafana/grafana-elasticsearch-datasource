@@ -27,13 +27,6 @@ func setIntPath(settings *simplejson.Json, path ...string) {
 // generateSettingsForDSL casts values to float when required by Elastic's query DSL for MetricAgg
 func (metricAggregation MetricAgg) generateSettingsForDSL() map[string]any {
 	switch metricAggregation.Type {
-	case "moving_avg":
-		setFloatPath(metricAggregation.Settings, "window")
-		setFloatPath(metricAggregation.Settings, "predict")
-		setFloatPath(metricAggregation.Settings, "settings", "alpha")
-		setFloatPath(metricAggregation.Settings, "settings", "beta")
-		setFloatPath(metricAggregation.Settings, "settings", "gamma")
-		setFloatPath(metricAggregation.Settings, "settings", "period")
 	case "serial_diff":
 		setFloatPath(metricAggregation.Settings, "lag")
 	}

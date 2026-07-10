@@ -314,10 +314,11 @@ func TestPipelineParser(t *testing.T) {
 	parser := newPipelineParser()
 
 	t.Run("CanParse", func(t *testing.T) {
-		assert.True(t, parser.CanParse("moving_avg"))
+		assert.True(t, parser.CanParse("moving_fn"))
 		assert.True(t, parser.CanParse("derivative"))
 		assert.True(t, parser.CanParse("cumulative_sum"))
 		assert.False(t, parser.CanParse("bucket_script"))
+		assert.False(t, parser.CanParse("moving_avg"))
 	})
 
 	t.Run("Parse", func(t *testing.T) {
@@ -325,13 +326,13 @@ func TestPipelineParser(t *testing.T) {
 			"buckets_path": "1",
 		}
 
-		agg, err := parser.Parse("moving", "moving_avg", aggValue)
+		agg, err := parser.Parse("moving", "moving_fn", aggValue)
 		require.NoError(t, err)
 		require.NotNil(t, agg)
 
 		metric := agg.toMetricAgg()
 		assert.Equal(t, "moving", metric.ID)
-		assert.Equal(t, "moving_avg", metric.Type)
+		assert.Equal(t, "moving_fn", metric.Type)
 		assert.Equal(t, "1", metric.Field)
 	})
 }
@@ -342,7 +343,7 @@ func TestBucketScriptParser(t *testing.T) {
 
 	t.Run("CanParse", func(t *testing.T) {
 		assert.True(t, parser.CanParse("bucket_script"))
-		assert.False(t, parser.CanParse("moving_avg"))
+		assert.False(t, parser.CanParse("avg"))
 	})
 
 	t.Run("Parse with map buckets_path", func(t *testing.T) {
@@ -564,7 +565,7 @@ func TestCompositeParser(t *testing.T) {
 							}
 						},
 						"moving": {
-							"moving_avg": {
+							"moving_fn": {
 								"buckets_path": "1"
 							}
 						},
@@ -584,11 +585,11 @@ func TestCompositeParser(t *testing.T) {
 		require.GreaterOrEqual(t, len(metricAggs), 2) // At least avg and one pipeline
 
 		// Find pipeline aggregations
-		movingAvgFound := false
+		movingFnFound := false
 		derivativeFound := false
 		for _, m := range metricAggs {
-			if m.ID == "moving" && m.Type == "moving_avg" {
-				movingAvgFound = true
+			if m.ID == "moving" && m.Type == "moving_fn" {
+				movingFnFound = true
 				assert.Equal(t, "1", m.Field)
 			}
 			if m.ID == "deriv" && m.Type == "derivative" {
@@ -596,7 +597,7 @@ func TestCompositeParser(t *testing.T) {
 				assert.Equal(t, "1", m.Field)
 			}
 		}
-		assert.True(t, movingAvgFound, "moving_avg aggregation not found")
+		assert.True(t, movingFnFound, "moving_fn aggregation not found")
 		assert.True(t, derivativeFound, "derivative aggregation not found")
 	})
 
