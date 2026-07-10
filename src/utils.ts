@@ -4,13 +4,18 @@ import { isMetricAggregationWithField } from './components/QueryEditor/MetricAgg
 import { metricAggregationConfig } from './components/QueryEditor/MetricAggregationsEditor/utils';
 import { ElasticsearchDataQuery, MetricAggregation, MetricAggregationWithInlineScript } from './dataquery.gen';
 
+// Saved queries can carry a metric `type` that has since been removed from
+// `MetricAggregationType` (e.g. `moving_avg`), so the config lookup can miss.
+export const metricAggregationLabel = (type: MetricAggregation['type']): string =>
+  metricAggregationConfig[type]?.label ?? `${type} (removed)`;
+
 export const describeMetric = (metric: MetricAggregation) => {
   if (!isMetricAggregationWithField(metric)) {
-    return metricAggregationConfig[metric.type].label;
+    return metricAggregationLabel(metric.type);
   }
 
   // TODO: field might be undefined
-  return `${metricAggregationConfig[metric.type].label} ${metric.field}`;
+  return `${metricAggregationLabel(metric.type)} ${metric.field}`;
 };
 
 /**

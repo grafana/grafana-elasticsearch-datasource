@@ -21,7 +21,9 @@ export const QueryTypeSelector = () => {
     return null;
   }
 
-  const queryType = metricAggregationConfig[firstMetric.type].impliedQueryType;
+  // Removed metric types (e.g. `moving_avg`) implied `metrics`; fall back to that
+  // so a saved query using a removed type doesn't crash the type picker.
+  const queryType = metricAggregationConfig[firstMetric.type]?.impliedQueryType ?? 'metrics';
 
   const onChange = (newQueryType: QueryType) => {
     dispatch(
