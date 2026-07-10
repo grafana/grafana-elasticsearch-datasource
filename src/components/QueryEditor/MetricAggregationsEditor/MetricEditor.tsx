@@ -7,6 +7,7 @@ import { InlineSegmentGroup, SegmentAsync, useTheme2 } from '@grafana/ui';
 import { MetricAggregation, MetricAggregationType } from '../../../dataquery.gen';
 import { useFields } from '../../../hooks/useFields';
 import { useDispatch } from '../../../hooks/useStatelessReducer';
+import { metricAggregationLabel } from '../../../utils';
 import { MetricPicker } from '../../MetricPicker';
 import { useQuery } from '../ElasticsearchQueryContext';
 import { segmentStyles } from '../styles';
@@ -24,7 +25,7 @@ import { getStyles } from './styles';
 import { metricAggregationConfig } from './utils';
 
 const toOption = (metric: MetricAggregation) => ({
-  label: metricAggregationConfig[metric.type]?.label ?? `${metric.type} (removed)`,
+  label: metricAggregationLabel(metric.type),
   value: metric.type,
 });
 

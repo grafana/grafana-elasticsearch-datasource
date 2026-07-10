@@ -62,7 +62,6 @@ import {
   isMetricAggregationWithField,
   isPipelineAggregationWithMultipleBucketPaths,
 } from './components/QueryEditor/MetricAggregationsEditor/aggregations';
-import { metricAggregationConfig } from './components/QueryEditor/MetricAggregationsEditor/utils';
 import { BucketAggregation, ElasticsearchDataQuery } from './dataquery.gen';
 import { isMetricAggregationWithMeta } from './guards';
 import {
@@ -86,7 +85,7 @@ import {
   isElasticsearchResponseWithAggregations,
   isElasticsearchResponseWithHits,
 } from './types';
-import { getScriptValue, isTimeSeriesQuery } from './utils';
+import { getScriptValue, isTimeSeriesQuery, metricAggregationLabel } from './utils';
 import { QueryValidatorRegistry, esqlValidator, toDataQueryError } from './validation';
 
 export const REF_ID_STARTER_LOG_VOLUME = 'log-volume-';
@@ -479,9 +478,7 @@ export class ElasticDatasource
     text += 'Metrics: ';
 
     text += metricAggs?.reduce((acc, metric) => {
-      const metricConfig = metricAggregationConfig[metric.type];
-
-      let text = metricConfig.label + '(';
+      let text = metricAggregationLabel(metric.type) + '(';
 
       if (isMetricAggregationWithField(metric)) {
         text += metric.field;
