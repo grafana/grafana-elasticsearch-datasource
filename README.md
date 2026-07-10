@@ -10,6 +10,7 @@ Elasticsearch data source for Grafana — query and visualize metrics, logs, and
 ## Requirements
 
 - Grafana 12.2.0 or later
+- Elasticsearch 8.x or 9.x (7.x is past its [end of life](https://www.elastic.co/support/eol) and no longer supported)
 
 ## Getting started
 
