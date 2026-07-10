@@ -1,7 +1,16 @@
 import { SemVer } from 'semver';
 
-import { ElasticsearchDataQuery } from './dataquery.gen';
-import { flattenObject, isSupportedVersion, isTimeSeriesQuery, removeEmpty } from './utils';
+import { ElasticsearchDataQuery, MetricAggregation } from './dataquery.gen';
+import { describeMetric, flattenObject, isSupportedVersion, isTimeSeriesQuery, removeEmpty } from './utils';
+
+describe('describeMetric', () => {
+  it('falls back to "<type> (removed)" for a metric type no longer in metricAggregationConfig', () => {
+    // Saved queries can carry a metric type removed from MetricAggregationType (e.g. moving_avg).
+    const metric = { id: '1', type: 'moving_avg' } as unknown as MetricAggregation;
+
+    expect(describeMetric(metric)).toBe('moving_avg (removed)');
+  });
+});
 
 describe('removeEmpty', () => {
   it('Should remove all empty', () => {
