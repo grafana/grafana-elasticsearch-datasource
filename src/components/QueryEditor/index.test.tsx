@@ -348,6 +348,24 @@ describe('QueryEditor', () => {
     ).not.toThrow();
 
     expect(screen.getByText('moving_avg (removed)')).toBeInTheDocument();
+    // moving_avg implied a metrics query, so the Group By section (bucket
+    // aggregations) must still be reachable to repair the date_histogram/terms buckets.
+    expect(screen.getByText('Group By')).toBeInTheDocument();
+  });
+
+  it('Should show the add-metric button when the first metric is a removed type (moving_avg)', () => {
+    // moving_avg implied a metrics query, so a user should still be able to add
+    // further metrics even though the first one can no longer be edited normally.
+    const query: ElasticsearchDataQuery = {
+      refId: 'A',
+      query: '',
+      metrics: [{ id: '1', type: 'moving_avg', field: '2' } as unknown as MetricAggregation],
+      bucketAggs: [{ id: '2', type: 'date_histogram' }],
+    };
+
+    render(<QueryEditor query={query} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />);
+
+    expect(screen.getByLabelText('Add metric')).toBeInTheDocument();
   });
 
   describe('Include runtime fields toggle', () => {

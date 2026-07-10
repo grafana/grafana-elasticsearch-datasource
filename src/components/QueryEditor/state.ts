@@ -2,10 +2,10 @@ import { Action, createAction } from '@reduxjs/toolkit';
 
 import { ElasticsearchDataQuery } from '../../dataquery.gen';
 import { QueryType } from '../../types';
+import { impliedQueryType } from '../../utils';
 
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
 
-import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
 import { getPreserveQueryDefault } from './preserveQueryPreference';
 
 /**
@@ -49,19 +49,16 @@ export const queryReducer = (prevQuery: ElasticsearchDataQuery['query'], action:
   // See https://github.com/grafana/grafana-elasticsearch-datasource/issues/350
   //
   // `previousType` may be a saved-query type that has since been removed from
-  // `metricAggregationConfig` (e.g. `moving_avg`). All removed types implied
-  // `metrics`, so fall back to that rather than treating the lookup as a
-  // query-type change and wiping the query.
+  // `metricAggregationConfig` (e.g. `moving_avg`); see `impliedQueryType` for
+  // the fallback behaviour.
   if (changeMetricType.match(action)) {
     const { previousType, type, preserveQuery } = action.payload;
 
     if (preserveQuery) {
       return prevQuery;
     }
-    const previousImpliedQueryType = previousType
-      ? (metricAggregationConfig[previousType]?.impliedQueryType ?? 'metrics')
-      : undefined;
-    const nextImpliedQueryType = metricAggregationConfig[type].impliedQueryType;
+    const previousImpliedQueryType = previousType ? impliedQueryType(previousType) : undefined;
+    const nextImpliedQueryType = impliedQueryType(type);
 
     // only wipe the query when the *kind* of query changed (e.g. metrics -> logs)
     if (previousImpliedQueryType !== nextImpliedQueryType) {
