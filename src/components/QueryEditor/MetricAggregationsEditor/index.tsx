@@ -33,7 +33,7 @@ export const MetricAggregationsEditor = ({ nextId }: Props) => {
             >
               <MetricEditor value={metric} />
 
-              {metricAggregationConfig[metric.type].impliedQueryType === 'metrics' && index === 0 && (
+              {metricAggregationConfig[metric.type]?.impliedQueryType === 'metrics' && index === 0 && (
                 <Button
                   variant="secondary"
                   fill="text"

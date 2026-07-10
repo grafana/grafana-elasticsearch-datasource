@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import { createTheme } from '@grafana/data';
 
-import { ElasticsearchDataQuery } from '../../dataquery.gen';
+import { ElasticsearchDataQuery, MetricAggregation } from '../../dataquery.gen';
 import { ElasticDatasource } from '../../datasource';
 import React from 'react';
 
@@ -328,6 +328,26 @@ describe('QueryEditor', () => {
 
       expect(screen.getByLabelText('Preserve query')).toBeChecked();
     });
+  });
+
+  it('Should render without throwing and show a fallback label for a saved query with a removed metric type (moving_avg)', () => {
+    // moving_avg was removed from MetricAggregationType/metricAggregationConfig, but saved
+    // queries (e.g. loaded from Explore history) may still contain it.
+    const query: ElasticsearchDataQuery = {
+      refId: 'A',
+      query: '',
+      metrics: [
+        { id: '1', type: 'count' },
+        { id: '2', type: 'moving_avg', field: '1' } as unknown as MetricAggregation,
+      ],
+      bucketAggs: [{ id: '3', type: 'date_histogram' }],
+    };
+
+    expect(() =>
+      render(<QueryEditor query={query} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />)
+    ).not.toThrow();
+
+    expect(screen.getByText('moving_avg (removed)')).toBeInTheDocument();
   });
 
   describe('Include runtime fields toggle', () => {
