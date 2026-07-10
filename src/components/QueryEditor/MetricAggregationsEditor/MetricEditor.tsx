@@ -51,7 +51,10 @@ const getTypeOptions = (
       .filter(([_, config]) => config.impliedQueryType === 'metrics')
       // Only showing metrics type supported by the version of ES.
       // if we cannot determine the version, we assume it is suitable.
-      .filter(([_, { versionRange = '*' }]) => (esVersion != null ? satisfies(esVersion, versionRange) : true))
+      // `includePrerelease` so versions like `8.14.0-SNAPSHOT` match `*` and other ranges.
+      .filter(([_, { versionRange = '*' }]) =>
+        esVersion != null ? satisfies(esVersion, versionRange, { includePrerelease: true }) : true
+      )
       // Filtering out Pipeline Aggregations if there's no basic metric selected before
       .filter(([_, config]) => includePipelineAggregations || !config.isPipelineAgg)
       .map(([key, { label }]) => ({
