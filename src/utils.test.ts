@@ -1,5 +1,7 @@
+import { SemVer } from 'semver';
+
 import { ElasticsearchDataQuery } from './dataquery.gen';
-import { flattenObject, isTimeSeriesQuery, removeEmpty } from './utils';
+import { flattenObject, isSupportedVersion, isTimeSeriesQuery, removeEmpty } from './utils';
 
 describe('removeEmpty', () => {
   it('Should remove all empty', () => {
@@ -113,5 +115,17 @@ describe('flattenObject', () => {
     };
 
     expect(flattenObject(nestedObject)).toEqual(nestedObject);
+  });
+});
+
+describe('isSupportedVersion', () => {
+  it.each([
+    ['8.0.0', true],
+    ['9.3.1', true],
+    ['8.14.0-SNAPSHOT', true],
+    ['7.17.0', false],
+    ['7.16.0', false],
+  ])('returns %s support = %s', (version, expected) => {
+    expect(isSupportedVersion(new SemVer(version))).toBe(expected);
   });
 });
