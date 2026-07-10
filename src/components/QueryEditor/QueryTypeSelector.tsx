@@ -4,10 +4,10 @@ import { QUERY_TYPE_SELECTOR_OPTIONS } from '../../configuration/utils';
 import { useDispatch } from '../../hooks/useStatelessReducer';
 import { queryTypeToMetricType } from '../../queryDef';
 import { QueryType } from '../../types';
+import { impliedQueryType } from '../../utils';
 
 import { useQuery } from './ElasticsearchQueryContext';
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
-import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
 import React from 'react';
 
 export const QueryTypeSelector = () => {
@@ -21,9 +21,7 @@ export const QueryTypeSelector = () => {
     return null;
   }
 
-  // Removed metric types (e.g. `moving_avg`) implied `metrics`; fall back to that
-  // so a saved query using a removed type doesn't crash the type picker.
-  const queryType = metricAggregationConfig[firstMetric.type]?.impliedQueryType ?? 'metrics';
+  const queryType = impliedQueryType(firstMetric.type);
 
   const onChange = (newQueryType: QueryType) => {
     dispatch(
