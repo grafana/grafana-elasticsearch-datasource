@@ -219,11 +219,11 @@ const QueryEditorForm = ({
   const currentEditorType: EditorType = value.editorType === 'code' ? 'code' : 'builder';
 
   const showBucketAggregationsEditor = value.metrics?.every(
-    (metric) => metricAggregationConfig[metric.type].impliedQueryType === 'metrics'
+    (metric) => metricAggregationConfig[metric.type]?.impliedQueryType === 'metrics'
   );
 
   const isRawDocumentEditor = value.metrics?.every(
-    (metric) => metricAggregationConfig[metric.type].impliedQueryType === 'raw_document'
+    (metric) => metricAggregationConfig[metric.type]?.impliedQueryType === 'raw_document'
   );
 
   const onEditorTypeChange = useCallback((newEditorType: EditorType) => {

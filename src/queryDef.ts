@@ -90,5 +90,5 @@ export function isPipelineAgg(metricType: MetricAggregationType) {
 }
 
 export function isPipelineAggWithMultipleBucketPaths(metricType: MetricAggregationType) {
-  return !!metricAggregationConfig[metricType].supportsMultipleBucketPaths;
+  return !!metricAggregationConfig[metricType]?.supportsMultipleBucketPaths;
 }

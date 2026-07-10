@@ -47,13 +47,20 @@ export const queryReducer = (prevQuery: ElasticsearchDataQuery['query'], action:
   // The user can opt in to always preserving the query via the `preserveQuery` flag on the action payload.
   // See https://github.com/grafana/grafana-elasticsearch-datasource/issues/309
   // See https://github.com/grafana/grafana-elasticsearch-datasource/issues/350
+  //
+  // `previousType` may be a saved-query type that has since been removed from
+  // `metricAggregationConfig` (e.g. `moving_avg`). All removed types implied
+  // `metrics`, so fall back to that rather than treating the lookup as a
+  // query-type change and wiping the query.
   if (changeMetricType.match(action)) {
     const { previousType, type, preserveQuery } = action.payload;
 
     if (preserveQuery) {
       return prevQuery;
     }
-    const previousImpliedQueryType = previousType ? metricAggregationConfig[previousType].impliedQueryType : undefined;
+    const previousImpliedQueryType = previousType
+      ? (metricAggregationConfig[previousType]?.impliedQueryType ?? 'metrics')
+      : undefined;
     const nextImpliedQueryType = metricAggregationConfig[type].impliedQueryType;
 
     // only wipe the query when the *kind* of query changed (e.g. metrics -> logs)
