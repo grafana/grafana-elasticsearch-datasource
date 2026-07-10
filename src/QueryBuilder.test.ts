@@ -357,7 +357,7 @@ describe('ElasticQueryBuilder', () => {
         },
         {
           id: '2',
-          type: 'moving_avg',
+          type: 'moving_fn',
           field: '3',
         },
       ],
@@ -367,8 +367,8 @@ describe('ElasticQueryBuilder', () => {
     const firstLevel = query.aggs['3'];
 
     expect(firstLevel.aggs['2']).not.toBe(undefined);
-    expect(firstLevel.aggs['2'].moving_avg).not.toBe(undefined);
-    expect(firstLevel.aggs['2'].moving_avg.buckets_path).toBe('3');
+    expect(firstLevel.aggs['2'].moving_fn).not.toBe(undefined);
+    expect(firstLevel.aggs['2'].moving_fn.buckets_path).toBe('3');
   });
 
   it('with moving average doc count', () => {
@@ -381,7 +381,7 @@ describe('ElasticQueryBuilder', () => {
         },
         {
           id: '2',
-          type: 'moving_avg',
+          type: 'moving_fn',
           field: '3',
         },
       ],
@@ -391,8 +391,8 @@ describe('ElasticQueryBuilder', () => {
     const firstLevel = query.aggs['4'];
 
     expect(firstLevel.aggs['2']).not.toBe(undefined);
-    expect(firstLevel.aggs['2'].moving_avg).not.toBe(undefined);
-    expect(firstLevel.aggs['2'].moving_avg.buckets_path).toBe('_count');
+    expect(firstLevel.aggs['2'].moving_fn).not.toBe(undefined);
+    expect(firstLevel.aggs['2'].moving_fn.buckets_path).toBe('_count');
   });
 
   it('with broken moving average', () => {
@@ -406,12 +406,12 @@ describe('ElasticQueryBuilder', () => {
         },
         {
           id: '2',
-          type: 'moving_avg',
+          type: 'moving_fn',
           field: '3',
         },
         {
           id: '4',
-          type: 'moving_avg',
+          type: 'moving_fn',
         },
       ],
       bucketAggs: [{ type: 'date_histogram', field: '@timestamp', id: '3' }],
@@ -420,8 +420,8 @@ describe('ElasticQueryBuilder', () => {
     const firstLevel = query.aggs['3'];
 
     expect(firstLevel.aggs['2']).not.toBe(undefined);
-    expect(firstLevel.aggs['2'].moving_avg).not.toBe(undefined);
-    expect(firstLevel.aggs['2'].moving_avg.buckets_path).toBe('3');
+    expect(firstLevel.aggs['2'].moving_fn).not.toBe(undefined);
+    expect(firstLevel.aggs['2'].moving_fn.buckets_path).toBe('3');
     expect(firstLevel.aggs['4']).toBe(undefined);
   });
 
@@ -895,42 +895,6 @@ describe('ElasticQueryBuilder', () => {
   });
 
   describe('Value casting for settings', () => {
-    it('correctly casts values in moving_avg ', () => {
-      const query = builder.build({
-        refId: 'A',
-        metrics: [
-          { type: 'avg', id: '2' },
-          {
-            type: 'moving_avg',
-            id: '3',
-            field: '2',
-            settings: {
-              window: '5',
-              model: 'holt_winters',
-              predict: '10',
-              settings: {
-                alpha: '1',
-                beta: '2',
-                gamma: '3',
-                period: '4',
-              },
-            },
-          },
-        ],
-        timeField: '@timestamp',
-        bucketAggs: [{ type: 'date_histogram', field: '@timestamp', id: '1' }],
-      });
-
-      const movingAvg = query.aggs['1'].aggs['3'].moving_avg;
-
-      expect(movingAvg.window).toBe(5);
-      expect(movingAvg.predict).toBe(10);
-      expect(movingAvg.settings.alpha).toBe(1);
-      expect(movingAvg.settings.beta).toBe(2);
-      expect(movingAvg.settings.gamma).toBe(3);
-      expect(movingAvg.settings.period).toBe(4);
-    });
-
     it('correctly casts values in serial_diff ', () => {
       const query = builder.build({
         refId: 'A',
