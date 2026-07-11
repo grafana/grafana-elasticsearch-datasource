@@ -79,9 +79,11 @@ machinery assumes `buckets_path` references another metric row by ID and drives 
 "apply to metric" picker, neither of which applies. Instead a new sibling
 classification (`isSiblingPipelineAgg` in Go, a config flag in the TS
 `metricAggregationConfig`) gates the new code paths. Sibling composites are
-explicitly filtered out of parent pipeline "apply to" pickers and out of terms
-order-by targets (the pre-existing filters only excluded pipeline-classified
-types).
+explicitly filtered out of the single-buckets-path "apply to" pickers and out of
+terms order-by targets (the pre-existing filters only excluded
+pipeline-classified types). The bucket_script variable picker intentionally
+keeps its full metric list, since chained pipeline references were already
+permitted there.
 
 ## Backend query generation
 
@@ -111,7 +113,8 @@ empty buckets. Series naming:
 
 - Go `pkg/elasticsearch/field_namer.go`: `<Outer> of <Inner> <field> per <groupBy>`
   (e.g. "Sum of Max storage_used per host").
-- TS `src/queryDef.ts` `describeMetric` equivalent for the editor row summary.
+- TS `src/components/QueryEditor/MetricAggregationsEditor/SettingsEditor/useDescription.ts`
+  for the editor row summary.
 - Display-name entries added to `metricAggType` in `pkg/elasticsearch/models.go`.
 
 ## UI

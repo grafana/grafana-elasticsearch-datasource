@@ -517,9 +517,9 @@ describe('ElasticQueryBuilder', () => {
     const firstLevel = query.aggs['2'];
 
     // Ordering by a sibling composite would emit an invalid nested aggregation,
-    // so the order for this key is omitted entirely and the sibling isn't nested
-    // directly inside the terms agg.
-    expect(firstLevel.terms.order).toEqual({});
+    // so the order key is dropped entirely (matching the backend's omitempty
+    // behaviour) and the sibling isn't nested directly inside the terms agg.
+    expect(firstLevel.terms.order).toBeUndefined();
     expect(firstLevel.aggs?.['5']).toBeUndefined();
   });
 

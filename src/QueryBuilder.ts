@@ -86,9 +86,9 @@ export class ElasticQueryBuilder {
             } else if (isSiblingPipelineAggregation(metric)) {
               // Sibling composites (sum_bucket, max_bucket, ...) are hidden terms+pipeline
               // pairs, not a metric that exists inside this terms bucket. Ordering by one
-              // would emit an invalid nested aggregation, so fall back to not emitting the
-              // order for this key.
-              queryNode.terms.order = {};
+              // would emit an invalid nested aggregation, so drop the order entirely,
+              // matching the backend's omitempty behaviour.
+              delete queryNode.terms.order;
             } else if (isMetricAggregationWithField(metric)) {
               queryNode.aggs = {};
               queryNode.aggs[metric.id] = {
