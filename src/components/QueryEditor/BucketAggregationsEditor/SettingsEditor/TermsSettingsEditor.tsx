@@ -8,7 +8,7 @@ import { ExtendedStatMetaType, ExtendedStats, MetricAggregation, Percentiles, Te
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
 import { describeMetric } from '../../../../utils';
 import { useQuery } from '../../ElasticsearchQueryContext';
-import { isPipelineAggregation } from '../../MetricAggregationsEditor/aggregations';
+import { isPipelineAggregation, isSiblingPipelineAggregation } from '../../MetricAggregationsEditor/aggregations';
 import { changeBucketAggregationSetting } from '../state/actions';
 import { bucketAggregationConfig, orderByOptions, orderOptions } from '../utils';
 
@@ -136,7 +136,10 @@ function isValidOrderTarget(metric: MetricAggregation) {
     // top metrics can't be used for ordering
     metric.type !== 'top_metrics' &&
     // pipeline aggregations can't be used for ordering: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-bucket-terms-aggregation.html#search-aggregations-bucket-terms-aggregation-order
-    !isPipelineAggregation(metric)
+    !isPipelineAggregation(metric) &&
+    // sibling composites are hidden terms+pipeline pairs, not a metric that exists inside this
+    // terms bucket, so they can't be used for ordering either
+    !isSiblingPipelineAggregation(metric)
   );
 }
 

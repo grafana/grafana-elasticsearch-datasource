@@ -1270,6 +1270,39 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Len(t, sr.Aggs[0].Aggregation.Aggs, 0)
 		})
 
+		t.Run("With terms order pointing at a sibling metric, the sibling is not emitted as an order or a nested metric", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{
+						"type": "terms",
+						"field": "@host",
+						"id": "2",
+						"settings": { "size": "5", "order": "asc", "orderBy": "3" }
+					},
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{ "id": "1", "type": "count" },
+					{
+						"id": "3",
+						"type": "sum_bucket",
+						"field": "storage_used",
+						"settings": { "metric": "max", "groupBy": "host", "limit": "500" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			termsAgg := sr.Aggs[0].Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Empty(t, termsAgg.Order, "order referencing a sibling metric must not be emitted")
+
+			for _, sub := range sr.Aggs[0].Aggregation.Aggs {
+				require.NotEqual(t, "3", sub.Key, "sibling metric must not be emitted as a nested metric of the terms agg")
+			}
+		})
+
 		t.Run("With derivative doc count", func(t *testing.T) {
 			// This test is with pipelineAgg and is passing. Same test without pipelineAgg is failing.
 			c := newFakeClient()

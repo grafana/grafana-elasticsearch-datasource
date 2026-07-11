@@ -116,6 +116,11 @@ func addTermsAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, metrics []*Metr
 					if m.ID == metricId {
 						if m.Type == "count" {
 							a.Order["_count"] = bucketAgg.Settings.Get("order").MustString("desc")
+						} else if isSiblingPipelineAgg(m.Type) {
+							// Sibling composites (sum_bucket, max_bucket, ...) are hidden
+							// terms+pipeline pairs, not a metric that exists inside this
+							// terms bucket. Ordering by one would emit an invalid nested
+							// aggregation, so fall back to not emitting the order for this key.
 						} else {
 							a.Order[orderBy] = bucketAgg.Settings.Get("order").MustString("desc")
 							b.Metric(m.ID, m.Type, m.Field, nil)

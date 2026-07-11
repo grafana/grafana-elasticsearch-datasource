@@ -470,6 +470,38 @@ describe('ElasticQueryBuilder', () => {
     expect(query.aggs['3'].aggs).toEqual({});
   });
 
+  it('with term agg and order by pointing at a sibling metric', () => {
+    const query = builder.build({
+      refId: 'A',
+      metrics: [
+        { type: 'count', id: '1' },
+        {
+          id: '5',
+          type: 'sum_bucket',
+          field: 'storage_used',
+          settings: { metric: 'max', groupBy: 'host', limit: '500' },
+        },
+      ],
+      bucketAggs: [
+        {
+          type: 'terms',
+          field: '@host',
+          settings: { size: '5', order: 'asc', orderBy: '5' },
+          id: '2',
+        },
+        { type: 'date_histogram', field: '@timestamp', id: '3' },
+      ],
+    });
+
+    const firstLevel = query.aggs['2'];
+
+    // Ordering by a sibling composite would emit an invalid nested aggregation,
+    // so the order for this key is omitted entirely and the sibling isn't nested
+    // directly inside the terms agg.
+    expect(firstLevel.terms.order).toEqual({});
+    expect(firstLevel.aggs?.['5']).toBeUndefined();
+  });
+
   it('with derivative', () => {
     const query = builder.build({
       refId: 'A',

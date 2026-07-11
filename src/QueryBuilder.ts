@@ -83,6 +83,12 @@ export class ElasticQueryBuilder {
           if (metric.id === metricId) {
             if (metric.type === 'count') {
               queryNode.terms.order = { _count: aggDef.settings.order };
+            } else if (isSiblingPipelineAggregation(metric)) {
+              // Sibling composites (sum_bucket, max_bucket, ...) are hidden terms+pipeline
+              // pairs, not a metric that exists inside this terms bucket. Ordering by one
+              // would emit an invalid nested aggregation, so fall back to not emitting the
+              // order for this key.
+              queryNode.terms.order = {};
             } else if (isMetricAggregationWithField(metric)) {
               queryNode.aggs = {};
               queryNode.aggs[metric.id] = {

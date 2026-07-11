@@ -6,9 +6,10 @@ import { SemVer } from 'semver';
 
 import { getDefaultTimeRange } from '@grafana/data';
 
-import { Average, Count, ElasticsearchDataQuery, UniqueCount } from '../../../dataquery.gen';
+import { Average, Count, Derivative, ElasticsearchDataQuery, SumBucket, UniqueCount } from '../../../dataquery.gen';
 import { ElasticDatasource } from '../../../datasource';
 import { defaultBucketAgg } from '../../../queryDef';
+import { describeMetric } from '../../../utils';
 import { ElasticsearchProvider } from '../ElasticsearchQueryContext';
 
 import { MetricEditor } from './MetricEditor';
@@ -169,5 +170,47 @@ describe('Metric Editor', () => {
     // Version-gated `moving_avg` (`<8.0.0`) must still be excluded — the fix
     // should not regress upper-bound filtering when the version is a prerelease.
     expect(screen.queryByText('Moving Average')).toBeNull();
+  });
+
+  it('Should not offer sibling composite metrics as "apply to" targets for a parent pipeline aggregation', async () => {
+    const sumBucket: SumBucket = {
+      id: '1',
+      type: 'sum_bucket',
+      field: 'storage_used',
+      settings: { metric: 'max', groupBy: 'host', limit: '500' },
+    };
+    const avg: Average = { id: '2', type: 'avg', field: '@value' };
+    const derivative: Derivative = { id: '3', type: 'derivative' };
+
+    const query: ElasticsearchDataQuery = {
+      refId: 'A',
+      query: '',
+      metrics: [sumBucket, avg, derivative],
+      bucketAggs: [defaultBucketAgg('4')],
+    };
+
+    const getFields: ElasticDatasource['getFields'] = jest.fn(() => from([[]]));
+
+    const wrapper = ({ children }: PropsWithChildren<{}>) => (
+      <ElasticsearchProvider
+        datasource={{ getFields } as ElasticDatasource}
+        query={query}
+        range={getDefaultTimeRange()}
+        onChange={() => {}}
+        onRunQuery={() => {}}
+      >
+        {children}
+      </ElasticsearchProvider>
+    );
+
+    render(<MetricEditor value={derivative} />, { wrapper });
+
+    await userEvent.click(screen.getByText('Select Metric'));
+
+    // The sibling composite is a hidden terms+pipeline pair, not a metric a parent
+    // pipeline aggregation can apply to.
+    expect(screen.queryByText(describeMetric(sumBucket))).not.toBeInTheDocument();
+    // Other, non-sibling metrics remain valid "apply to" targets.
+    expect(await screen.findByText(describeMetric(avg))).toBeInTheDocument();
   });
 });
