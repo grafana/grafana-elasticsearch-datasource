@@ -25,7 +25,32 @@ test.describe('Config editor', () => {
       await expect(page.getByLabel('Time field name')).toBeVisible();
       await expect(page.getByLabel('Max concurrent Shard Requests')).toBeVisible();
       await expect(page.getByLabel('Min time interval')).toBeVisible();
-      await expect(page.getByLabel('Include Frozen Indices')).toBeVisible();
+      // Deprecated option: hidden unless already enabled on the datasource
+      await expect(page.getByLabel(/Include Frozen Indices/)).toHaveCount(0);
+    });
+
+    test('should show the deprecated Include Frozen Indices toggle only when already enabled', async ({
+      gotoDataSourceConfigPage,
+      page,
+    }) => {
+      const res = await page.request.post('/api/datasources', {
+        data: {
+          name: `frozen-e2e-${Date.now()}`,
+          type: PLUGIN_TYPE,
+          access: 'proxy',
+          url: 'http://elasticsearch:9200',
+          jsonData: { timeField: '@timestamp', includeFrozen: true },
+        },
+      });
+      expect(res.ok()).toBeTruthy();
+      const { datasource } = await res.json();
+
+      try {
+        await gotoDataSourceConfigPage(datasource.uid);
+        await expect(page.getByLabel('Include Frozen Indices (deprecated)')).toBeVisible();
+      } finally {
+        await page.request.delete(`/api/datasources/uid/${datasource.uid}`);
+      }
     });
 
     test('should render Logs section', async ({ createDataSourceConfigPage, page }) => {
