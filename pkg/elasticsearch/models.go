@@ -85,6 +85,10 @@ var metricAggType = map[string]string{
 	"raw_data":       "Raw Data",
 	"rate":           "Rate",
 	"logs":           "Logs",
+	"sum_bucket":     "Sum Bucket",
+	"max_bucket":     "Max Bucket",
+	"min_bucket":     "Min Bucket",
+	"avg_bucket":     "Average Bucket",
 }
 
 var extendedStats = map[string]string{
@@ -119,6 +123,46 @@ var scriptableAggType = map[string]string{
 
 var pipelineAggWithMultipleBucketPathsType = map[string]string{
 	"bucket_script": "bucket_script",
+}
+
+// Sibling pipeline aggregations are composite metrics: they emit a hidden
+// terms aggregation (group-by field with an inner stat) plus an Elasticsearch
+// sibling pipeline aggregation over it. They are deliberately not part of
+// pipelineAggType, whose buckets_path machinery references other metric rows.
+var siblingPipelineAggType = map[string]string{
+	"sum_bucket": "sum_bucket",
+	"max_bucket": "max_bucket",
+	"min_bucket": "min_bucket",
+	"avg_bucket": "avg_bucket",
+}
+
+// siblingAggOuterName maps a sibling pipeline aggregation type to the word
+// used for its outer operation in generated series names, e.g. "Sum of Max".
+var siblingAggOuterName = map[string]string{
+	"sum_bucket": "Sum",
+	"max_bucket": "Max",
+	"min_bucket": "Min",
+	"avg_bucket": "Average",
+}
+
+var validSiblingInnerStats = map[string]struct{}{
+	"max": {},
+	"min": {},
+	"sum": {},
+	"avg": {},
+}
+
+const (
+	defaultSiblingInnerStat   = "max"
+	defaultSiblingBucketLimit = 500
+	// maxSiblingBucketLimit matches Elasticsearch's search.max_buckets ceiling
+	// for a single terms aggregation.
+	maxSiblingBucketLimit = 65535
+)
+
+func isSiblingPipelineAgg(metricType string) bool {
+	_, ok := siblingPipelineAggType[metricType]
+	return ok
 }
 
 func isPipelineAgg(metricType string) bool {
