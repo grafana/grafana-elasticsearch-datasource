@@ -1126,6 +1126,150 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, plAgg.BucketPath, "3")
 		})
 
+		t.Run("With sum_bucket sibling aggregation", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{
+						"id": "2",
+						"type": "sum_bucket",
+						"field": "storage_used",
+						"settings": { "metric": "max", "groupBy": "host", "limit": "500" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			firstLevel := sr.Aggs[0]
+			require.Equal(t, firstLevel.Key, "4")
+			require.Equal(t, firstLevel.Aggregation.Type, "date_histogram")
+			require.Len(t, firstLevel.Aggregation.Aggs, 2)
+
+			groupByAgg := firstLevel.Aggregation.Aggs[0]
+			require.Equal(t, groupByAgg.Key, "2_groupby")
+			require.Equal(t, groupByAgg.Aggregation.Type, "terms")
+			termsAgg := groupByAgg.Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, termsAgg.Field, "host")
+			require.Equal(t, termsAgg.Size, 500)
+
+			require.Len(t, groupByAgg.Aggregation.Aggs, 1)
+			innerAgg := groupByAgg.Aggregation.Aggs[0]
+			require.Equal(t, innerAgg.Key, "2_inner")
+			require.Equal(t, innerAgg.Aggregation.Type, "max")
+			innerMetric := innerAgg.Aggregation.Aggregation.(*es.MetricAggregation)
+			require.Equal(t, innerMetric.Field, "storage_used")
+
+			siblingAgg := firstLevel.Aggregation.Aggs[1]
+			require.Equal(t, siblingAgg.Key, "2")
+			require.Equal(t, siblingAgg.Aggregation.Type, "sum_bucket")
+			plAgg := siblingAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			require.Equal(t, plAgg.BucketPath, "2_groupby>2_inner")
+		})
+
+		t.Run("With max_bucket defaults applied", func(t *testing.T) {
+			// No inner metric or limit set: inner stat defaults to max, limit to 500.
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{
+						"id": "2",
+						"type": "max_bucket",
+						"field": "storage_used",
+						"settings": { "groupBy": "host" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			firstLevel := sr.Aggs[0]
+			groupByAgg := firstLevel.Aggregation.Aggs[0]
+			termsAgg := groupByAgg.Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, termsAgg.Size, 500)
+			require.Equal(t, groupByAgg.Aggregation.Aggs[0].Aggregation.Type, "max")
+			require.Equal(t, firstLevel.Aggregation.Aggs[1].Aggregation.Type, "max_bucket")
+		})
+
+		t.Run("With sibling aggregation limit clamped to elasticsearch maximum", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{
+						"id": "2",
+						"type": "sum_bucket",
+						"field": "storage_used",
+						"settings": { "groupBy": "host", "limit": "999999" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+			termsAgg := sr.Aggs[0].Aggregation.Aggs[0].Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, termsAgg.Size, 65535)
+		})
+
+		t.Run("With sibling aggregation invalid inner stat falls back to max", func(t *testing.T) {
+			// The inner stat becomes an aggregation type key in the request body,
+			// so unknown values must not pass through verbatim.
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{
+						"id": "2",
+						"type": "sum_bucket",
+						"field": "storage_used",
+						"settings": { "metric": "cardinality", "groupBy": "host" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+			require.Equal(t, sr.Aggs[0].Aggregation.Aggs[0].Aggregation.Aggs[0].Aggregation.Type, "max")
+		})
+
+		t.Run("With sibling aggregation missing groupBy is not emitted", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{ "id": "2", "type": "sum_bucket", "field": "storage_used", "settings": {} }
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+			require.Len(t, sr.Aggs[0].Aggregation.Aggs, 0)
+		})
+
+		t.Run("With sibling aggregation missing field is not emitted", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{ "id": "2", "type": "sum_bucket", "settings": { "groupBy": "host" } }
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+			require.Len(t, sr.Aggs[0].Aggregation.Aggs, 0)
+		})
+
 		t.Run("With derivative doc count", func(t *testing.T) {
 			// This test is with pipelineAgg and is passing. Same test without pipelineAgg is failing.
 			c := newFakeClient()
