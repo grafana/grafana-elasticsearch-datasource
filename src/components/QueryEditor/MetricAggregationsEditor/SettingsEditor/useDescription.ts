@@ -35,6 +35,16 @@ export const useDescription = (metric: MetricAggregation): string => {
       return `Size: ${size}`;
     }
 
+    case 'sum_bucket':
+    case 'max_bucket':
+    case 'min_bucket':
+    case 'avg_bucket': {
+      const inner = metric.settings?.metric || 'max';
+      const groupBy = metric.settings?.groupBy || 'not set';
+      const limit = metric.settings?.limit || '500';
+      return `Metric: ${inner}, Group by: ${groupBy}, Limit: ${limit}`;
+    }
+
     default:
       return 'Options';
   }

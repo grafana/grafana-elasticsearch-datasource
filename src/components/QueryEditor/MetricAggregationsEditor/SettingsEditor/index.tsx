@@ -8,13 +8,18 @@ import { ExtendedStat, MetricAggregation } from '../../../../dataquery.gen';
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
 import { extendedStats } from '../../../../queryDef';
 import { SettingsEditorContainer } from '../../SettingsEditorContainer';
-import { isMetricAggregationWithInlineScript, isMetricAggregationWithMissingSupport } from '../aggregations';
+import {
+  isMetricAggregationWithInlineScript,
+  isMetricAggregationWithMissingSupport,
+  isSiblingPipelineAggregation,
+} from '../aggregations';
 import { changeMetricMeta, changeMetricSetting } from '../state/actions';
 import { metricAggregationConfig } from '../utils';
 
 import { BucketScriptSettingsEditor } from './BucketScriptSettingsEditor';
 import { MovingAverageSettingsEditor } from './MovingAverageSettingsEditor';
 import { SettingField } from './SettingField';
+import { SiblingBucketSettingsEditor } from './SiblingBucketSettingsEditor';
 import { TopMetricsSettingsEditor } from './TopMetricsSettingsEditor';
 import { useDescription } from './useDescription';
 
@@ -76,6 +81,8 @@ export const SettingsEditor = ({ metric, previousMetrics }: Props) => {
       {metric.type === 'bucket_script' && (
         <BucketScriptSettingsEditor value={metric} previousMetrics={previousMetrics} />
       )}
+
+      {isSiblingPipelineAggregation(metric) && <SiblingBucketSettingsEditor metric={metric} />}
 
       {metric.type === 'cardinality' && (
         <SettingField label="Precision Threshold" metric={metric} settingName="precision_threshold" />
