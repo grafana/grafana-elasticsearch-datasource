@@ -2423,6 +2423,118 @@ func TestProcessBuckets(t *testing.T) {
 			require.Equal(t, frame.Fields[1].Len(), 2)
 			assert.Equal(t, frame.Name, "Average value")
 		})
+
+		t.Run("Sibling bucket aggregations", func(t *testing.T) {
+			t.Run("sum_bucket value is read per date histogram bucket and hidden terms agg is ignored", func(t *testing.T) {
+				targets := map[string]string{
+					"A": `{
+						"metrics": [
+							{
+								"id": "2",
+								"type": "sum_bucket",
+								"field": "storage_used",
+								"settings": { "metric": "max", "groupBy": "host", "limit": "500" }
+							}
+						],
+						"bucketAggs": [{ "type": "date_histogram", "field": "@timestamp", "id": "3" }]
+					}`,
+				}
+				// Each date_histogram bucket carries the hidden terms aggregation
+				// ("2_groupby", ignored by the parser) and the sibling value ("2").
+				// The final bucket has no matching documents: value is null.
+				response := `{
+					"responses": [
+						{
+							"aggregations": {
+								"3": {
+									"buckets": [
+										{
+											"key": 1000,
+											"doc_count": 10,
+											"2_groupby": {
+												"buckets": [
+													{ "key": "web-01", "doc_count": 5, "2_inner": { "value": 30 } },
+													{ "key": "web-02", "doc_count": 5, "2_inner": { "value": 18 } }
+												]
+											},
+											"2": { "value": 48 }
+										},
+										{
+											"key": 2000,
+											"doc_count": 8,
+											"2_groupby": {
+												"buckets": [
+													{ "key": "web-01", "doc_count": 4, "2_inner": { "value": 26 } },
+													{ "key": "web-02", "doc_count": 4, "2_inner": { "value": 18 } }
+												]
+											},
+											"2": { "value": 44 }
+										},
+										{
+											"key": 3000,
+											"doc_count": 0,
+											"2_groupby": { "buckets": [] },
+											"2": { "value": null }
+										}
+									]
+								}
+							}
+						}
+					]
+				}`
+				result, err := parseTestResponse(targets, response, false)
+				require.NoError(t, err)
+				require.Len(t, result.Responses, 1)
+
+				queryRes := result.Responses["A"]
+				require.NotNil(t, queryRes)
+				dataframes := queryRes.Frames
+				require.Len(t, dataframes, 1)
+
+				frame := dataframes[0]
+				require.Len(t, frame.Fields, 2)
+				require.Equal(t, frame.Fields[0].Len(), 3)
+				require.Equal(t, frame.Fields[1].Len(), 3)
+				require.Equal(t, *frame.Fields[1].At(0).(*float64), 48.0)
+				require.Equal(t, *frame.Fields[1].At(1).(*float64), 44.0)
+				require.Nil(t, frame.Fields[1].At(2).(*float64))
+				assert.Equal(t, frame.Name, "Sum of Max storage_used per host")
+			})
+
+			t.Run("max_bucket without explicit inner stat names series with default", func(t *testing.T) {
+				targets := map[string]string{
+					"A": `{
+						"metrics": [
+							{
+								"id": "2",
+								"type": "max_bucket",
+								"field": "storage_used",
+								"settings": { "groupBy": "host" }
+							}
+						],
+						"bucketAggs": [{ "type": "date_histogram", "field": "@timestamp", "id": "3" }]
+					}`,
+				}
+				response := `{
+					"responses": [
+						{
+							"aggregations": {
+								"3": {
+									"buckets": [
+										{ "key": 1000, "doc_count": 10, "2": { "value": 8 } }
+									]
+								}
+							}
+						}
+					]
+				}`
+				result, err := parseTestResponse(targets, response, false)
+				require.NoError(t, err)
+				frame := result.Responses["A"].Frames[0]
+				assert.Equal(t, frame.Name, "Max of Max storage_used per host")
+				require.Equal(t, *frame.Fields[1].At(0).(*float64), 8.0)
+			})
+		})
 	})
 
 	t.Run("Avg", func(t *testing.T) {
