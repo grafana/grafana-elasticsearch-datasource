@@ -1270,6 +1270,27 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Len(t, sr.Aggs[0].Aggregation.Aggs, 0)
 		})
 
+		t.Run("With sibling aggregation limit of -5 clamps to the default of 500", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{
+						"id": "2",
+						"type": "sum_bucket",
+						"field": "storage_used",
+						"settings": { "groupBy": "host", "limit": "-5" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+			termsAgg := sr.Aggs[0].Aggregation.Aggs[0].Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, 500, termsAgg.Size)
+		})
+
 		t.Run("With terms order pointing at a sibling metric, the sibling is not emitted as an order or a nested metric", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{

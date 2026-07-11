@@ -21,6 +21,15 @@ const QUERY_TYPE_LABELS: Array<{ value: QueryType; label: string }> = [
 const FIXTURE_FROM_ISO = '2026-03-17T21:00:00.000Z';
 const FIXTURE_TO_ISO = '2026-03-18T01:00:00.000Z';
 
+// Converts a UTC ISO-8601 timestamp (e.g. '2026-03-17T21:00:00.000Z') into the
+// 'YYYY-MM-DD HH:mm:ss' format explorePage.timeRange.set() expects. Dropping the
+// 'T' separator and the milliseconds/'Z' suffix is equivalent to the previous
+// hardcoded literals here, since the time range below is always set with an
+// explicit Coordinated Universal Time zone.
+function toTimeRangeInput(isoUtc: string): string {
+  return isoUtc.replace('T', ' ').replace(/\.\d+Z$/, '');
+}
+
 // Grafana 13 migrated query editor row selectors from aria-label to data-testid
 // (grafana/grafana#121784). This helper matches both so tests work across versions
 // until @grafana/plugin-e2e ships a fix and this repo upgrades.
@@ -386,8 +395,8 @@ test.describe('Query editor with fixture data', () => {
     }) => {
       await explorePage.datasource.set('infra');
       await explorePage.timeRange.set({
-        from: '2026-03-17 21:00:00',
-        to: '2026-03-18 01:00:00',
+        from: toTimeRangeInput(FIXTURE_FROM_ISO),
+        to: toTimeRangeInput(FIXTURE_TO_ISO),
         zone: 'Coordinated Universal Time',
       });
 

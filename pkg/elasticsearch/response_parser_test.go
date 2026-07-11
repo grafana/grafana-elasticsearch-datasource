@@ -2534,6 +2534,74 @@ func TestProcessBuckets(t *testing.T) {
 				assert.Equal(t, frame.Name, "Max of Max storage_used per host")
 				require.Equal(t, *frame.Fields[1].At(0).(*float64), 8.0)
 			})
+
+			t.Run("min_bucket without explicit inner stat names series with default", func(t *testing.T) {
+				targets := map[string]string{
+					"A": `{
+						"metrics": [
+							{
+								"id": "2",
+								"type": "min_bucket",
+								"field": "storage_used",
+								"settings": { "groupBy": "host" }
+							}
+						],
+						"bucketAggs": [{ "type": "date_histogram", "field": "@timestamp", "id": "3" }]
+					}`,
+				}
+				response := `{
+					"responses": [
+						{
+							"aggregations": {
+								"3": {
+									"buckets": [
+										{ "key": 1000, "doc_count": 10, "2": { "value": 8 } }
+									]
+								}
+							}
+						}
+					]
+				}`
+				result, err := parseTestResponse(targets, response, false)
+				require.NoError(t, err)
+				frame := result.Responses["A"].Frames[0]
+				assert.Equal(t, frame.Name, "Min of Max storage_used per host")
+				require.Equal(t, *frame.Fields[1].At(0).(*float64), 8.0)
+			})
+
+			t.Run("avg_bucket without explicit inner stat names series with default", func(t *testing.T) {
+				targets := map[string]string{
+					"A": `{
+						"metrics": [
+							{
+								"id": "2",
+								"type": "avg_bucket",
+								"field": "storage_used",
+								"settings": { "groupBy": "host" }
+							}
+						],
+						"bucketAggs": [{ "type": "date_histogram", "field": "@timestamp", "id": "3" }]
+					}`,
+				}
+				response := `{
+					"responses": [
+						{
+							"aggregations": {
+								"3": {
+									"buckets": [
+										{ "key": 1000, "doc_count": 10, "2": { "value": 8 } }
+									]
+								}
+							}
+						}
+					]
+				}`
+				result, err := parseTestResponse(targets, response, false)
+				require.NoError(t, err)
+				frame := result.Responses["A"].Frames[0]
+				assert.Equal(t, frame.Name, "Average of Max storage_used per host")
+				require.Equal(t, *frame.Fields[1].At(0).(*float64), 8.0)
+			})
 		})
 	})
 

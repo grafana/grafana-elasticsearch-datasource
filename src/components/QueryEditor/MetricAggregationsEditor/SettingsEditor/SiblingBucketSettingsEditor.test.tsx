@@ -1,8 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { from } from 'rxjs';
 
-import { getDefaultTimeRange } from '@grafana/data';
+import { getDefaultTimeRange, MetricFindValue } from '@grafana/data';
 import { ElasticsearchDataQuery, SumBucket } from '../../../../dataquery.gen';
 
 import { ElasticDatasource } from '../../../../datasource';
@@ -132,6 +133,42 @@ describe('SiblingBucketSettingsEditor', () => {
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
         metrics: [expect.objectContaining({ settings: expect.objectContaining({ metric: 'sum' }) })],
+      })
+    );
+  });
+
+  it('dispatches a groupBy setting change when a field is selected via the Group By picker', async () => {
+    const onChange = jest.fn();
+    const metricWithoutGroupBy: SumBucket = {
+      id: '1',
+      type: 'sum_bucket',
+      field: 'storage_used',
+      settings: { metric: 'max', limit: '500' },
+    };
+    const fieldAwareDatasource = {
+      getFields: jest.fn(() => from([[{ text: 'host' }] as MetricFindValue[]])),
+    } as unknown as ElasticDatasource;
+
+    render(
+      <ElasticsearchProvider
+        query={{ ...query, metrics: [metricWithoutGroupBy] }}
+        datasource={fieldAwareDatasource}
+        onChange={onChange}
+        onRunQuery={() => {}}
+        range={getDefaultTimeRange()}
+      >
+        <SettingsEditor metric={metricWithoutGroupBy} previousMetrics={[]} />
+      </ElasticsearchProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Metric: max, Group by: not set, Limit: 500/i }));
+
+    await userEvent.click(screen.getByText('Select Field'));
+    await userEvent.click(await screen.findByText('host'));
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metrics: [expect.objectContaining({ settings: expect.objectContaining({ groupBy: 'host' }) })],
       })
     );
   });

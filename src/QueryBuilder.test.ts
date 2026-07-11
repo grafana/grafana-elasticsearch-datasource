@@ -470,6 +470,27 @@ describe('ElasticQueryBuilder', () => {
     expect(query.aggs['3'].aggs).toEqual({});
   });
 
+  it('sibling aggregation with only groupBy applies true defaults', () => {
+    const query = builder.build({
+      refId: 'A',
+      metrics: [
+        {
+          id: '2',
+          type: 'sum_bucket',
+          field: 'storage_used',
+          settings: { groupBy: 'host' },
+        },
+      ],
+      timeField: '@timestamp',
+      bucketAggs: [{ type: 'date_histogram', field: '@timestamp', id: '3' }],
+    });
+
+    const firstLevel = query.aggs['3'];
+    expect(firstLevel.aggs['2_groupby'].terms).toEqual({ field: 'host', size: 500 });
+    expect(firstLevel.aggs['2_groupby'].aggs['2_inner'].max).toEqual({ field: 'storage_used' });
+    expect(firstLevel.aggs['2'].sum_bucket.buckets_path).toBe('2_groupby>2_inner');
+  });
+
   it('with term agg and order by pointing at a sibling metric', () => {
     const query = builder.build({
       refId: 'A',
