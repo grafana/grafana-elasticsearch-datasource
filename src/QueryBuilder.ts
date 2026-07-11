@@ -6,6 +6,7 @@ import {
   isMovingAverageWithModelSettings,
   isPipelineAggregation,
   isPipelineAggregationWithMultipleBucketPaths,
+  isSiblingPipelineAggregation,
 } from './components/QueryEditor/MetricAggregationsEditor/aggregations';
 import {
   DateHistogram,
@@ -17,11 +18,13 @@ import {
   Terms,
 } from './dataquery.gen';
 import {
+  clampSiblingBucketLimit,
   defaultBucketAgg,
   defaultGeoHashPrecisionString,
   findMetricById,
   highlightTags,
   queryTypeToMetricType,
+  SIBLING_INNER_STATS,
 } from './queryDef';
 import { QueryType, TermsQuery } from './types';
 import { convertOrderByToMetricId, getScriptValue } from './utils';
@@ -274,6 +277,27 @@ export class ElasticQueryBuilder {
     for (i = 0; i < target.metrics.length; i++) {
       metric = target.metrics[i];
       if (metric.type === 'count') {
+        continue;
+      }
+
+      if (isSiblingPipelineAggregation(metric)) {
+        // Composite sibling aggregation: hidden terms agg grouping by
+        // settings.groupBy with the inner stat nested inside, plus the
+        // sibling pipeline agg combining per-group results.
+        if (!metric.settings?.groupBy || !metric.field) {
+          continue;
+        }
+
+        const requestedStat = metric.settings.metric ?? '';
+        const innerStat = SIBLING_INNER_STATS.includes(requestedStat) ? requestedStat : 'max';
+
+        nestedAggs.aggs[`${metric.id}_groupby`] = {
+          terms: { field: metric.settings.groupBy, size: clampSiblingBucketLimit(metric.settings.limit) },
+          aggs: { [`${metric.id}_inner`]: { [innerStat]: { field: metric.field } } },
+        };
+        nestedAggs.aggs[metric.id] = {
+          [metric.type]: { buckets_path: `${metric.id}_groupby>${metric.id}_inner` },
+        };
         continue;
       }
 
