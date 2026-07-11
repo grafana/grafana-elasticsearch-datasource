@@ -139,6 +139,7 @@ func TestResponseSnapshots(t *testing.T) {
 		{name: "metric percentiles test", path: "metric_percentiles"},
 		{name: "metric top_metrics test", path: "metric_top_metrics"},
 		{name: "metric extended_stats test", path: "metric_extended_stats"},
+		{name: "metric sibling bucket test", path: "metric_sibling"},
 		{name: "raw data test", path: "raw_data"},
 		{name: "logs test", path: "logs"},
 	}
