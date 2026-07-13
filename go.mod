@@ -5,6 +5,7 @@ go 1.26.3
 require (
 	github.com/grafana/grafana-aws-sdk v1.4.3
 	github.com/grafana/grafana-plugin-sdk-go v0.292.1
+	github.com/grafana/macropro v1.0.0
 	github.com/grafana/schemads v0.0.8
 	github.com/magefile/mage v1.17.2
 	github.com/prometheus/client_golang v1.23.2

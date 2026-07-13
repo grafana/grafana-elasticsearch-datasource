@@ -30,13 +30,13 @@ func addDateHistogramAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, timeFro
 			a.CalendarInterval = interval
 		} else {
 			if interval == "auto" {
-				// note this is not really a valid grafana-variable-handling,
-				// because normally this would not match `$__interval_ms`,
-				// but because how we apply these in the go-code, this will work
-				// correctly, and becomes something like `500ms`.
-				// a nicer way would be to use `${__interval_ms}ms`, but
-				// that format is not recognized where we apply these variables
-				// in the elasticsearch datasource
+				// $__interval_msms is a dedicated macro (see searchBodyMacros
+				// in client/macros.go) that expands to the interval in
+				// milliseconds with an explicit "ms" unit, e.g. "500ms".
+				// fixed_interval needs a single-unit value, and the
+				// milliseconds form is valid for any interval, unlike
+				// $__interval whose time.Duration formatting can produce
+				// multi-unit values such as "1m30s".
 				a.FixedInterval = "$__interval_msms"
 			} else {
 				a.FixedInterval = interval
