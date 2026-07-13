@@ -43,6 +43,30 @@ func TestInterpolateEsqlQuery(t *testing.T) {
 			index:    "logs-*",
 			expected: "FROM logs-* | WHERE ts > $__timeFrom",
 		},
+		{
+			name:     "index pattern lists expand verbatim",
+			query:    "FROM $__index | LIMIT 10",
+			index:    "logs-*,metrics-*",
+			expected: "FROM logs-*,metrics-* | LIMIT 10",
+		},
+		{
+			name:     "macro names are case sensitive",
+			query:    "FROM $__INDEX | LIMIT 10",
+			index:    "logs-*",
+			expected: "FROM $__INDEX | LIMIT 10",
+		},
+		{
+			name:     "macros inside ES|QL comments still expand",
+			query:    "FROM $__index // $__index\n| LIMIT 10",
+			index:    "logs-*",
+			expected: "FROM logs-* // logs-*\n| LIMIT 10",
+		},
+		{
+			name:     "macros inside ES|QL string literals still expand",
+			query:    `FROM $__index | WHERE msg == "$__index"`,
+			index:    "logs-*",
+			expected: `FROM logs-* | WHERE msg == "logs-*"`,
+		},
 	}
 
 	for _, tt := range tests {
