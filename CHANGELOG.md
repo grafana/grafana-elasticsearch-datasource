@@ -1,5 +1,27 @@
 # Changelog
 
+## 12.7.0
+
+- Feature: Remove `elasticsearchRawDSLQuery` and `elasticsearchESQLQuery` feature toggles — raw DSL and ES|QL editors are now always available [#358](https://github.com/grafana/grafana-elasticsearch-datasource/pull/358)
+- Feature: Support PromQL source commands in ES|QL metrics queries [#332](https://github.com/grafana/grafana-elasticsearch-datasource/pull/332)
+- Fix: Migrate legacy variable queries so template variables keep working [#231](https://github.com/grafana/grafana-elasticsearch-datasource/pull/231)
+- Fix: Harden Elasticsearch backend against malformed responses and edge-case aggregations [#345](https://github.com/grafana/grafana-elasticsearch-datasource/pull/345)
+- Fix: Include prereleases when matching ES version against metric ranges [#323](https://github.com/grafana/grafana-elasticsearch-datasource/pull/323)
+- Fix: Load logs volume for raw DSL (Code editor) logs queries [#342](https://github.com/grafana/grafana-elasticsearch-datasource/pull/342)
+- Fix: Align value with `key_as_string` for typed Elasticsearch bucket fields [#324](https://github.com/grafana/grafana-elasticsearch-datasource/pull/324)
+- Fix: Word-wrap long Lucene queries instead of overflowing the input [#349](https://github.com/grafana/grafana-elasticsearch-datasource/pull/349)
+- Fix: Show per-level breakdown in Explore logs volume [#326](https://github.com/grafana/grafana-elasticsearch-datasource/pull/326)
+- Fix(esql): Inject time range when query contains template variables [#340](https://github.com/grafana/grafana-elasticsearch-datasource/pull/340)
+- Refactor: Add frontend query validation layer [#276](https://github.com/grafana/grafana-elasticsearch-datasource/pull/276)
+- Chore: Lock in UTC resolution for hourly index patterns in tests [#325](https://github.com/grafana/grafana-elasticsearch-datasource/pull/325)
+- Chore: Use shared data-sources Renovate base preset [#354](https://github.com/grafana/grafana-elasticsearch-datasource/pull/354)
+- CI: Add add-to-project workflow and remove issue_commands [#352](https://github.com/grafana/grafana-elasticsearch-datasource/pull/352)
+- CI: Update plugin-ci-workflows [#348](https://github.com/grafana/grafana-elasticsearch-datasource/pull/348)
+- Docs: Add signed commits requirement to CONTRIBUTING.md [#351](https://github.com/grafana/grafana-elasticsearch-datasource/pull/351)
+- Dependency updates:
+  - Fix(deps): Update grafana monorepo to v13 [#338](https://github.com/grafana/grafana-elasticsearch-datasource/pull/338)
+  - Chore(deps): Update Node.js to v24.17.0 [#335](https://github.com/grafana/grafana-elasticsearch-datasource/pull/335)
+
 ## 12.6.5
 
 - Fix: Preserve Lucene query when switching between metric aggregations [#328](https://github.com/grafana/grafana-elasticsearch-datasource/pull/328)
