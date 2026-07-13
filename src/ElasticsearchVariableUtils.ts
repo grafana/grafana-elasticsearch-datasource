@@ -15,7 +15,17 @@ export const migrateVariableQuery = (rawQuery: string | ElasticsearchDataQuery):
       meta: rawQuery.meta,
     };
   }
-  // Legacy string-based query
+
+  // Legacy string-based query. This covers the old Grafana-syntax forms
+  // ({"find":"terms","field":"..."} and {"find":"fields",...}) as well as plain Lucene strings.
+  // All of them route through metricFindQuery() -> getTerms()/getFields() — the same path core
+  // Grafana uses (grafana/grafana#120836), which is what this PR extends.
+  //
+  // We deliberately do NOT translate {"find":"terms"} into a raw DSL query: that path is gated
+  // behind the elasticsearchRawDSLQuery backend toggle, produces an empty frame without a metric,
+  // and bypasses getTerms() (losing the boolean key_as_string fix, issue #106053). Routing
+  // through metricFindQuery() resolves values with no toggle dependency and keeps
+  // {"find":"terms"} variables working after externalisation (issue #319).
   return {
     refId,
     query: rawQuery,

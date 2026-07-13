@@ -61,8 +61,14 @@ func parseResponse(ctx context.Context, responses []*es.SearchResponse, targets 
 	metricsProcessor := newMetricsResponseProcessor()
 
 	for i, res := range responses {
+		// Raw DSL queries (e.g. migrated from {"find":"terms"}) carry no structured metrics,
+		// so guard against an empty Metrics slice before reading it for the trace attribute.
+		queryMetricType := ""
+		if len(targets[i].Metrics) > 0 {
+			queryMetricType = targets[i].Metrics[0].Type
+		}
 		_, resSpan := tracing.DefaultTracer().Start(ctx, "datasource.elastic.parseResponse.response", trace.WithAttributes(
-			attribute.String("queryMetricType", targets[i].Metrics[0].Type),
+			attribute.String("queryMetricType", queryMetricType),
 		))
 		start := time.Now()
 		target := targets[i]

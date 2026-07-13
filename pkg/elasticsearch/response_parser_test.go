@@ -3792,6 +3792,44 @@ func TestFiltersAggregation_KeyedBuckets(t *testing.T) {
 	})
 }
 
+func TestParseResponseRawDSLWithoutMetrics(t *testing.T) {
+	// A raw DSL variable query — e.g. one migrated from {"find":"terms"} by
+	// migrateVariableQuery — carries no structured metrics. parseResponse must not panic
+	// when Metrics is empty (it previously indexed Metrics[0] unconditionally for a trace
+	// attribute, crashing with "index out of range [0] with length 0").
+	targets := map[string]string{
+		"A": `{
+			"refId": "A",
+			"queryType": "dsl",
+			"editorType": "code",
+			"query": "{\"size\":0,\"aggs\":{\"1\":{\"terms\":{\"field\":\"method.keyword\"}}}}"
+		}`,
+	}
+	response := `{
+		"responses": [
+			{
+				"aggregations": {
+					"1": {
+						"buckets": [
+							{ "key": "GET", "doc_count": 10 },
+							{ "key": "POST", "doc_count": 5 }
+						]
+					}
+				}
+			}
+		]
+	}`
+
+	var result *backend.QueryDataResponse
+	var err error
+	require.NotPanics(t, func() {
+		result, err = parseTestResponse(targets, response, false)
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Responses["A"])
+	require.NoError(t, result.Responses["A"].Error)
+}
+
 func parseTestResponse(tsdbQueries map[string]string, responseBody string, keepLabelsInResponse bool) (*backend.QueryDataResponse, error) {
 	from := time.Date(2018, 5, 15, 17, 50, 0, 0, time.UTC)
 	to := time.Date(2018, 5, 15, 17, 55, 0, 0, time.UTC)
