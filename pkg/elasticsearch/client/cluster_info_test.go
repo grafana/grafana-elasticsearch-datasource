@@ -3,6 +3,7 @@ package client
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -138,6 +139,162 @@ func TestGetClusterInfo(t *testing.T) {
 		require.Equal(t, ClusterInfo{}, clusterInfo)
 		assert.Contains(t, err.Error(), "unexpected status code 401 getting ES cluster info")
 	})
+}
+
+func TestGetClusterInfo_DetectionFields(t *testing.T) {
+	t.Run("Should capture version number, tagline and product header", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			rw.Header().Set("Content-Type", "application/json")
+			rw.Header().Set("X-Elastic-Product", "Elasticsearch")
+			_, err := rw.Write([]byte(`{
+				"name": "test-node",
+				"cluster_name": "elasticsearch",
+				"version": {
+					"number": "9.1.0",
+					"build_flavor": "default"
+				},
+				"tagline": "You Know, for Search"
+			}`))
+			require.NoError(t, err)
+		}))
+
+		t.Cleanup(func() {
+			ts.Close()
+		})
+
+		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+
+		require.NoError(t, err)
+		assert.Equal(t, "9.1.0", clusterInfo.Version.Number)
+		assert.Equal(t, "You Know, for Search", clusterInfo.Tagline)
+		assert.Equal(t, "Elasticsearch", clusterInfo.Product)
+	})
+
+	t.Run("Should capture reported distribution when present", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			rw.Header().Set("Content-Type", "application/json")
+			_, err := rw.Write([]byte(`{
+				"name": "test-node",
+				"cluster_name": "test-cluster",
+				"version": {
+					"distribution": "customdistro",
+					"number": "2.11.0",
+					"build_type": "tar",
+					"minimum_wire_compatibility_version": "7.10.0"
+				},
+				"tagline": "The CustomDistro Project"
+			}`))
+			require.NoError(t, err)
+		}))
+
+		t.Cleanup(func() {
+			ts.Close()
+		})
+
+		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+
+		require.NoError(t, err)
+		assert.Equal(t, "customdistro", clusterInfo.Version.Distribution)
+		assert.Equal(t, "2.11.0", clusterInfo.Version.Number)
+		assert.Equal(t, "The CustomDistro Project", clusterInfo.Tagline)
+		assert.Equal(t, "", clusterInfo.Product)
+	})
+}
+
+func TestClusterInfo_Distribution(t *testing.T) {
+	tests := []struct {
+		name        string
+		clusterInfo ClusterInfo
+		expected    string
+	}{
+		{
+			name: "serverless build flavor",
+			clusterInfo: ClusterInfo{
+				Product: "Elasticsearch",
+				Version: VersionInfo{Number: "8.11.0", BuildFlavor: BuildFlavorServerless},
+				Tagline: "You Know, for Search",
+			},
+			expected: DistributionElasticsearchServerless,
+		},
+		{
+			name: "product header present",
+			clusterInfo: ClusterInfo{
+				Product: "Elasticsearch",
+				Version: VersionInfo{Number: "9.1.0", BuildFlavor: "default"},
+				Tagline: "You Know, for Search",
+			},
+			expected: DistributionElasticsearch,
+		},
+		{
+			name: "reported distribution value used verbatim",
+			clusterInfo: ClusterInfo{
+				Version: VersionInfo{Number: "2.11.0", Distribution: "customdistro"},
+				Tagline: "The CustomDistro Project",
+			},
+			expected: "customdistro",
+		},
+		{
+			name: "reported distribution value is lowercased",
+			clusterInfo: ClusterInfo{
+				Version: VersionInfo{Number: "2.11.0", Distribution: "CustomDistro"},
+			},
+			expected: "customdistro",
+		},
+		{
+			name: "spoofed version number falls back to tagline",
+			clusterInfo: ClusterInfo{
+				Version: VersionInfo{Number: "7.10.2"},
+				Tagline: "The " + taglineDistribution + " Project",
+			},
+			expected: taglineDistribution,
+		},
+		{
+			name: "tagline matching is case-insensitive",
+			clusterInfo: ClusterInfo{
+				Version: VersionInfo{Number: "7.10.2"},
+				Tagline: "The " + strings.ToUpper(taglineDistribution) + " Project",
+			},
+			expected: taglineDistribution,
+		},
+		{
+			name: "legacy version without product header falls back to tagline",
+			clusterInfo: ClusterInfo{
+				Version: VersionInfo{Number: "7.10.2", BuildFlavor: "default"},
+				Tagline: "You Know, for Search",
+			},
+			expected: DistributionElasticsearch,
+		},
+		{
+			name:        "no detection signals",
+			clusterInfo: ClusterInfo{},
+			expected:    DistributionUnknown,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, tc.clusterInfo.Distribution())
+		})
+	}
+}
+
+func TestClusterInfo_VersionMajor(t *testing.T) {
+	tests := []struct {
+		name     string
+		number   string
+		expected string
+	}{
+		{name: "major.minor.patch", number: "8.19.4", expected: "8"},
+		{name: "pre-release suffix", number: "9.0.0-SNAPSHOT", expected: "9"},
+		{name: "empty version", number: "", expected: DistributionUnknown},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			clusterInfo := ClusterInfo{Version: VersionInfo{Number: tc.number}}
+			assert.Equal(t, tc.expected, clusterInfo.VersionMajor())
+		})
+	}
 }
 
 func TestClusterInfo_IsServerless(t *testing.T) {
