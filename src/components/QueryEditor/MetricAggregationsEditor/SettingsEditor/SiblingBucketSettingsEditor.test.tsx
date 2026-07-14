@@ -109,6 +109,35 @@ describe('SiblingBucketSettingsEditor', () => {
     expect(screen.getByRole('button', { name: /Metric: max, Group by: not set, Limit: 500/i })).toBeInTheDocument();
   });
 
+  it('shows the effective inner stat when the query model holds an invalid one', () => {
+    // Query emission falls back to max for unknown inner stats, so the
+    // description and select must not echo the invalid value.
+    const metricWithInvalidStat: SumBucket = {
+      id: '1',
+      type: 'sum_bucket',
+      field: 'storage_used',
+      settings: { metric: 'cardinality', groupBy: 'host', limit: '500' },
+    };
+
+    render(
+      <ElasticsearchProvider
+        query={{ ...query, metrics: [metricWithInvalidStat] }}
+        datasource={datasource}
+        onChange={() => {}}
+        onRunQuery={() => {}}
+        range={getDefaultTimeRange()}
+      >
+        <SettingsEditor metric={metricWithInvalidStat} previousMetrics={[]} />
+      </ElasticsearchProvider>
+    );
+
+    const settingsButton = screen.getByRole('button', { name: /Metric: max, Group by: host, Limit: 500/i });
+    fireEvent.click(settingsButton);
+
+    expect(screen.queryByText('cardinality')).not.toBeInTheDocument();
+    expect(screen.getByText('Max')).toBeInTheDocument();
+  });
+
   it('dispatches a metric setting change when a different inner stat is selected', async () => {
     const onChange = jest.fn();
 

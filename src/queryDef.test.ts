@@ -93,6 +93,12 @@ describe('ElasticQueryDef', () => {
       expect(clampSiblingBucketLimit('-5')).toBe(500);
     });
 
+    test('rejects partial numeric strings for parity with the backend strconv.Atoi', () => {
+      expect(clampSiblingBucketLimit('500abc')).toBe(500);
+      expect(clampSiblingBucketLimit('1e3')).toBe(500);
+      expect(clampSiblingBucketLimit('50.5')).toBe(500);
+    });
+
     test('passes through valid values and clamps to the elasticsearch maximum', () => {
       expect(clampSiblingBucketLimit('50')).toBe(50);
       expect(clampSiblingBucketLimit('65535')).toBe(65535);

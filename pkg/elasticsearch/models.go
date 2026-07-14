@@ -155,8 +155,9 @@ var validSiblingInnerStats = map[string]struct{}{
 const (
 	defaultSiblingInnerStat   = "max"
 	defaultSiblingBucketLimit = 500
-	// maxSiblingBucketLimit matches Elasticsearch's search.max_buckets ceiling
-	// for a single terms aggregation.
+	// maxSiblingBucketLimit is a conservative cap just below Elasticsearch's
+	// default search.max_buckets ceiling (65536), which bounds the total buckets
+	// a request may create across all aggregations.
 	maxSiblingBucketLimit = 65535
 )
 

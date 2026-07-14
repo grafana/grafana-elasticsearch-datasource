@@ -27,7 +27,7 @@ const FIXTURE_TO_ISO = '2026-03-18T01:00:00.000Z';
 // hardcoded literals here, since the time range below is always set with an
 // explicit Coordinated Universal Time zone.
 function toTimeRangeInput(isoUtc: string): string {
-  return isoUtc.replace('T', ' ').replace(/\.\d+Z$/, '');
+  return isoUtc.replace('T', ' ').replace(/(?:\.\d+)?Z$/, '');
 }
 
 // Grafana 13 migrated query editor row selectors from aria-label to data-testid

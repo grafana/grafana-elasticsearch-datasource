@@ -38,11 +38,14 @@ export const siblingInnerStatOptions: Array<{ label: string; value: string }> = 
 export const SIBLING_INNER_STATS = siblingInnerStatOptions.map((o) => o.value);
 
 export const SIBLING_BUCKET_DEFAULT_LIMIT = 500;
-// Matches Elasticsearch's search.max_buckets ceiling for a single terms aggregation.
+// Conservative cap just below Elasticsearch's default search.max_buckets ceiling (65536),
+// which bounds the total buckets a request may create across all aggregations.
 export const SIBLING_BUCKET_MAX_LIMIT = 65535;
 
 export function clampSiblingBucketLimit(value?: string): number {
-  const parsed = parseInt(value ?? '', 10);
+  // Strict integer parse for parity with the backend's strconv.Atoi: partial
+  // numeric strings like "500abc", "1e3" or "50.5" fall back to the default.
+  const parsed = /^[+-]?\d+$/.test(value ?? '') ? Number(value) : NaN;
   if (isNaN(parsed) || parsed < 1) {
     return SIBLING_BUCKET_DEFAULT_LIMIT;
   }

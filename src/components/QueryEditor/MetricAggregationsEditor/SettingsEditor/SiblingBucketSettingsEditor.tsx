@@ -6,7 +6,7 @@ import { InlineField, SegmentAsync, Select } from '@grafana/ui';
 import { BaseSiblingPipelineMetricAggregation } from '../../../../dataquery.gen';
 import { useFields } from '../../../../hooks/useFields';
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
-import { siblingInnerStatOptions } from '../../../../queryDef';
+import { SIBLING_INNER_STATS, siblingInnerStatOptions } from '../../../../queryDef';
 import { changeMetricSetting } from '../state/actions';
 
 import { SettingField } from './SettingField';
@@ -19,6 +19,10 @@ export const SiblingBucketSettingsEditor = ({ metric }: Props) => {
   const dispatch = useDispatch();
   const getGroupByOptions = useFields([]);
   const metricFieldId = useId();
+  // Show the effective inner stat: query emission falls back to max for
+  // unknown values, so the select must not echo an invalid one.
+  const requestedStat = metric.settings?.metric ?? '';
+  const innerStat = SIBLING_INNER_STATS.includes(requestedStat) ? requestedStat : 'max';
 
   return (
     <>
@@ -32,7 +36,7 @@ export const SiblingBucketSettingsEditor = ({ metric }: Props) => {
           id={metricFieldId}
           onChange={(e) => dispatch(changeMetricSetting({ metric, settingName: 'metric', newValue: e.value }))}
           options={siblingInnerStatOptions}
-          value={metric.settings?.metric || 'max'}
+          value={innerStat}
         />
       </InlineField>
       <InlineField
