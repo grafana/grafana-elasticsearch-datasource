@@ -10,6 +10,7 @@ import { useFields } from '../../../hooks/useFields';
 import { useDispatch } from '../../../hooks/useStatelessReducer';
 import { MetricPicker } from '../../MetricPicker';
 import { useDatasource, useQuery } from '../ElasticsearchQueryContext';
+import { resolvePreserveQuery } from '../preserveQueryPreference';
 import { segmentStyles } from '../styles';
 
 import { SettingsEditor } from './SettingsEditor';
@@ -98,7 +99,16 @@ export const MetricEditor = ({ value }: Props) => {
         <SegmentAsync
           className={cx(styles.color, segmentStyles)}
           loadOptions={() => getTypeOptionsAsync(previousMetrics)}
-          onChange={(e) => dispatch(changeMetricType({ id: value.id, type: e.value!, previousType: value.type }))}
+          onChange={(e) =>
+            dispatch(
+              changeMetricType({
+                id: value.id,
+                type: e.value!,
+                previousType: value.type,
+                preserveQuery: resolvePreserveQuery(query.preserveQuery),
+              })
+            )
+          }
           value={toOption(value)}
         />
 

@@ -120,6 +120,35 @@ describe('Query Reducer', () => {
         .whenActionIsDispatched(changeMetricType({ id: '1', type: 'avg' }))
         .thenStateShouldEqual('');
     });
+
+    it('Should preserve query when preserveQuery is true, even switching logs -> metrics', () => {
+      const initialQuery: ElasticsearchDataQuery['query'] = 'some logs query';
+
+      reducerTester<ElasticsearchDataQuery['query']>()
+        .givenReducer(queryReducer, initialQuery)
+        .whenActionIsDispatched(changeMetricType({ id: '1', type: 'avg', previousType: 'logs', preserveQuery: true }))
+        .thenStateShouldEqual(initialQuery);
+    });
+
+    it('Should preserve query when preserveQuery is true, even switching to raw_data', () => {
+      const initialQuery: ElasticsearchDataQuery['query'] = 'field:value';
+
+      reducerTester<ElasticsearchDataQuery['query']>()
+        .givenReducer(queryReducer, initialQuery)
+        .whenActionIsDispatched(
+          changeMetricType({ id: '1', type: 'raw_data', previousType: 'avg', preserveQuery: true })
+        )
+        .thenStateShouldEqual(initialQuery);
+    });
+
+    it('Should still clear query when preserveQuery is false, even if it were true before', () => {
+      const initialQuery: ElasticsearchDataQuery['query'] = 'field:value';
+
+      reducerTester<ElasticsearchDataQuery['query']>()
+        .givenReducer(queryReducer, initialQuery)
+        .whenActionIsDispatched(changeMetricType({ id: '1', type: 'logs', previousType: 'avg', preserveQuery: false }))
+        .thenStateShouldEqual('');
+    });
   });
 });
 
