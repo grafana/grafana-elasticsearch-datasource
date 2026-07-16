@@ -486,6 +486,29 @@ func TestDatasourceInstanceGauge(t *testing.T) {
 
 		require.Equal(t, before, gaugeValue(t, gauge))
 	})
+
+	t.Run("repeated Dispose decrements the gauge only once", func(t *testing.T) {
+		// The SDK schedules Dispose on a cached instance before attempting its
+		// replacement. When constructing the replacement fails, the old
+		// instance stays cached and a later settings change schedules Dispose
+		// on it again.
+		server := mockElasticsearchServer()
+		defer server.Close()
+
+		gauge := instrumentation.DatasourceInstances.WithLabelValues(es.DistributionElasticsearchServerless, "8")
+		before := gaugeValue(t, gauge)
+
+		instance, err := NewDatasource(context.Background(), backend.DataSourceInstanceSettings{
+			URL:      server.URL,
+			JSONData: json.RawMessage(`{"timeField": "@timestamp"}`),
+		})
+		require.NoError(t, err)
+
+		ds := unwrapTestDatasource(t, instance)
+		ds.Dispose()
+		ds.Dispose()
+		require.Equal(t, before, gaugeValue(t, gauge))
+	})
 }
 
 func TestCreateElasticsearchURL(t *testing.T) {

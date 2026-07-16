@@ -12,6 +12,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/grafana/grafana-aws-sdk/pkg/awsauth"
@@ -79,6 +80,11 @@ type DataSource struct {
 	// the instance was never registered.
 	distribution string
 	versionMajor string
+	// disposeOnce caps the gauge decrement at one per instance: the SDK
+	// schedules Dispose before attempting a replacement, so a failed
+	// replacement leaves this instance cached and a later settings change
+	// disposes it again, concurrently in the worst case.
+	disposeOnce sync.Once
 }
 
 func (ds *DataSource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
@@ -94,7 +100,9 @@ func (ds *DataSource) Dispose() {
 		ds.info.HTTPClient.CloseIdleConnections()
 	}
 	if ds.distribution != "" {
-		instrumentation.DatasourceInstances.WithLabelValues(ds.distribution, ds.versionMajor).Dec()
+		ds.disposeOnce.Do(func() {
+			instrumentation.DatasourceInstances.WithLabelValues(ds.distribution, ds.versionMajor).Dec()
+		})
 	}
 }
 
