@@ -11,9 +11,12 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
+	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/instrumentation"
 )
 
 func unwrapTestDatasource(t *testing.T, instance instancemgmt.Instance) *DataSource {
@@ -422,6 +425,89 @@ func TestDispose(t *testing.T) {
 	t.Run("is safe to call when info is nil", func(t *testing.T) {
 		ds := &DataSource{}
 		require.NotPanics(t, func() { ds.Dispose() })
+	})
+}
+
+func gaugeValue(t *testing.T, gauge prometheus.Gauge) float64 {
+	t.Helper()
+	var m dto.Metric
+	require.NoError(t, gauge.Write(&m))
+	return m.GetGauge().GetValue()
+}
+
+func TestDatasourceInstanceGauge(t *testing.T) {
+	t.Run("NewDatasource increments the instance gauge and Dispose decrements it", func(t *testing.T) {
+		// mockElasticsearchServer reports build_flavor serverless and version 8.0.0
+		server := mockElasticsearchServer()
+		defer server.Close()
+
+		gauge := instrumentation.DatasourceInstances.WithLabelValues(es.DistributionElasticsearchServerless, "8")
+		before := gaugeValue(t, gauge)
+
+		instance, err := NewDatasource(context.Background(), backend.DataSourceInstanceSettings{
+			URL:      server.URL,
+			JSONData: json.RawMessage(`{"timeField": "@timestamp"}`),
+		})
+		require.NoError(t, err)
+		require.Equal(t, before+1, gaugeValue(t, gauge))
+
+		ds := unwrapTestDatasource(t, instance)
+		ds.Dispose()
+		require.Equal(t, before, gaugeValue(t, gauge))
+	})
+
+	t.Run("gauge reports unknown labels when the root endpoint is not accessible", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+		}))
+		defer server.Close()
+
+		gauge := instrumentation.DatasourceInstances.WithLabelValues(es.DistributionUnknown, es.DistributionUnknown)
+		before := gaugeValue(t, gauge)
+
+		instance, err := NewDatasource(context.Background(), backend.DataSourceInstanceSettings{
+			URL:      server.URL,
+			JSONData: json.RawMessage(`{"timeField": "@timestamp"}`),
+		})
+		require.NoError(t, err)
+		require.Equal(t, before+1, gaugeValue(t, gauge))
+
+		ds := unwrapTestDatasource(t, instance)
+		ds.Dispose()
+		require.Equal(t, before, gaugeValue(t, gauge))
+	})
+
+	t.Run("Dispose does not decrement for instances that never registered", func(t *testing.T) {
+		gauge := instrumentation.DatasourceInstances.WithLabelValues(es.DistributionUnknown, es.DistributionUnknown)
+		before := gaugeValue(t, gauge)
+
+		ds := &DataSource{info: &es.DatasourceInfo{}}
+		ds.Dispose()
+
+		require.Equal(t, before, gaugeValue(t, gauge))
+	})
+
+	t.Run("repeated Dispose decrements the gauge only once", func(t *testing.T) {
+		// The SDK schedules Dispose on a cached instance before attempting its
+		// replacement. When constructing the replacement fails, the old
+		// instance stays cached and a later settings change schedules Dispose
+		// on it again.
+		server := mockElasticsearchServer()
+		defer server.Close()
+
+		gauge := instrumentation.DatasourceInstances.WithLabelValues(es.DistributionElasticsearchServerless, "8")
+		before := gaugeValue(t, gauge)
+
+		instance, err := NewDatasource(context.Background(), backend.DataSourceInstanceSettings{
+			URL:      server.URL,
+			JSONData: json.RawMessage(`{"timeField": "@timestamp"}`),
+		})
+		require.NoError(t, err)
+
+		ds := unwrapTestDatasource(t, instance)
+		ds.Dispose()
+		ds.Dispose()
+		require.Equal(t, before, gaugeValue(t, gauge))
 	})
 }
 
