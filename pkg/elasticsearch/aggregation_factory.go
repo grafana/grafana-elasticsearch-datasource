@@ -120,6 +120,13 @@ func addTermsAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, metrics []*Metr
 			} else {
 				a.Order[orderBy] = bucketAgg.Settings.Get("order").MustString("desc")
 			}
+		} else {
+			// Queries saved before the editor stored its defaults can omit the
+			// ordering options. Apply the same default the editor displays
+			// (Order by: Term value, descending) so the query keeps the meaning
+			// shown in the UI instead of falling back to Elasticsearch's
+			// _count ordering.
+			a.Order["_term"] = bucketAgg.Settings.Get("order").MustString("desc")
 		}
 
 		aggBuilder = b

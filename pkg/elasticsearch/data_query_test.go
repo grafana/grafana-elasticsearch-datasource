@@ -280,6 +280,55 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, termsAgg.Order["_key"], "asc")
 		})
 
+		t.Run("With term agg and no order settings", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{
+						"type": "terms",
+						"field": "@host",
+						"id": "2",
+						"settings": { "size": "5" }
+					},
+					{ "type": "date_histogram", "field": "@timestamp", "id": "3" }
+				],
+				"metrics": [
+					{"type": "count", "id": "1" }
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			// The editor displays "Order by: Term value, Top" when the ordering
+			// options are missing, so the built query must match it rather than
+			// fall back to Elasticsearch's _count ordering.
+			termsAgg := sr.Aggs[0].Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, termsAgg.Order["_key"], "desc")
+		})
+
+		t.Run("With term agg and order but no orderBy", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{
+						"type": "terms",
+						"field": "@host",
+						"id": "2",
+						"settings": { "size": "5", "order": "asc" }
+					},
+					{ "type": "date_histogram", "field": "@timestamp", "id": "3" }
+				],
+				"metrics": [
+					{"type": "count", "id": "1" }
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			termsAgg := sr.Aggs[0].Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, termsAgg.Order["_key"], "asc")
+		})
+
 		t.Run("With term agg and valid min_doc_count (from frontend tests)", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
