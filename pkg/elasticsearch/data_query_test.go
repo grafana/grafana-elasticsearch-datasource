@@ -2017,6 +2017,33 @@ func TestExecuteElasticsearchDataQuery_EdgeCases(t *testing.T) {
 				"bucket_script with no resolvable pipeline variables must not be emitted")
 		}
 	})
+
+	t.Run("bucket_script drops numeric references to deleted metrics but keeps resolved ones", func(t *testing.T) {
+		c := newFakeClient()
+		_, err := executeElasticsearchDataQuery(c, `{
+			"bucketAggs": [{ "type": "date_histogram", "field": "@timestamp", "id": "2" }],
+			"metrics": [
+				{ "id": "1", "type": "sum", "field": "@value" },
+				{
+					"id": "4",
+					"type": "bucket_script",
+					"pipelineVariables": [
+						{ "name": "var1", "pipelineAgg": "1" },
+						{ "name": "var2", "pipelineAgg": "999" }
+					],
+					"settings": { "script": "params.var1 * 2" }
+				}
+			]
+		}`, from, to)
+		require.NoError(t, err)
+
+		sr := c.multisearchRequests[0].Requests[0]
+		bucketScriptAgg := findSubAggByKey(t, sr.Aggs[0].Aggregation.Aggs, "4")
+		require.NotNil(t, bucketScriptAgg)
+		plAgg := bucketScriptAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+		require.Equal(t, map[string]any{"var1": "1"}, plAgg.BucketPath,
+			"numeric reference to a deleted metric must be dropped, resolved reference kept")
+	})
 }
 
 func newFakeClient() *fakeClient {
@@ -2267,5 +2294,73 @@ func TestRawDSLQuery(t *testing.T) {
 			require.Contains(t, string(body), `"term"`)
 			require.Contains(t, string(body), "tempo")
 		})
+
+		// A raw-DSL bucket_script references its sibling metrics by their aggregation names
+		// (the parser adopts the DSL agg name as the metric ID), not by numeric builder IDs.
+		// The rebuilt request must keep the bucket_script with its named buckets_path instead
+		// of silently dropping it because the references fail the numeric-ID check.
+		t.Run("DSL bucket_script with named buckets_path referencing a sibling metric is kept", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"refId": "A",
+				"queryType": "dsl",
+				"editorType": "code",
+				"metrics": [{ "type": "count", "id": "1" }],
+				"query": "{\"size\":0,\"aggs\":{\"per_min\":{\"date_histogram\":{\"field\":\"@timestamp\",\"fixed_interval\":\"1m\"},\"aggs\":{\"total_sales\":{\"sum\":{\"field\":\"price\"}},\"pct\":{\"bucket_script\":{\"buckets_path\":{\"total\":\"total_sales\"},\"script\":\"params.total * 2\"}}}}}}"
+			}`, from, to)
+			require.NoError(t, err)
+			require.Len(t, c.multisearchRequests, 1)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			require.Len(t, sr.Aggs, 1)
+			require.Equal(t, "per_min", sr.Aggs[0].Key)
+
+			bucketScriptAgg := findSubAggByKey(t, sr.Aggs[0].Aggregation.Aggs, "pct")
+			require.NotNil(t, bucketScriptAgg, "named-reference bucket_script must not be dropped from the request")
+			plAgg := bucketScriptAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			require.Equal(t, map[string]any{"total": "total_sales"}, plAgg.BucketPath)
+
+			// The serialised request must carry the named buckets_path through to Elasticsearch.
+			body, err := json.Marshal(sr)
+			require.NoError(t, err)
+			require.Contains(t, string(body), `"buckets_path":{"total":"total_sales"}`)
+		})
+
+		// Named references that do not match any sibling metric ID (nested paths, _count) are
+		// passed through verbatim so Elasticsearch validates them, rather than the plugin
+		// silently omitting the aggregation.
+		t.Run("DSL bucket_script with unresolved named buckets_path is passed through verbatim", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"refId": "A",
+				"queryType": "dsl",
+				"editorType": "code",
+				"metrics": [{ "type": "count", "id": "1" }],
+				"query": "{\"size\":0,\"aggs\":{\"per_min\":{\"date_histogram\":{\"field\":\"@timestamp\",\"fixed_interval\":\"1m\"},\"aggs\":{\"pct\":{\"bucket_script\":{\"buckets_path\":{\"total\":\"other>total_sales\",\"c\":\"_count\"},\"script\":\"params.total / params.c\"}}}}}}"
+			}`, from, to)
+			require.NoError(t, err)
+			require.Len(t, c.multisearchRequests, 1)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			require.Len(t, sr.Aggs, 1)
+			require.Equal(t, "per_min", sr.Aggs[0].Key)
+
+			bucketScriptAgg := findSubAggByKey(t, sr.Aggs[0].Aggregation.Aggs, "pct")
+			require.NotNil(t, bucketScriptAgg, "bucket_script with unresolved named references must not be dropped from the request")
+			plAgg := bucketScriptAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			require.Equal(t, map[string]any{"total": "other>total_sales", "c": "_count"}, plAgg.BucketPath)
+		})
 	})
+}
+
+// findSubAggByKey returns the sub-aggregation with the given key, or nil when absent.
+// Raw-DSL aggregations are parsed from a JSON object, so sibling order is not deterministic.
+func findSubAggByKey(t *testing.T, aggs es.AggArray, key string) *es.Agg {
+	t.Helper()
+	for _, agg := range aggs {
+		if agg.Key == key {
+			return agg
+		}
+	}
+	return nil
 }
