@@ -99,16 +99,52 @@ func TestInterpolateSearchBody(t *testing.T) {
 			expected: `{"script":"$__ $__."}`,
 		},
 		{
-			name:     "parentheses after a known macro are consumed as arguments",
+			name:     "parenthesised text after a known macro is preserved",
 			body:     `{"script":"$__interval_ms(x)"}`,
 			interval: 15 * time.Second,
-			expected: `{"script":"15000"}`,
+			expected: `{"script":"15000(x)"}`,
 		},
 		{
 			name:     "unbalanced parenthesis after a known macro expands as zero-arg",
 			body:     `{"script":"$__interval_ms("}`,
 			interval: 15 * time.Second,
 			expected: `{"script":"15000("}`,
+		},
+		{
+			name:     "painless script arguments after interval_ms are preserved",
+			body:     `{"script":{"source":"x * $__interval_ms(doc['y'].value)"}}`,
+			interval: 15 * time.Second,
+			expected: `{"script":{"source":"x * 15000(doc['y'].value)"}}`,
+		},
+		{
+			name:     "parentheses spanning JSON string values leave sibling keys intact",
+			body:     `{"a":"$__interval_ms(","b":") important"}`,
+			interval: 15 * time.Second,
+			expected: `{"a":"15000(","b":") important"}`,
+		},
+		{
+			name:     "adjacent macros expand independently",
+			body:     `{"script":"$__interval_ms$__interval"}`,
+			interval: 15 * time.Second,
+			expected: `{"script":"1500015s"}`,
+		},
+		{
+			name:     "body consisting only of a macro expands",
+			body:     `$__interval_ms`,
+			interval: 15 * time.Second,
+			expected: `15000`,
+		},
+		{
+			name:     "multi-unit interval keeps duration formatting",
+			body:     `{"fixed_interval":"$__interval"}`,
+			interval: 90 * time.Second,
+			expected: `{"fixed_interval":"1m30s"}`,
+		},
+		{
+			name:     "interval_msms falls back to 1000ms for negative interval",
+			body:     `{"fixed_interval":"$__interval_msms"}`,
+			interval: -5 * time.Second,
+			expected: `{"fixed_interval":"1000ms"}`,
 		},
 	}
 
