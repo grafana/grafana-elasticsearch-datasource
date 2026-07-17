@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
@@ -287,6 +288,38 @@ func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query) (*back
 	}, nil
 }
 
+// stripLeadingEsqlComments removes the comments and whitespace that precede
+// the first ES|QL command in query. Only LEADING comments are stripped:
+// removing interior comments naively would corrupt string literals that
+// contain comment markers, for example URLs such as "http://example.com".
+// Because stripping stops at the first non-comment content, string literals
+// are never touched. A query that is entirely comments, or that opens with an
+// unterminated block comment, yields an empty string.
+func stripLeadingEsqlComments(query string) string {
+	rest := query
+	for {
+		rest = strings.TrimLeftFunc(rest, unicode.IsSpace)
+		switch {
+		case strings.HasPrefix(rest, "//"):
+			// Line comment: drop through the end of the line.
+			idx := strings.Index(rest, "\n")
+			if idx == -1 {
+				return ""
+			}
+			rest = rest[idx+1:]
+		case strings.HasPrefix(rest, "/*"):
+			// Block comment: drop through the matching terminator.
+			idx := strings.Index(rest[2:], "*/")
+			if idx == -1 {
+				return ""
+			}
+			rest = rest[2+idx+2:]
+		default:
+			return rest
+		}
+	}
+}
+
 // hasEsqlMetricsCommand reports whether an ES|QL query contains a command that
 // produces aggregated metric time series: the PROMQL source command or a STATS
 // processing command.
@@ -294,7 +327,10 @@ func hasEsqlMetricsCommand(query string) bool {
 	tokens := strings.Fields(strings.ToUpper(query))
 
 	// PROMQL is a source command, so it can only appear as the first token.
-	if len(tokens) > 0 && strings.Trim(tokens[0], esqlCommandDelimiters) == esqlPromQLCommand {
+	// ES|QL permits comments before the source command, so strip leading
+	// comments before checking.
+	promqlTokens := strings.Fields(strings.ToUpper(stripLeadingEsqlComments(query)))
+	if len(promqlTokens) > 0 && strings.Trim(promqlTokens[0], esqlCommandDelimiters) == esqlPromQLCommand {
 		return true
 	}
 

@@ -629,6 +629,113 @@ func TestProcessEsqlMetricsResponse_ReturnsTimeSeriesForPromqlQuery(t *testing.T
 	require.Equal(t, 6.2, *v1)
 }
 
+func TestProcessEsqlMetricsResponse_DetectsPromqlBehindLeadingComment(t *testing.T) {
+	// A leading ES|QL comment must not stop PROMQL detection, otherwise the
+	// query silently returns no data even though Elasticsearch executed it.
+	response := &es.EsqlResponse{
+		Columns: []es.EsqlColumn{
+			{Name: "avg(metrics.system.cpu.logical.count)", Type: "double"},
+			{Name: "step", Type: "date"},
+		},
+		Values: [][]interface{}{
+			{6.2, "2026-05-21T14:00:00.000Z"},
+			{6.6, "2026-05-21T14:01:00.000Z"},
+		},
+	}
+
+	target := &Query{
+		RefID:    "A",
+		RawQuery: "// cpu usage\nPROMQL index=metrics-* step=1m avg(metrics.system.cpu.logical.count)",
+		Metrics: []*MetricAgg{
+			{Type: countType},
+		},
+	}
+
+	res, err := processEsqlMetricsResponse(response, target)
+	require.NoError(t, err)
+	require.Len(t, res.Frames, 1)
+
+	frame := res.Frames[0]
+	require.NotNil(t, frame.Meta)
+	require.Equal(t, data.FrameTypeTimeSeriesMulti, frame.Meta.Type)
+	require.Equal(t, 2, frame.Fields[0].Len())
+}
+
+func TestHasEsqlMetricsCommand(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  bool
+	}{
+		{
+			name:  "plain PROMQL query",
+			query: "PROMQL index=metrics-* step=1m avg(cpu)",
+			want:  true,
+		},
+		{
+			name:  "lowercase promql query",
+			query: "promql index=metrics-* step=1m avg(cpu)",
+			want:  true,
+		},
+		{
+			name:  "PROMQL behind leading line comment",
+			query: "// cpu usage\nPROMQL index=metrics-* step=1m avg(cpu)",
+			want:  true,
+		},
+		{
+			name:  "lowercase promql behind leading line comment",
+			query: "// c\npromql index=metrics-* step=1m avg(cpu)",
+			want:  true,
+		},
+		{
+			name:  "PROMQL behind leading block comment",
+			query: "/* cpu usage */ PROMQL index=metrics-* step=1m avg(cpu)",
+			want:  true,
+		},
+		{
+			name:  "PROMQL behind multiple stacked leading comments",
+			query: "// first\n/* second */\n// third\nPROMQL index=metrics-* step=1m avg(cpu)",
+			want:  true,
+		},
+		{
+			name:  "comment-only query",
+			query: "// just a comment",
+			want:  false,
+		},
+		{
+			name:  "unterminated block comment",
+			query: "/* unterminated PROMQL index=metrics-*",
+			want:  false,
+		},
+		{
+			name:  "STATS query",
+			query: "FROM x | STATS count(*) BY BUCKET(@timestamp, 1 day)",
+			want:  true,
+		},
+		{
+			name:  "interior comment marker inside a string literal",
+			query: "FROM x | WHERE url == \"http://a\"",
+			want:  false,
+		},
+		{
+			name:  "PROMQL as a non-first command is not a source command",
+			query: "FROM x | PROMQL avg(cpu)",
+			want:  false,
+		},
+		{
+			name:  "empty query",
+			query: "",
+			want:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, hasEsqlMetricsCommand(tc.query))
+		})
+	}
+}
+
 func TestProcessEsqlMetricsResponse_GroupsByBreakdownFieldsForPromqlQuery(t *testing.T) {
 	response := &es.EsqlResponse{
 		Columns: []es.EsqlColumn{
