@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -49,8 +50,13 @@ const (
 
 // GetClusterInfo fetches cluster information from the Elasticsearch root endpoint.
 // It returns the cluster build flavor which is used to determine if the cluster is serverless.
-func GetClusterInfo(httpCli *http.Client, url string) (clusterInfo ClusterInfo, err error) {
-	resp, err := httpCli.Get(url)
+func GetClusterInfo(ctx context.Context, httpCli *http.Client, url string) (clusterInfo ClusterInfo, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return ClusterInfo{}, fmt.Errorf("error creating ES cluster info request: %w", err)
+	}
+
+	resp, err := httpCli.Do(req)
 	if err != nil {
 		return ClusterInfo{}, fmt.Errorf("error getting ES cluster info: %w", err)
 	}
@@ -77,6 +83,12 @@ func GetClusterInfo(httpCli *http.Client, url string) (clusterInfo ClusterInfo, 
 
 func (ci ClusterInfo) IsServerless() bool {
 	return ci.Version.BuildFlavor == BuildFlavorServerless
+}
+
+// IsEmpty reports whether no cluster information was captured, which happens
+// when the root-endpoint fetch failed when the instance was created.
+func (ci ClusterInfo) IsEmpty() bool {
+	return ci == ClusterInfo{}
 }
 
 // Distribution classifies the backend serving the root endpoint. Detection

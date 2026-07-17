@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -35,7 +36,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), ts.Client(), ts.URL)
 
 		require.NoError(t, err)
 		require.NotNil(t, clusterInfo)
@@ -66,7 +67,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), ts.Client(), ts.URL)
 
 		require.NoError(t, err)
 		require.NotNil(t, clusterInfo)
@@ -75,7 +76,7 @@ func TestGetClusterInfo(t *testing.T) {
 	})
 
 	t.Run("Should return error when HTTP request fails", func(t *testing.T) {
-		clusterInfo, err := GetClusterInfo(http.DefaultClient, "http://invalid-url-that-does-not-exist.local:9999")
+		clusterInfo, err := GetClusterInfo(context.Background(), http.DefaultClient, "http://invalid-url-that-does-not-exist.local:9999")
 
 		require.Error(t, err)
 		require.Equal(t, ClusterInfo{}, clusterInfo)
@@ -93,7 +94,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), ts.Client(), ts.URL)
 
 		require.Error(t, err)
 		require.Equal(t, ClusterInfo{}, clusterInfo)
@@ -114,7 +115,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), ts.Client(), ts.URL)
 
 		require.NoError(t, err)
 		require.Equal(t, ClusterInfo{}, clusterInfo)
@@ -133,7 +134,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), ts.Client(), ts.URL)
 
 		require.Error(t, err)
 		require.Equal(t, ClusterInfo{}, clusterInfo)
@@ -162,7 +163,7 @@ func TestGetClusterInfo_DetectionFields(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), ts.Client(), ts.URL)
 
 		require.NoError(t, err)
 		assert.Equal(t, "9.1.0", clusterInfo.Version.Number)
@@ -191,7 +192,7 @@ func TestGetClusterInfo_DetectionFields(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), ts.Client(), ts.URL)
 
 		require.NoError(t, err)
 		assert.Equal(t, "customdistro", clusterInfo.Version.Distribution)

@@ -30,12 +30,24 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 		}, nil
 	}
 
-	// If the cluster is serverless, return a healthy result
-	if ds.info.ClusterInfo.IsServerless() {
-		return &backend.CheckHealthResult{
-			Status:  backend.HealthStatusOk,
-			Message: "Elasticsearch Serverless data source is healthy.",
-		}, nil
+	clusterInfo := ds.info.ClusterInfo
+	if clusterInfo.IsEmpty() {
+		// Cluster info detection failed when the instance was created, for
+		// example because the root endpoint was unreachable at that point, so
+		// the serverless classification may be wrong. Retry here so a
+		// serverless cluster is not sent to _cluster/health, which it answers
+		// with 410 Gone.
+		refetched, err := es.GetClusterInfo(ctx, ds.info.HTTPClient, ds.info.URL)
+		if err != nil {
+			logger.Warn("Failed to get Elasticsearch cluster info during health check", "error", err)
+		} else {
+			clusterInfo = refetched
+		}
+	}
+
+	// Serverless clusters do not support _cluster/health, so validate data access instead
+	if clusterInfo.IsServerless() {
+		return ds.checkServerlessHealth(ctx)
 	}
 
 	// check that ES is healthy
@@ -63,6 +75,22 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 		}, nil
 	}
 
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			logger.Warn("Failed to close response body", "error", err)
+		}
+	}()
+
+	if response.StatusCode == http.StatusGone {
+		// Serverless clusters answer unsupported endpoints such as
+		// _cluster/health with 410 Gone. Reaching this point means the
+		// cluster responded but serverless detection via the root endpoint
+		// failed, so fall back to the serverless data-access check rather
+		// than reporting the raw 410 to the user.
+		logger.Debug("_cluster/health returned 410 Gone, treating cluster as serverless")
+		return ds.checkServerlessHealth(ctx)
+	}
+
 	if response.StatusCode == http.StatusRequestTimeout {
 		return &backend.CheckHealthResult{
 			Status:  backend.HealthStatusError,
@@ -78,12 +106,6 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 	}
 
 	logger.Info("Response received from Elasticsearch", "statusCode", response.StatusCode, "status", "ok", "duration", time.Since(start))
-
-	defer func() {
-		if err := response.Body.Close(); err != nil {
-			logger.Warn("Failed to close response body", "error", err)
-		}
-	}()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -145,6 +167,29 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 	}, nil
 }
 
+// checkServerlessHealth reports the health of a serverless cluster, where
+// _cluster/health is unavailable (it answers 410 Gone). _field_caps is
+// supported on serverless, so index validation doubles as the connectivity
+// and credentials probe.
+func (ds *DataSource) checkServerlessHealth(ctx context.Context) (*backend.CheckHealthResult, error) {
+	message, level := validateIndex(ctx, ds.info)
+	if level == "error" {
+		return &backend.CheckHealthResult{
+			Status:  backend.HealthStatusError,
+			Message: message,
+		}, nil
+	}
+
+	successMessage := "Elasticsearch Serverless data source is healthy."
+	if level == "warning" {
+		successMessage = fmt.Sprintf("%s Warning: %s", successMessage, message)
+	}
+	return &backend.CheckHealthResult{
+		Status:  backend.HealthStatusOk,
+		Message: successMessage,
+	}, nil
+}
+
 func validateIndex(ctx context.Context, ds *es.DatasourceInfo) (message string, level string) {
 	// validate that the index exist and has date field
 	ip, err := es.NewIndexPattern(ds.Interval, ds.Database)
@@ -191,15 +236,21 @@ func validateIndex(ctx context.Context, ds *es.DatasourceInfo) (message string, 
 		return "Failed to unmarshal field capabilities response", "error"
 	}
 	if fieldCaps["error"] != nil {
+		// Rejected credentials mean the data source cannot query at all, so
+		// they are reported as unhealthy rather than as a warning.
+		errorLevel := "warning"
+		if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
+			errorLevel = "error"
+		}
 		errorMap, ok := fieldCaps["error"].(map[string]any)
 		if !ok {
-			return "Error validating index", "warning"
+			return "Error validating index", errorLevel
 		}
 		errorMessage, ok := errorMap["reason"].(string)
 		if !ok {
-			return "Error validating index", "warning"
+			return "Error validating index", errorLevel
 		}
-		return fmt.Sprintf("Error validating index: %s", errorMessage), "warning"
+		return fmt.Sprintf("Error validating index: %s", errorMessage), errorLevel
 	}
 
 	fields, ok := fieldCaps["fields"].(map[string]any)
