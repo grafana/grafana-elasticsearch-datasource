@@ -17,6 +17,16 @@ var (
 		Help:      "Duration of Elasticsearch parsing the response in seconds",
 		Buckets:   []float64{.001, 0.0025, .005, .0075, .01, .02, .03, .04, .05, .075, .1, .25, .5, 1, 5, 10, 25},
 	}, []string{"status", "endpoint"})
+
+	// DatasourceInstances tracks the currently active data source instances by
+	// the distribution and major version detected from the cluster root
+	// endpoint. Incremented when an instance is created and decremented when
+	// the SDK disposes it.
+	DatasourceInstances = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "grafana",
+		Name:      "elasticsearch_plugin_datasource_instances",
+		Help:      "Active Elasticsearch data source instances by detected cluster distribution and major version",
+	}, []string{"distribution", "version_major"})
 )
 
 func UpdatePluginParsingResponseDurationSeconds(ctx context.Context, duration time.Duration, status string) {

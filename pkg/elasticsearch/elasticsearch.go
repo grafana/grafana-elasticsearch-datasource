@@ -12,6 +12,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/grafana/grafana-aws-sdk/pkg/awsauth"
@@ -22,6 +23,7 @@ import (
 	schemas "github.com/grafana/schemads"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
+	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/instrumentation"
 )
 
 // instanceWithSchema wraps the Elasticsearch datasource with schemads (dsabstraction) schema discovery
@@ -73,6 +75,16 @@ type DataSource struct {
 	info           *es.DatasourceInfo
 	schemaSettings schemaSettings
 	logger         log.Logger
+	// distribution and versionMajor are the instance gauge labels registered at
+	// creation time, kept so Dispose decrements the same series. Both empty when
+	// the instance was never registered.
+	distribution string
+	versionMajor string
+	// disposeOnce caps the gauge decrement at one per instance: the SDK
+	// schedules Dispose before attempting a replacement, so a failed
+	// replacement leaves this instance cached and a later settings change
+	// disposes it again, concurrently in the worst case.
+	disposeOnce sync.Once
 }
 
 func (ds *DataSource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
@@ -86,6 +98,11 @@ func (ds *DataSource) QueryData(ctx context.Context, req *backend.QueryDataReque
 func (ds *DataSource) Dispose() {
 	if ds.info != nil && ds.info.HTTPClient != nil {
 		ds.info.HTTPClient.CloseIdleConnections()
+	}
+	if ds.distribution != "" {
+		ds.disposeOnce.Do(func() {
+			instrumentation.DatasourceInstances.WithLabelValues(ds.distribution, ds.versionMajor).Dec()
+		})
 	}
 }
 
@@ -223,7 +240,11 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		info:           &model,
 		schemaSettings: defaultSchemaSettings(),
 		logger:         log.New().FromContext(ctx),
+		distribution:   clusterInfo.Distribution(),
+		versionMajor:   clusterInfo.VersionMajor(),
 	}
+	instrumentation.DatasourceInstances.WithLabelValues(ds.distribution, ds.versionMajor).Inc()
+	ds.logger.Info("Detected cluster distribution", "distribution", ds.distribution, "version", clusterInfo.Version.Number)
 	backend.Logger.Info("NewDatasource", "url", ds.info.URL)
 	schemaProvider := NewSchemaProvider(ds)
 	schemaDS := schemas.NewSchemaDatasource(
