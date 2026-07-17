@@ -477,6 +477,36 @@ func TestDatasourceInstanceGauge(t *testing.T) {
 		require.Equal(t, before, gaugeValue(t, gauge))
 	})
 
+	t.Run("gauge bounds labels when the cluster reports garbage version info", func(t *testing.T) {
+		// A remote endpoint controls the distribution and version strings in
+		// the root response. Unbounded values would mint a permanent gauge
+		// series per distinct pair, so they must collapse to bounded labels.
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"version": map[string]interface{}{
+					"distribution": "Elasticsearch<script>",
+					"number":       "banana",
+				},
+			})
+		}))
+		defer server.Close()
+
+		gauge := instrumentation.DatasourceInstances.WithLabelValues("other", "unknown")
+		before := gaugeValue(t, gauge)
+
+		instance, err := NewDatasource(context.Background(), backend.DataSourceInstanceSettings{
+			URL:      server.URL,
+			JSONData: json.RawMessage(`{"timeField": "@timestamp"}`),
+		})
+		require.NoError(t, err)
+		require.Equal(t, before+1, gaugeValue(t, gauge))
+
+		ds := unwrapTestDatasource(t, instance)
+		ds.Dispose()
+		require.Equal(t, before, gaugeValue(t, gauge))
+	})
+
 	t.Run("Dispose does not decrement for instances that never registered", func(t *testing.T) {
 		gauge := instrumentation.DatasourceInstances.WithLabelValues(es.DistributionUnknown, es.DistributionUnknown)
 		before := gaugeValue(t, gauge)

@@ -34,6 +34,9 @@ const (
 	// for example when the root endpoint is not accessible to the configured
 	// credentials.
 	DistributionUnknown = "unknown"
+	// DistributionTagline is the distribution reported when only the tagline
+	// identifies the cluster.
+	DistributionTagline = taglineDistribution
 
 	productHeaderName          = "X-Elastic-Product"
 	productHeaderElasticsearch = "Elasticsearch"
