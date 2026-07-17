@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
@@ -52,12 +50,10 @@ func (e *requestEncoder) encodeBatchRequests(requests []*multiRequest) ([]byte, 
 			return nil, fmt.Errorf("unknown request type: %T", r.body)
 		}
 
-		intervalMs := r.interval.Milliseconds()
-		if intervalMs <= 0 {
-			intervalMs = 1000
+		body, err = interpolateSearchBody(body, r.interval)
+		if err != nil {
+			return nil, fmt.Errorf("interpolating macros in search request body: %w", err)
 		}
-		body = strings.ReplaceAll(body, "$__interval_ms", strconv.FormatInt(intervalMs, 10))
-		body = strings.ReplaceAll(body, "$__interval", r.interval.String())
 
 		payload.WriteString(body + "\n")
 	}

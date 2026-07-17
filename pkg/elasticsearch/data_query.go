@@ -107,7 +107,10 @@ func (e *elasticsearchDataQuery) executeEsqlQuery(q *Query) (*backend.DataRespon
 		return nil, backend.DownstreamError(fmt.Errorf("ES|QL query is empty"))
 	}
 
-	query := e.resolveEsqlIndexPlaceholder(q.RawQuery, q.Index)
+	query, err := e.resolveEsqlIndexPlaceholder(q.RawQuery, q.Index)
+	if err != nil {
+		return nil, backend.DownstreamError(fmt.Errorf("failed to interpolate macros in ES|QL query: %w", err))
+	}
 	e.logger.Debug("Executing ES|QL query", "query", query, "refID", q.RefID)
 
 	esqlRes, err := e.client.ExecuteEsql(query)
@@ -132,16 +135,16 @@ func (e *elasticsearchDataQuery) executeEsqlQuery(q *Query) (*backend.DataRespon
 	}
 }
 
-func (e *elasticsearchDataQuery) resolveEsqlIndexPlaceholder(query string, indexOverride string) string {
+func (e *elasticsearchDataQuery) resolveEsqlIndexPlaceholder(query string, indexOverride string) (string, error) {
 	idx := e.datasourceIndex
 	if indexOverride != "" {
 		idx = indexOverride
 	}
 	if idx == "" {
-		return query
+		return query, nil
 	}
 
-	return strings.ReplaceAll(query, "$__index", idx)
+	return interpolateEsqlQuery(query, idx)
 }
 
 func (e *elasticsearchDataQuery) executeRegularQueries(queries []*Query, start time.Time) (*backend.QueryDataResponse, error) {
