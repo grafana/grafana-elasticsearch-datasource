@@ -6,7 +6,19 @@ import { ElasticDatasource } from './datasource';
 import { ElasticsearchOptions } from './types';
 
 export function createElasticDatasource(
-  settings: Partial<DataSourceInstanceSettings<Partial<ElasticsearchOptions>>> = {}
+  settings: Partial<DataSourceInstanceSettings<Partial<ElasticsearchOptions>>> = {},
+  templateSrv: TemplateSrv = {
+    getVariables: () => [],
+    replace: (text?: string) => {
+      if (text?.startsWith('$')) {
+        return `resolvedVariable`;
+      } else {
+        return text || '';
+      }
+    },
+    containsTemplate: (text?: string) => text?.includes('$') ?? false,
+    updateTimeRange: () => {},
+  }
 ) {
   const { jsonData, ...rest } = settings;
 
@@ -46,19 +58,6 @@ export function createElasticDatasource(
       ...jsonData,
     },
     ...rest,
-  };
-
-  const templateSrv: TemplateSrv = {
-    getVariables: () => [],
-    replace: (text?: string) => {
-      if (text?.startsWith('$')) {
-        return `resolvedVariable`;
-      } else {
-        return text || '';
-      }
-    },
-    containsTemplate: (text?: string) => text?.includes('$') ?? false,
-    updateTimeRange: () => { },
   };
 
   return new ElasticDatasource(instanceSettings, templateSrv);

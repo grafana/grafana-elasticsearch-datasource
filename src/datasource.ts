@@ -745,12 +745,18 @@ export class ElasticDatasource
     const frontendErrors: DataQueryError[] = [];
     const ctx = { timeField: this.timeField };
     for (const target of request.targets) {
-      // Validate the query string that will actually be sent to the backend - i.e. after
-      // time-range injection and template/scoped-var replacement performed by
-      // applyTemplateVariables() - so a query that is only valid once its variables are
-      // resolved isn't rejected, and errors introduced by replacement are still caught.
-      const interpolated = this.applyTemplateVariables(target, request.scopedVars, request.filters);
-      const errors = this.validators.validate(interpolated, ctx);
+      // Validate the query text after variable interpolation but *before* the transformations
+      // applyTemplateVariables() performs (time-range injection, ad hoc filters, pretty-printing).
+      // Interpolating first means a query that is only valid once its variables resolve isn't
+      // rejected. Validating pre-transformation matters because the ES|QL parser recovers from
+      // errors: rewriting the partial AST of an invalid query silently deletes the offending
+      // clause and yields valid text that would pass validation. It also keeps error positions
+      // aligned with what the user wrote in the editor.
+      const interpolatedQuery =
+        target.queryType === 'esql'
+          ? this.interpolateEsqlQuery(target.query || '', request.scopedVars)
+          : this.interpolateLuceneQuery(target.query || '', request.scopedVars);
+      const errors = this.validators.validate({ ...target, query: interpolatedQuery }, ctx);
       if (errors.length === 0) {
         validTargets.push(target);
       } else {
@@ -1245,9 +1251,15 @@ export class ElasticDatasource
     }
 
     try {
-      // Parse errors are caught upfront by esqlValidator; this call should always
-      // succeed here. The try/catch remains as a defense-in-depth fallback.
-      const { root } = Parser.parse(esqlQuery, { withFormatting: true });
+      const { root, errors } = Parser.parse(esqlQuery, { withFormatting: true });
+
+      // The ANTLR parser recovers from errors and returns a partial AST. Mutating and
+      // re-printing that AST would silently delete the invalid parts of the query, so bail
+      // out and leave anything that slipped past the frontend validator for the backend
+      // to reject with a proper error.
+      if (errors.length) {
+        return esqlQuery;
+      }
 
       const whereCommands = Walker.matchAll(root, {
         type: 'command',
