@@ -224,6 +224,45 @@ func TestSearchRequest(t *testing.T) {
 		})
 	})
 
+	t.Run("and adding a terms agg without order", func(t *testing.T) {
+		b := setup()
+		aggBuilder := b.Agg()
+		aggBuilder.Terms("1", "@hostname", nil)
+
+		t.Run("When marshal to JSON should omit the order property", func(t *testing.T) {
+			sr, err := b.Build()
+			require.Nil(t, err)
+			body, err := json.Marshal(sr)
+			require.Nil(t, err)
+			json, err := simplejson.NewJson(body)
+			require.Nil(t, err)
+
+			// An empty order object is rejected by Elasticsearch with
+			// "Must specify at least one field for [order]".
+			termsAgg := json.GetPath("aggs", "1", "terms").MustMap()
+			require.NotContains(t, termsAgg, "order")
+		})
+	})
+
+	t.Run("and adding a terms agg with order", func(t *testing.T) {
+		b := setup()
+		aggBuilder := b.Agg()
+		aggBuilder.Terms("1", "@hostname", func(a *TermsAggregation, ib AggBuilder) {
+			a.Order["_count"] = "desc"
+		})
+
+		t.Run("When marshal to JSON should keep the order property", func(t *testing.T) {
+			sr, err := b.Build()
+			require.Nil(t, err)
+			body, err := json.Marshal(sr)
+			require.Nil(t, err)
+			json, err := simplejson.NewJson(body)
+			require.Nil(t, err)
+
+			require.Equal(t, "desc", json.GetPath("aggs", "1", "terms", "order", "_count").MustString())
+		})
+	})
+
 	t.Run("and adding top level agg with child agg", func(t *testing.T) {
 		b := setup()
 		aggBuilder := b.Agg()
