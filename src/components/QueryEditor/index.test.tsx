@@ -27,6 +27,17 @@ describe('QueryEditor', () => {
       expect(queryField.tagName).toBe('TEXTAREA');
     });
 
+    it('renders in a monospace font, matching the Code editor and the query editors of other datasources', () => {
+      // Regression test: the Lucene box briefly rendered in the default UI sans-serif
+      // font after the Slate-based QueryField (which got monospace for free via a
+      // global grafana-ui CSS rule) was replaced with a plain Input/TextArea. See
+      // https://github.com/grafana/grafana-elasticsearch-datasource/pull/310 and #349.
+      render(<QueryEditor query={buildQuery('')} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />);
+
+      const queryField = screen.getByPlaceholderText('Enter a lucene query');
+      expect(getComputedStyle(queryField).fontFamily).toContain('Roboto Mono');
+    });
+
     it('calls onChange with the new value as the user types', () => {
       const onChange = jest.fn<void, [ElasticsearchDataQuery]>();
       render(<QueryEditor query={buildQuery('')} datasource={datasourceMock} onChange={onChange} onRunQuery={noop} />);
