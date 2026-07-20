@@ -59,7 +59,10 @@ func clampAutoInterval(q *Query, fromMs, toMs int64) time.Duration {
 	if rangeMs/effective.Milliseconds()+2 <= budget {
 		return interval
 	}
-	floorMs := (rangeMs + budget - 3) / (budget - 2) // ceil(rangeMs / (budget - 2))
+	// Reserve the two extra buckets out of the budget, then round the floor up with
+	// ceiling division so the widened interval never lets the bucket count overshoot.
+	maxTimeBuckets := budget - 2
+	floorMs := (rangeMs + maxTimeBuckets - 1) / maxTimeBuckets
 	return roundUpInterval(floorMs)
 }
 

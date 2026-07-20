@@ -135,7 +135,12 @@ func TestClampAutoIntervalToMaxBuckets(t *testing.T) {
 		require.Equal(t, sr.Interval, 5*time.Minute)
 	})
 
-	t.Run("zero interval falls back to one second before clamping", func(t *testing.T) {
+	t.Run("zero interval is still clamped without dividing by zero", func(t *testing.T) {
+		// Grafana sends no interval on some paths (Interval stays zero). The clamp
+		// substitutes the encoder's one-second fallback for the bucket estimate;
+		// without that substitution this test panics on integer division by zero.
+		// The clamped result is independent of the incoming interval, so it matches
+		// the 10s case above.
 		sr := executeWithInterval(t, `{
 			"bucketAggs": [
 				{ "type": "terms", "field": "@host", "id": "2", "settings": { "size": "0" } },
@@ -146,14 +151,33 @@ func TestClampAutoIntervalToMaxBuckets(t *testing.T) {
 		require.Equal(t, sr.Interval, 2*time.Hour)
 	})
 
-	t.Run("terms size given as a number is used for the clamp", func(t *testing.T) {
+	t.Run("zero interval that fits the budget passes through unchanged", func(t *testing.T) {
+		// Over five minutes the one-second fallback estimate fits the budget, so the
+		// zero interval is returned as is for the request encoder to apply its own
+		// one-second fallback at substitution time.
+		fiveMinFrom := time.Date(2018, 5, 15, 17, 50, 0, 0, time.UTC)
+		fiveMinTo := time.Date(2018, 5, 15, 17, 55, 0, 0, time.UTC)
 		sr := executeWithInterval(t, `{
 			"bucketAggs": [
-				{ "type": "terms", "field": "@host", "id": "2", "settings": { "size": 500 } },
+				{ "type": "terms", "field": "@host", "id": "2", "settings": { "size": "5" } },
+				{ "type": "date_histogram", "field": "@timestamp", "id": "3", "settings": { "interval": "auto" } }
+			],
+			"metrics": [{ "type": "count", "id": "1" }]
+		}`, fiveMinFrom, fiveMinTo, 0)
+		require.Equal(t, sr.Interval, time.Duration(0))
+	})
+
+	t.Run("terms size given as a number is used for the clamp", func(t *testing.T) {
+		// 100 differs from the 500 default on purpose: 100 terms buckets budget ~653
+		// time buckets across 7 days, clamping to 30m instead of the 2h the default
+		// would give, which proves the numeric size path fed the multiplier.
+		sr := executeWithInterval(t, `{
+			"bucketAggs": [
+				{ "type": "terms", "field": "@host", "id": "2", "settings": { "size": 100 } },
 				{ "type": "date_histogram", "field": "@timestamp", "id": "3", "settings": { "interval": "auto" } }
 			],
 			"metrics": [{ "type": "count", "id": "1" }]
 		}`, weekFrom, weekTo, 10*time.Second)
-		require.Equal(t, sr.Interval, 2*time.Hour)
+		require.Equal(t, sr.Interval, 30*time.Minute)
 	})
 }
