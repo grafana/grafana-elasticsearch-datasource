@@ -29,7 +29,7 @@ import { ElasticsearchProvider } from './ElasticsearchQueryContext';
 import { ElasticsearchQueryOptions } from './ElasticsearchQueryOptions';
 import { MetricAggregationsEditor } from './MetricAggregationsEditor';
 import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
-import { resolvePreserveQuery, setPreserveQueryDefault } from './preserveQueryPreference';
+import { setPreserveQueryDefault } from './preserveQueryPreference';
 import { QueryTypeSelector } from './QueryTypeSelector';
 import { changeAliasPattern, changeEditorTypeAndResetQuery, changeQuery } from './state';
 
@@ -179,6 +179,7 @@ const QueryEditorForm = ({
   const dispatch = useDispatch();
   const nextId = useNextId();
   const inputId = useId();
+  const preserveQueryId = useId();
   const styles = useStyles2(getStyles);
 
   const [switchModalOpen, setSwitchModalOpen] = useState(false);
@@ -249,10 +250,11 @@ const QueryEditorForm = ({
           <QueryTypeSelector />
         </div>
 
-        <InlineField transparent label="Preserve query">
+        <InlineField transparent label="Preserve query" htmlFor={preserveQueryId}>
           <InlineSwitch
+            id={preserveQueryId}
             transparent
-            value={resolvePreserveQuery(value.preserveQuery)}
+            value={value.preserveQuery ?? false}
             onChange={(e) => {
               const preserveQuery = e.currentTarget.checked;
               setPreserveQueryDefault(preserveQuery);

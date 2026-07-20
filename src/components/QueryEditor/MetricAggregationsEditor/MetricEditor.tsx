@@ -10,7 +10,6 @@ import { useFields } from '../../../hooks/useFields';
 import { useDispatch } from '../../../hooks/useStatelessReducer';
 import { MetricPicker } from '../../MetricPicker';
 import { useDatasource, useQuery } from '../ElasticsearchQueryContext';
-import { resolvePreserveQuery } from '../preserveQueryPreference';
 import { segmentStyles } from '../styles';
 
 import { SettingsEditor } from './SettingsEditor';
@@ -105,7 +104,7 @@ export const MetricEditor = ({ value }: Props) => {
                 id: value.id,
                 type: e.value!,
                 previousType: value.type,
-                preserveQuery: resolvePreserveQuery(query.preserveQuery),
+                preserveQuery: query.preserveQuery ?? false,
               })
             )
           }

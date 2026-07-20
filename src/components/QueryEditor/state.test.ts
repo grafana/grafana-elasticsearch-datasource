@@ -2,6 +2,7 @@ import { ElasticsearchDataQuery } from '../../dataquery.gen';
 import { reducerTester } from '../reducerTester';
 
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
+import { setPreserveQueryDefault } from './preserveQueryPreference';
 import {
   aliasPatternReducer,
   changeAliasPattern,
@@ -9,6 +10,7 @@ import {
   changeQuery,
   changeQueryType,
   initQuery,
+  preserveQueryReducer,
   queryReducer,
   queryTypeReducer,
 } from './state';
@@ -236,5 +238,36 @@ describe('Query Type Reducer', () => {
       .givenReducer(queryTypeReducer, initialQueryType)
       .whenActionIsDispatched(initQuery())
       .thenStateShouldEqual('dsl');
+  });
+});
+
+describe('Preserve Query Reducer', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('Should bake the sticky localStorage default into the query on init when unset', () => {
+    setPreserveQueryDefault(true);
+
+    reducerTester<ElasticsearchDataQuery['preserveQuery']>()
+      .givenReducer(preserveQueryReducer, undefined)
+      .whenActionIsDispatched(initQuery())
+      .thenStateShouldEqual(true);
+  });
+
+  it('Should default to false on init when nothing is stored', () => {
+    reducerTester<ElasticsearchDataQuery['preserveQuery']>()
+      .givenReducer(preserveQueryReducer, undefined)
+      .whenActionIsDispatched(initQuery())
+      .thenStateShouldEqual(false);
+  });
+
+  it('Should not override an explicit per-query value on init', () => {
+    setPreserveQueryDefault(true);
+
+    reducerTester<ElasticsearchDataQuery['preserveQuery']>()
+      .givenReducer(preserveQueryReducer, false)
+      .whenActionIsDispatched(initQuery())
+      .thenStateShouldEqual(false);
   });
 });

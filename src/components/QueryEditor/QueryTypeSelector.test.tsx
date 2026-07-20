@@ -6,6 +6,7 @@ import { useDispatch } from '../../hooks/useStatelessReducer';
 import { renderWithESProvider } from '../../test-helpers/render';
 
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
+import { setPreserveQueryDefault } from './preserveQueryPreference';
 import { QueryTypeSelector } from './QueryTypeSelector';
 import React from 'react';
 
@@ -74,6 +75,29 @@ describe('QueryTypeSelector', () => {
 
     expect(dispatch).toHaveBeenCalledWith(
       changeMetricType({ id: '1', type: 'logs', previousType: 'count', preserveQuery: true })
+    );
+  });
+
+  it('should not use the sticky localStorage default when the query has no preserveQuery', async () => {
+    // Sticky preference only applies when a new query is initialised. Once the editor
+    // is rendering, the value on the query model is the source of truth so dashboards
+    // behave the same across browsers.
+    setPreserveQueryDefault(true);
+
+    const query: ElasticsearchDataQuery = {
+      refId: 'A',
+      query: '',
+      metrics: [{ id: '1', type: 'count' }],
+      bucketAggs: [{ type: 'date_histogram', id: '2' }],
+    };
+
+    renderWithESProvider(<QueryTypeSelector />, { providerProps: { query } });
+
+    const logsRadio = screen.getByRole('radio', { name: 'Logs' });
+    await userEvent.click(logsRadio);
+
+    expect(dispatch).toHaveBeenCalledWith(
+      changeMetricType({ id: '1', type: 'logs', previousType: 'count', preserveQuery: false })
     );
   });
 

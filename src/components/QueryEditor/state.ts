@@ -6,6 +6,7 @@ import { QueryType } from '../../types';
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
 
 import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
+import { getPreserveQueryDefault } from './preserveQueryPreference';
 
 /**
  * When the `initQuery` Action is dispatched, the query gets populated with default values where values are not present.
@@ -123,4 +124,21 @@ export const editorTypeReducer = (prevEditorType: ElasticsearchDataQuery['editor
   }
 
   return prevEditorType;
+};
+
+/**
+ * Bake the remembered "Preserve query" preference into the query once on init so the
+ * toggle state always round-trips through the saved query JSON, instead of being
+ * resolved from localStorage at read time (which would make the same dashboard behave
+ * differently across browsers).
+ */
+export const preserveQueryReducer = (
+  prevPreserveQuery: ElasticsearchDataQuery['preserveQuery'],
+  action: Action
+): ElasticsearchDataQuery['preserveQuery'] => {
+  if (initQuery.match(action)) {
+    return prevPreserveQuery ?? getPreserveQueryDefault();
+  }
+
+  return prevPreserveQuery;
 };
