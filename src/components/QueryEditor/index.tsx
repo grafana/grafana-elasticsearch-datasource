@@ -82,6 +82,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
     resize: 'none',
     overflow: 'hidden',
     minHeight: theme.spacing(theme.components.height.md),
+    fontFamily: theme.typography.fontFamilyMonospace,
   }),
 });
 
