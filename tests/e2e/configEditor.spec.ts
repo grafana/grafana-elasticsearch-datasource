@@ -17,6 +17,9 @@ test.describe('Config editor', () => {
     test('should render Elasticsearch details section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_TYPE });
 
+      // Wait for the Additional settings section to be visible first
+      await page.getByText('Additional settings').waitFor({ state: 'visible', timeout: 10000 });
+
       const esSection = page.getByText('Elasticsearch details').first();
       await esSection.scrollIntoViewIfNeeded();
       await expect(esSection).toBeVisible();
@@ -31,6 +34,9 @@ test.describe('Config editor', () => {
     test('should render Logs section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_TYPE });
 
+      // Wait for the Additional settings section to be visible first
+      await page.getByText('Additional settings').waitFor({ state: 'visible', timeout: 10000 });
+
       const logsSection = page.getByRole('heading', { name: 'Logs', exact: true });
       await logsSection.scrollIntoViewIfNeeded();
       await expect(logsSection).toBeVisible();
@@ -41,6 +47,9 @@ test.describe('Config editor', () => {
 
     test('should render Data links section with Add button', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+
+      // Wait for the Additional settings section to be visible first
+      await page.getByText('Additional settings').waitFor({ state: 'visible', timeout: 10000 });
 
       const dataLinksSection = page.getByRole('heading', { name: 'Data links', exact: true });
       await dataLinksSection.scrollIntoViewIfNeeded();
@@ -60,6 +69,9 @@ test.describe('Config editor', () => {
       const ds = await readProvisionedDataSource<ElasticsearchOptions>({ fileName: 'datasources.yml' });
       await gotoDataSourceConfigPage(ds.uid);
 
+      // Wait for the Additional settings section to be visible first
+      await page.getByText('Additional settings').waitFor({ state: 'visible', timeout: 10000 });
+
       await page.getByText('Elasticsearch details').first().scrollIntoViewIfNeeded();
       await expect(page.getByLabel('Index name')).toHaveValue(ds.jsonData.index!);
       await expect(page.getByLabel('Time field name')).toHaveValue(ds.jsonData.timeField);
@@ -73,6 +85,9 @@ test.describe('Config editor', () => {
       const ds = await readProvisionedDataSource<ElasticsearchOptions>({ fileName: 'datasources.yml' });
       await gotoDataSourceConfigPage(ds.uid);
 
+      // Wait for the Additional settings section to be visible first
+      await page.getByText('Additional settings').waitFor({ state: 'visible', timeout: 10000 });
+
       await page.getByRole('heading', { name: 'Logs', exact: true }).scrollIntoViewIfNeeded();
       await expect(page.getByLabel('Message field name')).toHaveValue(ds.jsonData.logMessageField!);
       await expect(page.getByLabel('Level field name')).toHaveValue(ds.jsonData.logLevelField!);
@@ -83,9 +98,13 @@ test.describe('Config editor', () => {
     test('should pass health check for provisioned datasource', async ({
       readProvisionedDataSource,
       gotoDataSourceConfigPage,
+      page,
     }) => {
       const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
       const configPage = await gotoDataSourceConfigPage(ds.uid);
+
+      // Wait for the page to fully load before clicking save and test
+      await page.getByText('Additional settings').waitFor({ state: 'visible', timeout: 10000 });
 
       // toBeOK() takes a Promise<Response> — pass the unawaited call
       await expect(configPage.saveAndTest()).toBeOK();
@@ -94,6 +113,9 @@ test.describe('Config editor', () => {
 
     test('should show error alert when health check fails', async ({ createDataSourceConfigPage, page }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+
+      // Wait for the page to fully load
+      await page.getByLabel('Data source connection URL').waitFor({ state: 'visible', timeout: 10000 });
 
       // A URL must be present for the save to succeed and trigger the health check.
       // The mock then intercepts /health and returns a 400 so we can assert the error UI.
@@ -106,6 +128,9 @@ test.describe('Config editor', () => {
 
     test('should show error alert when Elasticsearch is unreachable', async ({ createDataSourceConfigPage, page }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+
+      // Wait for the page to fully load
+      await page.getByLabel('Data source connection URL').waitFor({ state: 'visible', timeout: 10000 });
 
       // Point at a port nothing is listening on — the backend health check will fail for real
       await page.getByLabel('Data source connection URL').fill('http://localhost:19200');

@@ -2027,4 +2027,147 @@ describe('ElasticDatasource', () => {
       expect(finalReplaceCall).toContain('${__to:date:iso}');
     });
   });
+
+  describe('getIndices', () => {
+    it('should parse _resolve/index/* response correctly', async () => {
+      const mockResponse = {
+        indices: [
+          { name: 'logs-2024', data_stream: undefined },
+          { name: 'metrics-2024', data_stream: undefined },
+          { name: '.hidden-index', data_stream: undefined },
+          { name: '.ds-logs-2024', data_stream: 'logs' },
+        ],
+        aliases: [{ name: 'logs-alias' }, { name: '.hidden-alias' }],
+        data_streams: [{ name: 'logs-stream' }, { name: '.hidden-stream' }],
+      };
+
+      const ds = createElasticDatasource();
+      jest.spyOn(ds, 'getResourceRequest').mockResolvedValue(mockResponse);
+
+      const result = await ds.getIndices();
+
+      expect(result).toEqual(['logs-2024', 'logs-alias', 'logs-stream', 'metrics-2024']);
+    });
+
+    it('should filter out hidden indices starting with dot', async () => {
+      const mockResponse = {
+        indices: [
+          { name: 'public-index', data_stream: undefined },
+          { name: '.hidden-index', data_stream: undefined },
+        ],
+        aliases: [{ name: 'public-alias' }, { name: '.hidden-alias' }],
+        data_streams: [{ name: 'public-stream' }, { name: '.hidden-stream' }],
+      };
+
+      const ds = createElasticDatasource();
+      jest.spyOn(ds, 'getResourceRequest').mockResolvedValue(mockResponse);
+
+      const result = await ds.getIndices();
+
+      expect(result).toEqual(['public-alias', 'public-index', 'public-stream']);
+      expect(result).not.toContain('.hidden-index');
+      expect(result).not.toContain('.hidden-alias');
+      expect(result).not.toContain('.hidden-stream');
+    });
+
+    it('should filter out data stream backing indices', async () => {
+      const mockResponse = {
+        indices: [
+          { name: 'regular-index', data_stream: undefined },
+          { name: '.ds-logs-2024-01', data_stream: 'logs' },
+          { name: '.ds-metrics-2024-01', data_stream: 'metrics' },
+        ],
+        aliases: [],
+        data_streams: [{ name: 'logs' }, { name: 'metrics' }],
+      };
+
+      const ds = createElasticDatasource();
+      jest.spyOn(ds, 'getResourceRequest').mockResolvedValue(mockResponse);
+
+      const result = await ds.getIndices();
+
+      expect(result).toEqual(['logs', 'metrics', 'regular-index']);
+      expect(result).not.toContain('.ds-logs-2024-01');
+      expect(result).not.toContain('.ds-metrics-2024-01');
+    });
+
+    it('should deduplicate index names', async () => {
+      const mockResponse = {
+        indices: [{ name: 'logs', data_stream: undefined }],
+        aliases: [{ name: 'logs' }],
+        data_streams: [{ name: 'logs' }],
+      };
+
+      const ds = createElasticDatasource();
+      jest.spyOn(ds, 'getResourceRequest').mockResolvedValue(mockResponse);
+
+      const result = await ds.getIndices();
+
+      expect(result).toEqual(['logs']);
+      expect(result.length).toBe(1);
+    });
+
+    it('should return sorted array', async () => {
+      const mockResponse = {
+        indices: [
+          { name: 'zebra', data_stream: undefined },
+          { name: 'alpha', data_stream: undefined },
+          { name: 'beta', data_stream: undefined },
+        ],
+        aliases: [],
+        data_streams: [],
+      };
+
+      const ds = createElasticDatasource();
+      jest.spyOn(ds, 'getResourceRequest').mockResolvedValue(mockResponse);
+
+      const result = await ds.getIndices();
+
+      expect(result).toEqual(['alpha', 'beta', 'zebra']);
+    });
+
+    it('should return empty array on error', async () => {
+      const ds = createElasticDatasource();
+      jest.spyOn(ds, 'getResourceRequest').mockRejectedValue(new Error('Connection failed'));
+
+      const result = await ds.getIndices();
+
+      expect(result).toEqual([]);
+    });
+
+    it('should handle empty response', async () => {
+      const mockResponse = {
+        indices: [],
+        aliases: [],
+        data_streams: [],
+      };
+
+      const ds = createElasticDatasource();
+      jest.spyOn(ds, 'getResourceRequest').mockResolvedValue(mockResponse);
+
+      const result = await ds.getIndices();
+
+      expect(result).toEqual([]);
+    });
+
+    it('should handle missing response fields', async () => {
+      const mockResponse = {};
+
+      const ds = createElasticDatasource();
+      jest.spyOn(ds, 'getResourceRequest').mockResolvedValue(mockResponse);
+
+      const result = await ds.getIndices();
+
+      expect(result).toEqual([]);
+    });
+
+    it('should handle null response', async () => {
+      const ds = createElasticDatasource();
+      jest.spyOn(ds, 'getResourceRequest').mockResolvedValue(null);
+
+      const result = await ds.getIndices();
+
+      expect(result).toEqual([]);
+    });
+  });
 });

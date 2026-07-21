@@ -269,6 +269,8 @@ func isFieldCaps(url string) bool {
 
 func (ds *DataSource) callResourcePassthrough(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
 	logger := ds.logger.FromContext(ctx)
+	logger.Debug("Resource request received", "path", req.Path, "method", req.Method)
+
 	// allowed paths for resource calls:
 	// - empty string for fetching db version
 	// - /_mapping for fetching index mapping, e.g. requests going to `index/_mapping`
@@ -276,8 +278,10 @@ func (ds *DataSource) callResourcePassthrough(ctx context.Context, req *backend.
 	// - _msearch for executing getTerms queries
 	// - _mapping for fetching "root" index mappings
 	// - _field_caps for fetching "root" field capabilities
+	// - _resolve/index/* for listing indices, aliases, and data streams
 	if req.Path != "" && !isFieldCaps(req.Path) && req.Path != "_msearch" &&
-		!strings.HasSuffix(req.Path, "/_mapping") && req.Path != "_mapping" {
+		!strings.HasSuffix(req.Path, "/_mapping") && req.Path != "_mapping" &&
+		!strings.HasPrefix(req.Path, "_resolve/index/") {
 		logger.Error("Invalid resource path", "path", req.Path)
 		return fmt.Errorf("invalid resource URL: %s", req.Path)
 	}

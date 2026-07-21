@@ -9,7 +9,8 @@ import { QueryEditor } from '.';
 const noop = () => void 0;
 const datasourceMock = {
   getDatabaseVersion: () => Promise.resolve(null),
-} as ElasticDatasource;
+  getIndices: () => Promise.resolve([]),
+} as unknown as ElasticDatasource;
 
 describe('QueryEditor', () => {
   describe('Lucene Query Field', () => {

@@ -1027,6 +1027,60 @@ export class ElasticDatasource
   }
 
   /**
+   * Retrieves the list of available indices, aliases, and data streams from Elasticsearch.
+   * @returns A Promise that resolves to an array of index names.
+   */
+  async getIndices(): Promise<string[]> {
+    interface ResolveIndexResponse {
+      indices?: Array<{ name: string; data_stream?: string }>;
+      aliases?: Array<{ name: string }>;
+      data_streams?: Array<{ name: string }>;
+    }
+
+    try {
+      // Try _resolve/index/* API (ES 7.9+) which lists indices, aliases, and data streams
+      const response = (await this.getResourceRequest('_resolve/index/*')) as ResolveIndexResponse;
+
+      if (response && typeof response === 'object') {
+        const indexSet = new Set<string>();
+
+        // Add concrete indices (excluding data stream backing indices and hidden indices)
+        if (response.indices && Array.isArray(response.indices)) {
+          response.indices.forEach((idx) => {
+            if (!idx.data_stream && !idx.name.startsWith('.')) {
+              indexSet.add(idx.name);
+            }
+          });
+        }
+
+        // Add aliases (excluding hidden aliases)
+        if (response.aliases && Array.isArray(response.aliases)) {
+          response.aliases.forEach((alias) => {
+            if (!alias.name.startsWith('.')) {
+              indexSet.add(alias.name);
+            }
+          });
+        }
+
+        // Add data streams (excluding hidden data streams)
+        if (response.data_streams && Array.isArray(response.data_streams)) {
+          response.data_streams.forEach((ds) => {
+            if (!ds.name.startsWith('.')) {
+              indexSet.add(ds.name);
+            }
+          });
+        }
+
+        // Return deduplicated sorted array
+        return Array.from(indexSet).sort();
+      }
+      return [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  /**
    * Implemented as part of the DataSourceAPI.
    * Used by alerting to check if query contains template variables.
    */

@@ -47,6 +47,9 @@ test.describe('Query editor', () => {
       async ({ page }) => {
         const queryRow = getQueryEditorRow(page, 'A');
 
+        // Wait for the query editor to fully load by waiting for the first radio button
+        await queryRow.getByRole('radio', { name: 'Metrics' }).waitFor({ state: 'visible', timeout: 10000 });
+
         for (const { label } of QUERY_TYPE_LABELS) {
           await expect(queryRow.getByRole('radio', { name: label })).toBeVisible();
         }

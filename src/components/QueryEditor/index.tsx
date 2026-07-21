@@ -10,6 +10,7 @@ import { useNextId } from '../../hooks/useNextId';
 import { useDispatch } from '../../hooks/useStatelessReducer';
 import { EditorType, ElasticDatasourceLike, ElasticsearchOptions } from '../../types';
 import { isSupportedVersion, isTimeSeriesQuery, unsupportedVersionMessage } from '../../utils';
+import { IndexSelector } from '../IndexSelector';
 
 import { BucketAggregationsEditor } from './BucketAggregationsEditor';
 import { CodeEditorSection } from './CodeEditorSection';
@@ -19,7 +20,7 @@ import { ElasticsearchQueryOptions } from './ElasticsearchQueryOptions';
 import { MetricAggregationsEditor } from './MetricAggregationsEditor';
 import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
 import { QueryTypeSelector } from './QueryTypeSelector';
-import { changeAliasPattern, changeEditorTypeAndResetQuery, changeQuery } from './state';
+import { changeAliasPattern, changeEditorTypeAndResetQuery, changeQuery, changeIndex } from './state';
 
 export type ElasticQueryEditorProps = QueryEditorProps<
   ElasticDatasourceLike,
@@ -225,6 +226,21 @@ const QueryEditorForm = ({
           <EditorTypeSelector value={currentEditorType} onChange={onEditorTypeChange} />
         </div>
       </div>
+
+      {!isCodeEditor && (
+        <div className={styles.root}>
+          <InlineLabel width={17} tooltip="Optionally override the data source index pattern for this query">
+            Index
+          </InlineLabel>
+          <div className={styles.queryItem}>
+            <IndexSelector
+              value={value.index}
+              onChange={(index) => dispatch(changeIndex(index))}
+              placeholder="Leave empty to use data source index"
+            />
+          </div>
+        </div>
+      )}
 
       {isCodeEditor && (
         <CodeEditorSection
