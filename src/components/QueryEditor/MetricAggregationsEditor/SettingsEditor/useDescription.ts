@@ -1,6 +1,6 @@
 import { MetricAggregation } from '../../../../dataquery.gen';
 
-import { extendedStats, SIBLING_INNER_STATS } from '../../../../queryDef';
+import { clampSiblingBucketLimit, extendedStats, SIBLING_INNER_STATS } from '../../../../queryDef';
 
 const hasValue = (value: string) => (object: { value: string }) => object.value === value;
 
@@ -39,12 +39,13 @@ export const useDescription = (metric: MetricAggregation): string => {
     case 'max_bucket':
     case 'min_bucket':
     case 'avg_bucket': {
-      // Show the effective inner stat: query emission falls back to max for
-      // unknown values, so the description must not echo an invalid one.
+      // Show the effective values: query emission falls back to max for
+      // unknown inner stats and clamps the limit, so the description must
+      // not echo settings the query will not actually use.
       const requested = metric.settings?.metric ?? '';
       const inner = SIBLING_INNER_STATS.includes(requested) ? requested : 'max';
       const groupBy = metric.settings?.groupBy || 'not set';
-      const limit = metric.settings?.limit || '500';
+      const limit = clampSiblingBucketLimit(metric.settings?.limit);
       return `Metric: ${inner}, Group by: ${groupBy}, Limit: ${limit}`;
     }
 

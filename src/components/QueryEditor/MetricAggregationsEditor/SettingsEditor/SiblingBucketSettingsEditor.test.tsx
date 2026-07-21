@@ -138,6 +138,31 @@ describe('SiblingBucketSettingsEditor', () => {
     expect(screen.getByText('Max')).toBeInTheDocument();
   });
 
+  it('shows the effective limit in the description when the raw value would be clamped', () => {
+    // Query emission clamps the limit (default 500, cap 65535), so the
+    // description must show what will actually be sent to Elasticsearch.
+    const metricWithOversizedLimit: SumBucket = {
+      id: '1',
+      type: 'sum_bucket',
+      field: 'storage_used',
+      settings: { metric: 'max', groupBy: 'host', limit: '999999' },
+    };
+
+    render(
+      <ElasticsearchProvider
+        query={{ ...query, metrics: [metricWithOversizedLimit] }}
+        datasource={datasource}
+        onChange={() => {}}
+        onRunQuery={() => {}}
+        range={getDefaultTimeRange()}
+      >
+        <SettingsEditor metric={metricWithOversizedLimit} previousMetrics={[]} />
+      </ElasticsearchProvider>
+    );
+
+    expect(screen.getByRole('button', { name: /Metric: max, Group by: host, Limit: 65535/i })).toBeInTheDocument();
+  });
+
   it('dispatches a metric setting change when a different inner stat is selected', async () => {
     const onChange = jest.fn();
 

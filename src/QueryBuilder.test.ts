@@ -83,6 +83,27 @@ describe('ElasticQueryBuilder', () => {
     expect(firstLevel.terms.order._key).toBe('asc');
   });
 
+  it('with term agg and orderBy without an order direction defaults to desc', () => {
+    // An undefined direction would be dropped by JSON serialisation, leaving
+    // the empty "order": {} object Elasticsearch 9 rejects. The backend
+    // defaults to desc in this situation, so the frontend must match.
+    const query = builder.build({
+      refId: 'A',
+      metrics: [{ type: 'count', id: '1' }],
+      bucketAggs: [
+        {
+          type: 'terms',
+          field: '@host',
+          settings: { size: '5', orderBy: '_term' },
+          id: '2',
+        },
+        { type: 'date_histogram', field: '@timestamp', id: '3' },
+      ],
+    });
+
+    expect(query.aggs['2'].terms.order._key).toBe('desc');
+  });
+
   it('with term agg and order by metric agg', () => {
     const query = builder.build({
       refId: 'A',

@@ -69,11 +69,15 @@ export class ElasticQueryBuilder {
     queryNode.terms.size = size === 0 ? 500 : size;
 
     if (aggDef.settings.orderBy !== void 0) {
+      // Default the direction like the backend does (MustString("desc")): an
+      // undefined order would be dropped by JSON serialisation, leaving the
+      // empty "order": {} object Elasticsearch 9 rejects.
+      const order = aggDef.settings.order ?? 'desc';
       queryNode.terms.order = {};
       if (aggDef.settings.orderBy === '_term') {
-        queryNode.terms.order['_key'] = aggDef.settings.order;
+        queryNode.terms.order['_key'] = order;
       } else {
-        queryNode.terms.order[aggDef.settings.orderBy] = aggDef.settings.order;
+        queryNode.terms.order[aggDef.settings.orderBy] = order;
       }
 
       // if metric ref, look it up and add it to this agg level
@@ -82,7 +86,7 @@ export class ElasticQueryBuilder {
         for (let metric of target.metrics || []) {
           if (metric.id === metricId) {
             if (metric.type === 'count') {
-              queryNode.terms.order = { _count: aggDef.settings.order };
+              queryNode.terms.order = { _count: order };
             } else if (isSiblingPipelineAggregation(metric)) {
               // Sibling composites (sum_bucket, max_bucket, ...) are hidden terms+pipeline
               // pairs, not a metric that exists inside this terms bucket. Ordering by one
