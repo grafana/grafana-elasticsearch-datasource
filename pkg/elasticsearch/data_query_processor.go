@@ -156,26 +156,33 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 				if len(m.PipelineVariables) > 0 {
 					bucketPaths := make(map[string]any, len(m.PipelineVariables))
 					for name, pipelineAgg := range m.PipelineVariables {
-						if _, err := strconv.Atoi(pipelineAgg); err == nil {
-							var appliedAgg *MetricAgg
-							for _, pipelineMetric := range q.Metrics {
-								if pipelineMetric.ID == pipelineAgg {
-									appliedAgg = pipelineMetric
-									break
-								}
+						var appliedAgg *MetricAgg
+						for _, pipelineMetric := range q.Metrics {
+							if pipelineMetric.ID == pipelineAgg {
+								appliedAgg = pipelineMetric
+								break
 							}
-							if appliedAgg != nil {
-								if appliedAgg.Type == countType {
-									bucketPaths[name] = "_count"
-								} else {
-									bucketPaths[name] = pipelineAgg
-								}
+						}
+						if appliedAgg != nil {
+							// The reference resolves to a sibling metric. This covers
+							// numeric builder-UI IDs and named raw-DSL aggregation IDs.
+							if appliedAgg.Type == countType {
+								bucketPaths[name] = "_count"
+							} else {
+								bucketPaths[name] = pipelineAgg
 							}
+						} else if _, err := strconv.Atoi(pipelineAgg); err != nil {
+							// A non-numeric reference that matches no sibling comes from a
+							// raw-DSL query (e.g. a nested path like "agg>metric" or
+							// "_count"): pass it through verbatim so Elasticsearch
+							// validates it. Numeric references that match no sibling are
+							// builder-UI pointers to deleted metrics and are dropped.
+							bucketPaths[name] = pipelineAgg
 						}
 					}
 
-					// Skip emitting the pipeline aggregation when none of the
-					// variables resolved to a real metric: an empty buckets_path
+					// Skip emitting the pipeline aggregation when no variable resolved
+					// to a real metric or a raw-DSL reference: an empty buckets_path
 					// would produce an invalid Elasticsearch query.
 					if len(bucketPaths) == 0 {
 						continue
