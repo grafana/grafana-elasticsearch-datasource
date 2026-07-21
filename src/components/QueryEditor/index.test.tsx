@@ -11,7 +11,8 @@ import { QueryEditor } from '.';
 const noop = () => void 0;
 const datasourceMock = {
   getDatabaseVersion: () => Promise.resolve(null),
-} as ElasticDatasource;
+  getIndices: () => Promise.resolve([]),
+} as unknown as ElasticDatasource;
 
 describe('QueryEditor', () => {
   describe('Lucene Query Field', () => {
@@ -94,19 +95,25 @@ describe('QueryEditor', () => {
     });
 
     describe('resize-driven re-measurement', () => {
-      let observedCallback: ResizeObserverCallback | undefined;
       const originalResizeObserver = global.ResizeObserver;
+      let resizeObserverInstances: MockResizeObserver[];
+
+      class MockResizeObserver {
+        observedElements: Element[] = [];
+
+        constructor(public callback: ResizeObserverCallback) {
+          resizeObserverInstances.push(this);
+        }
+
+        observe = jest.fn((element: Element) => {
+          this.observedElements.push(element);
+        });
+        unobserve = jest.fn();
+        disconnect = jest.fn();
+      }
 
       beforeEach(() => {
-        observedCallback = undefined;
-        class MockResizeObserver {
-          constructor(callback: ResizeObserverCallback) {
-            observedCallback = callback;
-          }
-          observe = jest.fn();
-          unobserve = jest.fn();
-          disconnect = jest.fn();
-        }
+        resizeObserverInstances = [];
         global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
       });
 
@@ -124,15 +131,25 @@ describe('QueryEditor', () => {
           />
         );
         const queryField = screen.getByPlaceholderText('Enter a lucene query') as HTMLTextAreaElement;
-        expect(observedCallback).toBeDefined();
+        const queryFieldResizeObserver = resizeObserverInstances.find((observer) =>
+          observer.observedElements.includes(queryField)
+        );
+        expect(queryFieldResizeObserver).toBeDefined();
 
         Object.defineProperty(queryField, 'scrollHeight', { value: 50, configurable: true });
         Object.defineProperty(queryField, 'clientHeight', { value: 50, configurable: true });
         Object.defineProperty(queryField, 'offsetHeight', { value: 52, configurable: true });
 
+        const notifyQueryFieldWidth = (width: number) => {
+          queryFieldResizeObserver!.callback(
+            [{ contentRect: { width } } as ResizeObserverEntry],
+            queryFieldResizeObserver as unknown as ResizeObserver
+          );
+        };
+
         // Width goes from unset to 400px (e.g. Explore split-pane settling on mount): re-measure.
         act(() => {
-          observedCallback!([{ contentRect: { width: 400 } } as ResizeObserverEntry], {} as ResizeObserver);
+          notifyQueryFieldWidth(400);
         });
         expect(queryField.style.height).toBe('52px');
 
@@ -145,14 +162,14 @@ describe('QueryEditor', () => {
         // Same width reported again (e.g. a height-only notification caused by our own
         // height update): must be ignored, so the height should stay unchanged.
         act(() => {
-          observedCallback!([{ contentRect: { width: 400 } } as ResizeObserverEntry], {} as ResizeObserver);
+          notifyQueryFieldWidth(400);
         });
         expect(queryField.style.height).toBe('52px');
 
         // Width actually changes (e.g. dragging the Explore split-pane divider): re-measure
         // and pick up the new content geometry.
         act(() => {
-          observedCallback!([{ contentRect: { width: 300 } } as ResizeObserverEntry], {} as ResizeObserver);
+          notifyQueryFieldWidth(300);
         });
         expect(queryField.style.height).toBe('92px');
       });
