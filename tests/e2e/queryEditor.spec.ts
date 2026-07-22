@@ -186,7 +186,11 @@ test.describe('Query editor', () => {
 // it after other awaits causes Playwright to lose the CDP body reference.
 function exploreUrl(
   datasourceUid: string,
-  options?: { luceneQuery?: string; metricsType?: 'logs' | 'raw_data' }
+  options?: {
+    luceneQuery?: string;
+    metricsType?: 'logs' | 'raw_data';
+    bucketAggs?: Array<Record<string, unknown>>;
+  }
 ): string {
   const query: Record<string, unknown> = {
     refId: 'A',
@@ -197,6 +201,10 @@ function exploreUrl(
   }
   if (options?.metricsType) {
     query.metrics = [{ id: '1', type: options.metricsType }];
+  }
+  if (options?.bucketAggs) {
+    query.metrics = [{ id: '1', type: 'count' }];
+    query.bucketAggs = options.bucketAggs;
   }
   const panes = JSON.stringify({
     explore: {
@@ -257,6 +265,46 @@ test.describe('Query editor with fixture data', () => {
       await page.goto(exploreUrl('httplogs-e2e', { metricsType: 'logs' }));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
+      expect(body.results?.A?.error).toBeUndefined();
+      expect(body.results?.A?.frames?.length).toBeGreaterThan(0);
+    });
+
+    test('Metrics mode: high-cardinality terms with auto interval does not exceed max buckets', async ({ page }) => {
+      // 200 distinct traceIds multiplied by the ~1,000+ time buckets a panel-width auto
+      // interval produces would need well over the Elasticsearch search.max_buckets
+      // default (65,535) and fail with "Trying to create too many buckets". The backend
+      // widens the auto interval to fit instead (#383).
+      // Resolve on any results.A (error or frames) so a regression fails the assertion
+      // below instead of timing out in waitForMainQueryResponse().
+      let body: any;
+      const responsePromise = page.waitForResponse(async (r: Response) => {
+        if (!r.url().includes('/api/ds/query')) {
+          return false;
+        }
+        const b = await r.json().catch(() => null);
+        if (!b?.results?.A) {
+          return false;
+        }
+        body = b;
+        return true;
+      });
+      await page.goto(
+        exploreUrl('httplogs-e2e', {
+          bucketAggs: [
+            // order/orderBy match the query builder's defaults. Without them the
+            // backend serialises an empty terms "order" object which Elasticsearch
+            // rejects (a separate pre-existing bug, not what this test covers).
+            {
+              id: '2',
+              type: 'terms',
+              field: 'traceId.keyword',
+              settings: { size: '0', order: 'desc', orderBy: '_term' },
+            },
+            { id: '3', type: 'date_histogram', field: '@timestamp', settings: { interval: 'auto' } },
+          ],
+        })
+      );
+      await responsePromise;
       expect(body.results?.A?.error).toBeUndefined();
       expect(body.results?.A?.frames?.length).toBeGreaterThan(0);
     });

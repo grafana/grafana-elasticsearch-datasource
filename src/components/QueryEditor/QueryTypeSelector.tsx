@@ -29,6 +29,7 @@ export const QueryTypeSelector = () => {
         id: firstMetric.id,
         type: queryTypeToMetricType(newQueryType),
         previousType: firstMetric.type,
+        preserveQuery: query.preserveQuery ?? false,
       })
     );
   };

@@ -6,6 +6,7 @@ import { QueryType } from '../../types';
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
 
 import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
+import { getPreserveQueryDefault } from './preserveQueryPreference';
 
 /**
  * When the `initQuery` Action is dispatched, the query gets populated with default values where values are not present.
@@ -43,9 +44,15 @@ export const queryReducer = (prevQuery: ElasticsearchDataQuery['query'], action:
   // Clear the query only when the metric change alters the implied query type
   // (e.g. metrics -> logs, or -> raw_data). Switching between aggregations that
   // share the same implied query type (e.g. count -> avg) preserves the query.
+  // The user can opt in to always preserving the query via the `preserveQuery` flag on the action payload.
   // See https://github.com/grafana/grafana-elasticsearch-datasource/issues/309
+  // See https://github.com/grafana/grafana-elasticsearch-datasource/issues/350
   if (changeMetricType.match(action)) {
-    const { previousType, type } = action.payload;
+    const { previousType, type, preserveQuery } = action.payload;
+
+    if (preserveQuery) {
+      return prevQuery;
+    }
     const previousImpliedQueryType = previousType ? metricAggregationConfig[previousType].impliedQueryType : undefined;
     const nextImpliedQueryType = metricAggregationConfig[type].impliedQueryType;
 
@@ -117,4 +124,21 @@ export const editorTypeReducer = (prevEditorType: ElasticsearchDataQuery['editor
   }
 
   return prevEditorType;
+};
+
+/**
+ * Bake the remembered "Preserve query" preference into the query once on init so the
+ * toggle state always round-trips through the saved query JSON, instead of being
+ * resolved from localStorage at read time (which would make the same dashboard behave
+ * differently across browsers).
+ */
+export const preserveQueryReducer = (
+  prevPreserveQuery: ElasticsearchDataQuery['preserveQuery'],
+  action: Action
+): ElasticsearchDataQuery['preserveQuery'] => {
+  if (initQuery.match(action)) {
+    return prevPreserveQuery ?? getPreserveQueryDefault();
+  }
+
+  return prevPreserveQuery;
 };
