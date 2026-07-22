@@ -407,6 +407,11 @@ export interface ElasticsearchDataQuery extends common.DataQuery {
    */
   metrics?: MetricAggregation[];
   /**
+   * When true, switching between Metrics, Logs, Raw Data, and Raw Document
+   * preserves the current query text instead of clearing it.
+   */
+  preserveQuery?: boolean;
+  /**
    * Query string (Lucene or DSL depending on queryType)
    */
   query?: string;

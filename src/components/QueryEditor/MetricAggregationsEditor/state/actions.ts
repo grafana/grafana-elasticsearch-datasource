@@ -12,6 +12,7 @@ export const changeMetricType = createAction<{
   id: MetricAggregation['id'];
   type: MetricAggregation['type'];
   previousType?: MetricAggregation['type'];
+  preserveQuery?: boolean;
 }>('@metrics/change_type');
 export const changeEditorType = createAction<{ id: MetricAggregation['id']; type: MetricAggregation['type'] }>(
   '@metrics/change_type'
