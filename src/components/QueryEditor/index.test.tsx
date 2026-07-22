@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
+import { createTheme } from '@grafana/data';
+
 import { ElasticsearchDataQuery } from '../../dataquery.gen';
 import { ElasticDatasource } from '../../datasource';
 import React from 'react';
@@ -26,6 +28,21 @@ describe('QueryEditor', () => {
 
       const queryField = screen.getByPlaceholderText('Enter a lucene query');
       expect(queryField.tagName).toBe('TEXTAREA');
+    });
+
+    it('renders in a monospace font, matching the Code editor and the query editors of other datasources', () => {
+      // Regression test: the Lucene box briefly rendered in the default UI sans-serif
+      // font after the Slate-based QueryField (which got monospace for free via a
+      // global grafana-ui CSS rule) was replaced with a plain Input/TextArea. See
+      // https://github.com/grafana/grafana-elasticsearch-datasource/pull/310 and #349.
+      //
+      // Assert against the theme's configured monospace font rather than a hardcoded
+      // font name, so this doesn't break if the theme's font choice ever changes.
+      render(<QueryEditor query={buildQuery('')} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />);
+
+      const queryField = screen.getByPlaceholderText('Enter a lucene query');
+      const expectedFont = createTheme().typography.fontFamilyMonospace.replace(/['"]/g, '').split(',')[0].trim();
+      expect(getComputedStyle(queryField).fontFamily.replace(/['"]/g, '')).toContain(expectedFont);
     });
 
     it('calls onChange with the new value as the user types', () => {
@@ -259,6 +276,59 @@ describe('QueryEditor', () => {
     render(<QueryEditor query={query} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />);
 
     expect(screen.getByText('Group By')).toBeInTheDocument();
+  });
+
+  describe('Preserve query toggle', () => {
+    it('associates the label with the switch for accessibility', () => {
+      const query: ElasticsearchDataQuery = {
+        refId: 'A',
+        query: '',
+        metrics: [{ id: '1', type: 'count' }],
+        bucketAggs: [{ id: '2', type: 'date_histogram' }],
+        preserveQuery: true,
+      };
+
+      render(<QueryEditor query={query} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />);
+
+      const toggle = screen.getByLabelText('Preserve query');
+      expect(toggle).toBeInTheDocument();
+      expect(toggle).toBeChecked();
+    });
+
+    it('reflects the per-query value rather than the sticky localStorage default', () => {
+      localStorage.setItem('grafana.datasources.elasticsearch.preserveQuery', 'true');
+
+      const query: ElasticsearchDataQuery = {
+        refId: 'A',
+        query: '',
+        metrics: [{ id: '1', type: 'count' }],
+        bucketAggs: [{ id: '2', type: 'date_histogram' }],
+      };
+
+      render(<QueryEditor query={query} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />);
+
+      expect(screen.getByLabelText('Preserve query')).not.toBeChecked();
+    });
+
+    it('stays checked for a fully-initialized query copied via Explore split, regardless of the sticky localStorage default', () => {
+      // Explore's splitOpen copies the origin pane's query object as-is (only refId changes),
+      // so a query that already has metrics/bucketAggs/query set never goes through `initQuery`
+      // again in the new pane. `preserveQuery` must therefore come from the copied query itself,
+      // not from whatever the sticky default happens to be at that moment.
+      localStorage.setItem('grafana.datasources.elasticsearch.preserveQuery', 'false');
+
+      const splitCopiedQuery: ElasticsearchDataQuery = {
+        refId: 'A',
+        query: 'status:200',
+        metrics: [{ id: '1', type: 'count' }],
+        bucketAggs: [{ id: '2', type: 'date_histogram' }],
+        preserveQuery: true,
+      };
+
+      render(<QueryEditor query={splitCopiedQuery} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />);
+
+      expect(screen.getByLabelText('Preserve query')).toBeChecked();
+    });
   });
 
   describe('Include runtime fields toggle', () => {

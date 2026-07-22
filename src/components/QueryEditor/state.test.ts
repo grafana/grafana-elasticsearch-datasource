@@ -2,6 +2,7 @@ import { ElasticsearchDataQuery } from '../../dataquery.gen';
 import { reducerTester } from '../reducerTester';
 
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
+import { setPreserveQueryDefault } from './preserveQueryPreference';
 import {
   aliasPatternReducer,
   changeAliasPattern,
@@ -11,6 +12,7 @@ import {
   changeQueryType,
   indexReducer,
   initQuery,
+  preserveQueryReducer,
   queryReducer,
   queryTypeReducer,
 } from './state';
@@ -120,6 +122,35 @@ describe('Query Reducer', () => {
       reducerTester<ElasticsearchDataQuery['query']>()
         .givenReducer(queryReducer, initialQuery)
         .whenActionIsDispatched(changeMetricType({ id: '1', type: 'avg' }))
+        .thenStateShouldEqual('');
+    });
+
+    it('Should preserve query when preserveQuery is true, even switching logs -> metrics', () => {
+      const initialQuery: ElasticsearchDataQuery['query'] = 'some logs query';
+
+      reducerTester<ElasticsearchDataQuery['query']>()
+        .givenReducer(queryReducer, initialQuery)
+        .whenActionIsDispatched(changeMetricType({ id: '1', type: 'avg', previousType: 'logs', preserveQuery: true }))
+        .thenStateShouldEqual(initialQuery);
+    });
+
+    it('Should preserve query when preserveQuery is true, even switching to raw_data', () => {
+      const initialQuery: ElasticsearchDataQuery['query'] = 'field:value';
+
+      reducerTester<ElasticsearchDataQuery['query']>()
+        .givenReducer(queryReducer, initialQuery)
+        .whenActionIsDispatched(
+          changeMetricType({ id: '1', type: 'raw_data', previousType: 'avg', preserveQuery: true })
+        )
+        .thenStateShouldEqual(initialQuery);
+    });
+
+    it('Should still clear query when preserveQuery is false, even if it were true before', () => {
+      const initialQuery: ElasticsearchDataQuery['query'] = 'field:value';
+
+      reducerTester<ElasticsearchDataQuery['query']>()
+        .givenReducer(queryReducer, initialQuery)
+        .whenActionIsDispatched(changeMetricType({ id: '1', type: 'logs', previousType: 'avg', preserveQuery: false }))
         .thenStateShouldEqual('');
     });
   });
@@ -265,5 +296,36 @@ describe('Index Reducer', () => {
       .givenReducer(indexReducer, initialIndex)
       .whenActionIsDispatched({ type: 'THIS ACTION SHOULD NOT HAVE ANY EFFECT IN THIS REDUCER' })
       .thenStateShouldEqual(initialIndex);
+  });
+});
+
+describe('Preserve Query Reducer', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('Should bake the sticky localStorage default into the query on init when unset', () => {
+    setPreserveQueryDefault(true);
+
+    reducerTester<ElasticsearchDataQuery['preserveQuery']>()
+      .givenReducer(preserveQueryReducer, undefined)
+      .whenActionIsDispatched(initQuery())
+      .thenStateShouldEqual(true);
+  });
+
+  it('Should default to false on init when nothing is stored', () => {
+    reducerTester<ElasticsearchDataQuery['preserveQuery']>()
+      .givenReducer(preserveQueryReducer, undefined)
+      .whenActionIsDispatched(initQuery())
+      .thenStateShouldEqual(false);
+  });
+
+  it('Should not override an explicit per-query value on init', () => {
+    setPreserveQueryDefault(true);
+
+    reducerTester<ElasticsearchDataQuery['preserveQuery']>()
+      .givenReducer(preserveQueryReducer, false)
+      .whenActionIsDispatched(initQuery())
+      .thenStateShouldEqual(false);
   });
 });

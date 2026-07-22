@@ -790,6 +790,9 @@ type ElasticsearchDataQuery struct {
 	BucketAggs []BucketAggregation `json:"bucketAggs,omitempty"`
 	// List of metric aggregations
 	Metrics []MetricAggregation `json:"metrics,omitempty"`
+	// When true, switching between Metrics, Logs, Raw Data, and Raw Document
+	// preserves the current query text instead of clearing it.
+	PreserveQuery *bool `json:"preserveQuery,omitempty"`
 	// Whether to include runtime fields in the response
 	IncludeRuntimeFields *bool `json:"includeRuntimeFields,omitempty"`
 	// Metadata for variable queries

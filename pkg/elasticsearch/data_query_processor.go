@@ -18,7 +18,7 @@ func (e *elasticsearchDataQuery) processQuery(q *Query, ms *es.MultiSearchReques
 	}
 
 	defaultTimeField := e.client.GetConfiguredFields().TimeField
-	b := ms.Search(q.Interval, q.TimeRange)
+	b := ms.Search(clampAutoInterval(q, from, to), q.TimeRange)
 	if q.Index != "" {
 		b.SetIndex(q.Index)
 	}

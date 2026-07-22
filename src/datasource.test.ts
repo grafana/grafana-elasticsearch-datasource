@@ -294,13 +294,18 @@ describe('ElasticDatasource', () => {
       });
 
       it('validates the interpolated query rather than the raw target', async () => {
-        // The raw target is invalid ES|QL, but applyTemplateVariables resolves it (e.g. a
-        // template variable) into a valid query - which is what the backend actually receives.
-        // Validation must run against that resolved query so it isn't a false positive.
-        jest.spyOn(ds, 'applyTemplateVariables').mockImplementation((target) => ({
-          ...target,
-          query: 'FROM logs | LIMIT 10',
-        }));
+        // The raw target is invalid ES|QL until its variable resolves - a bare `${foo}s`
+        // token is a parse error before substitution (see issue #339). Validation must run
+        // against the interpolated query so it isn't a false positive.
+        const dsWithVars = createElasticDatasource(
+          { jsonData: { timeField: '@timestamp' } },
+          {
+            getVariables: () => [],
+            replace: (text?: string) => (text ?? '').split('${foo}').join('30'),
+            containsTemplate: (text?: string) => text?.includes('$') ?? false,
+            updateTimeRange: () => {},
+          }
+        );
         const fetchMock = jest.fn().mockReturnValue(
           of(
             createResponse({
@@ -311,9 +316,15 @@ describe('ElasticDatasource', () => {
         setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
         const query = {
           ...createElasticQuery(),
-          targets: [{ refId: 'A', queryType: 'esql', query: 'FROM $index | WHER broken' }],
+          targets: [
+            {
+              refId: 'A',
+              queryType: 'esql',
+              query: 'FROM logs | STATS total = SUM(v) BY b = BUCKET(@timestamp, ${foo}s) | LIMIT 10',
+            },
+          ],
         };
-        await expect(ds.query(query)).toEmitValuesWith((received) => {
+        await expect(dsWithVars.query(query)).toEmitValuesWith((received) => {
           expect(received[0].errors ?? []).toHaveLength(0);
         });
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -355,6 +366,51 @@ describe('ElasticDatasource', () => {
           expect(received[0].errors ?? []).toHaveLength(0);
         });
         expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      describe('with a configured time field', () => {
+        // jsonData.timeField defaults to '@timestamp' in real configs, which makes
+        // applyTemplateVariables inject a time-range WHERE clause via an AST rewrite.
+        // The ANTLR parser recovers from errors, so an invalid query would otherwise be
+        // rewritten into a valid one with the offending clause silently deleted -
+        // validation must run before that rewrite can mangle the query.
+        const invalidQuery = 'FROM logs | LIMIT 10 | FOO BAR';
+
+        it('rejects an invalid ES|QL query instead of sending it to the backend', async () => {
+          const dsWithTimeField = createElasticDatasource({ jsonData: { timeField: '@timestamp' } });
+          const fetchMock = jest.fn().mockReturnValue(of({ data: { results: {} } }));
+          setBackendSrv({ ...origBackendSrv, fetch: fetchMock });
+          const query = {
+            ...createElasticQuery(),
+            targets: [{ refId: 'A', queryType: 'esql', query: invalidQuery }],
+          };
+          await expect(dsWithTimeField.query(query)).toEmitValuesWith((received) => {
+            expect(received[0].errors?.length).toBe(1);
+            expect(received[0].errors?.[0].refId).toBe('A');
+            expect(received[0].errors?.[0].message).toMatch(/\[\d+:\d+\]/);
+            expect(received[0].data).toEqual([]);
+          });
+          expect(fetchMock).not.toHaveBeenCalled();
+        });
+
+        it('does not silently rewrite an invalid ES|QL query during interpolation', () => {
+          const dsWithTimeField = createElasticDatasource({ jsonData: { timeField: '@timestamp' } });
+          const interpolated = dsWithTimeField.interpolateVariablesInQueries(
+            [{ refId: 'A', queryType: 'esql', query: invalidQuery }],
+            {}
+          )[0];
+          expect(interpolated.query).toBe(invalidQuery);
+        });
+
+        it('still injects the time-range filter into a valid ES|QL query', () => {
+          const dsWithTimeField = createElasticDatasource({ jsonData: { timeField: '@timestamp' } });
+          const interpolated = dsWithTimeField.interpolateVariablesInQueries(
+            [{ refId: 'A', queryType: 'esql', query: 'FROM logs | LIMIT 10' }],
+            {}
+          )[0];
+          expect(interpolated.query).toContain('WHERE @timestamp >=');
+          expect(interpolated.query).toContain('LIMIT 10');
+        });
       });
     });
 

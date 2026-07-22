@@ -82,14 +82,20 @@ func addHistogramAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg) es.AggBuild
 	return aggBuilder
 }
 
+// termsAggSize resolves the size setting of a terms aggregation the same way the
+// request builder does: a numeric value is used as is, anything else falls back to
+// the default size.
+func termsAggSize(bucketAgg *BucketAgg) int {
+	if size, err := bucketAgg.Settings.Get("size").Int(); err == nil {
+		return size
+	}
+	return stringToIntWithDefaultValue(bucketAgg.Settings.Get("size").MustString(), defaultSize)
+}
+
 // addTermsAgg adds a terms aggregation to the aggregation builder
 func addTermsAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, metrics []*MetricAgg) es.AggBuilder {
 	aggBuilder.Terms(bucketAgg.ID, bucketAgg.Field, func(a *es.TermsAggregation, b es.AggBuilder) {
-		if size, err := bucketAgg.Settings.Get("size").Int(); err == nil {
-			a.Size = size
-		} else {
-			a.Size = stringToIntWithDefaultValue(bucketAgg.Settings.Get("size").MustString(), defaultSize)
-		}
+		a.Size = termsAggSize(bucketAgg)
 
 		if minDocCount, err := bucketAgg.Settings.Get("min_doc_count").Int(); err == nil {
 			a.MinDocCount = &minDocCount
