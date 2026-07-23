@@ -71,7 +71,17 @@ func Test_validateIndex_Warning_WrongTimestampType(t *testing.T) {
 		Headers:       nil,
 	})
 	assert.Equal(t, backend.HealthStatusOk, res.Status)
-	assert.Equal(t, "Elasticsearch data source is healthy. Warning: Could not find time field 'timestamp' with type date in index", res.Message)
+	assert.Equal(t, "Elasticsearch data source is healthy. Warning: Could not find time field 'timestamp' with type date or date_nanos in index", res.Message)
+}
+
+func Test_validateIndex_Success_DateNanosTimeField(t *testing.T) {
+	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"date_nanos":{"metadata_field":false}}}}`)
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
+		PluginContext: backend.PluginContext{},
+		Headers:       nil,
+	})
+	assert.Equal(t, backend.HealthStatusOk, res.Status)
+	assert.Equal(t, "Elasticsearch data source is healthy.", res.Message)
 }
 func Test_validateIndex_Warning_FailedToUnmarshalValidateResponse(t *testing.T) {
 	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `\\\///{"fields":null}"`)
