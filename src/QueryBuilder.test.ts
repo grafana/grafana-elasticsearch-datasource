@@ -83,6 +83,27 @@ describe('ElasticQueryBuilder', () => {
     expect(firstLevel.terms.order._key).toBe('asc');
   });
 
+  it('with term agg and empty-string orderBy emits no order object', () => {
+    // An empty orderBy would serialise as "order": {"": "desc"}, which
+    // Elasticsearch rejects. The backend guards orderBy != "", so the
+    // frontend must match.
+    const query = builder.build({
+      refId: 'A',
+      metrics: [{ type: 'count', id: '1' }],
+      bucketAggs: [
+        {
+          type: 'terms',
+          field: '@host',
+          settings: { size: '5', order: 'desc', orderBy: '' },
+          id: '2',
+        },
+        { type: 'date_histogram', field: '@timestamp', id: '3' },
+      ],
+    });
+
+    expect(query.aggs['2'].terms.order).toBeUndefined();
+  });
+
   it('with term agg and orderBy without an order direction defaults to desc', () => {
     // An undefined direction would be dropped by JSON serialisation, leaving
     // the empty "order": {} object Elasticsearch 9 rejects. The backend

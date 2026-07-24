@@ -2441,7 +2441,8 @@ func TestProcessBuckets(t *testing.T) {
 				}
 				// Each date_histogram bucket carries the hidden terms aggregation
 				// ("2_groupby", ignored by the parser) and the sibling value ("2").
-				// The final bucket has no matching documents: value is null.
+				// The final bucket has no matching documents: sum_bucket returns 0
+				// (the sum identity), unlike max/min/avg_bucket which return null.
 				response := `{
 					"responses": [
 						{
@@ -2474,7 +2475,7 @@ func TestProcessBuckets(t *testing.T) {
 											"key": 3000,
 											"doc_count": 0,
 											"2_groupby": { "buckets": [] },
-											"2": { "value": null }
+											"2": { "value": 0 }
 										}
 									]
 								}
@@ -2497,7 +2498,7 @@ func TestProcessBuckets(t *testing.T) {
 				require.Equal(t, frame.Fields[1].Len(), 3)
 				require.Equal(t, *frame.Fields[1].At(0).(*float64), 48.0)
 				require.Equal(t, *frame.Fields[1].At(1).(*float64), 44.0)
-				require.Nil(t, frame.Fields[1].At(2).(*float64))
+				require.Equal(t, *frame.Fields[1].At(2).(*float64), 0.0)
 				assert.Equal(t, frame.Name, "Sum of Max storage_used per host")
 			})
 
@@ -2515,13 +2516,16 @@ func TestProcessBuckets(t *testing.T) {
 						"bucketAggs": [{ "type": "date_histogram", "field": "@timestamp", "id": "3" }]
 					}`,
 				}
+				// Unlike sum_bucket, max_bucket returns null for a bucket with no
+				// matching documents (there is no identity value for max).
 				response := `{
 					"responses": [
 						{
 							"aggregations": {
 								"3": {
 									"buckets": [
-										{ "key": 1000, "doc_count": 10, "2": { "value": 8 } }
+										{ "key": 1000, "doc_count": 10, "2": { "value": 8 } },
+										{ "key": 2000, "doc_count": 0, "2": { "value": null } }
 									]
 								}
 							}
@@ -2532,7 +2536,9 @@ func TestProcessBuckets(t *testing.T) {
 				require.NoError(t, err)
 				frame := result.Responses["A"].Frames[0]
 				assert.Equal(t, frame.Name, "Max of Max storage_used per host")
+				require.Equal(t, frame.Fields[1].Len(), 2)
 				require.Equal(t, *frame.Fields[1].At(0).(*float64), 8.0)
+				require.Nil(t, frame.Fields[1].At(1).(*float64))
 			})
 
 			t.Run("min_bucket without explicit inner stat names series with default", func(t *testing.T) {

@@ -68,7 +68,10 @@ export class ElasticQueryBuilder {
     const size = aggDef.settings?.size ? parseInt(aggDef.settings.size, 10) : 500;
     queryNode.terms.size = size === 0 ? 500 : size;
 
-    if (aggDef.settings.orderBy !== void 0) {
+    // An empty-string orderBy must be treated like an absent one, matching the
+    // backend's orderBy != "" guard: it would otherwise emit "order": {"": ...},
+    // which Elasticsearch rejects as an unparseable order field.
+    if (aggDef.settings.orderBy) {
       // Default the direction like the backend does (MustString("desc")): an
       // undefined order would be dropped by JSON serialisation, leaving the
       // empty "order": {} object Elasticsearch 9 rejects.
