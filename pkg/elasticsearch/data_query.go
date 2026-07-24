@@ -12,6 +12,7 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	"github.com/grafana/grafana-plugin-sdk-go/config"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
@@ -27,12 +28,16 @@ type elasticsearchDataQuery struct {
 	ctx                          context.Context
 	datasourceIndex              string
 	keepLabelsInResponse         bool
+	dataplaneEnabled             bool
 	aggregationParserDSLRawQuery AggregationParser
 }
 
 var newElasticsearchDataQuery = func(ctx context.Context, client es.Client, req *backend.QueryDataRequest, logger log.Logger, datasourceIndex string) *elasticsearchDataQuery {
 	_, fromAlert := req.Headers[headerFromAlert]
 	fromExpression := req.GetHTTPHeader(headerFromExpression) != ""
+
+	cfg := config.GrafanaConfigFromContext(ctx)
+	dataplaneEnabled := cfg.FeatureToggles().IsEnabled(dataplaneFeatureToggle)
 
 	return &elasticsearchDataQuery{
 		client:          client,
@@ -43,6 +48,7 @@ var newElasticsearchDataQuery = func(ctx context.Context, client es.Client, req 
 		// To maintain backward compatibility, it is necessary to keep labels in responses for alerting and expressions queries.
 		// Historically, these labels have been used in alerting rules and transformations.
 		keepLabelsInResponse: fromAlert || fromExpression,
+		dataplaneEnabled:     dataplaneEnabled,
 
 		aggregationParserDSLRawQuery: NewAggregationParser(),
 	}
@@ -123,7 +129,7 @@ func (e *elasticsearchDataQuery) executeEsqlQuery(q *Query) (*backend.DataRespon
 	configuredFields := e.client.GetConfiguredFields()
 
 	if isLogsQuery(q) {
-		return processEsqlLogsResponse(esqlRes, q, configuredFields)
+		return processEsqlLogsResponse(esqlRes, q, configuredFields, e.dataplaneEnabled)
 	} else if isRawDocumentQuery(q) {
 		return processEsqlRawDocumentResponse(esqlRes, q)
 	} else if isRawDataQuery(q) {
@@ -198,5 +204,5 @@ func (e *elasticsearchDataQuery) executeRegularQueries(queries []*Query, start t
 		return response, nil
 	}
 
-	return parseResponse(e.ctx, res.Responses, queries, e.client.GetConfiguredFields(), e.keepLabelsInResponse, e.logger)
+	return parseResponse(e.ctx, res.Responses, queries, e.client.GetConfiguredFields(), e.keepLabelsInResponse, e.dataplaneEnabled, e.logger)
 }
