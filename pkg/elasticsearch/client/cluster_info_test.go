@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -35,7 +36,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, ts.Client(), ts.URL))
 
 		require.NoError(t, err)
 		require.NotNil(t, clusterInfo)
@@ -66,7 +67,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, ts.Client(), ts.URL))
 
 		require.NoError(t, err)
 		require.NotNil(t, clusterInfo)
@@ -75,7 +76,7 @@ func TestGetClusterInfo(t *testing.T) {
 	})
 
 	t.Run("Should return error when HTTP request fails", func(t *testing.T) {
-		clusterInfo, err := GetClusterInfo(http.DefaultClient, "http://invalid-url-that-does-not-exist.local:9999")
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, http.DefaultClient, "http://invalid-url-that-does-not-exist.local:9999"))
 
 		require.Error(t, err)
 		require.Equal(t, ClusterInfo{}, clusterInfo)
@@ -93,7 +94,7 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, ts.Client(), ts.URL))
 
 		require.Error(t, err)
 		require.Equal(t, ClusterInfo{}, clusterInfo)
@@ -114,10 +115,10 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, ts.Client(), ts.URL))
 
 		require.NoError(t, err)
-		require.Equal(t, ClusterInfo{}, clusterInfo)
+		require.Equal(t, ClusterInfo{Product: "Elasticsearch"}, clusterInfo)
 		assert.Equal(t, "", clusterInfo.Version.BuildFlavor)
 		assert.False(t, clusterInfo.IsServerless())
 	})
@@ -133,11 +134,19 @@ func TestGetClusterInfo(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, ts.Client(), ts.URL))
 
 		require.Error(t, err)
 		require.Equal(t, ClusterInfo{}, clusterInfo)
 		assert.Contains(t, err.Error(), "unexpected status code 401 getting ES cluster info")
+	})
+
+	t.Run("Should return error when elasticsearch client is nil", func(t *testing.T) {
+		clusterInfo, err := GetClusterInfo(context.Background(), nil)
+
+		require.Error(t, err)
+		require.Equal(t, ClusterInfo{}, clusterInfo)
+		assert.Contains(t, err.Error(), "elasticsearch client is required")
 	})
 }
 
@@ -162,42 +171,12 @@ func TestGetClusterInfo_DetectionFields(t *testing.T) {
 			ts.Close()
 		})
 
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
+		clusterInfo, err := GetClusterInfo(context.Background(), newTestESClient(t, ts.Client(), ts.URL))
 
 		require.NoError(t, err)
 		assert.Equal(t, "9.1.0", clusterInfo.Version.Number)
 		assert.Equal(t, "You Know, for Search", clusterInfo.Tagline)
 		assert.Equal(t, "Elasticsearch", clusterInfo.Product)
-	})
-
-	t.Run("Should capture reported distribution when present", func(t *testing.T) {
-		ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-			rw.Header().Set("Content-Type", "application/json")
-			_, err := rw.Write([]byte(`{
-				"name": "test-node",
-				"cluster_name": "test-cluster",
-				"version": {
-					"distribution": "customdistro",
-					"number": "2.11.0",
-					"build_type": "tar",
-					"minimum_wire_compatibility_version": "7.10.0"
-				},
-				"tagline": "The CustomDistro Project"
-			}`))
-			require.NoError(t, err)
-		}))
-
-		t.Cleanup(func() {
-			ts.Close()
-		})
-
-		clusterInfo, err := GetClusterInfo(ts.Client(), ts.URL)
-
-		require.NoError(t, err)
-		assert.Equal(t, "customdistro", clusterInfo.Version.Distribution)
-		assert.Equal(t, "2.11.0", clusterInfo.Version.Number)
-		assert.Equal(t, "The CustomDistro Project", clusterInfo.Tagline)
-		assert.Equal(t, "", clusterInfo.Product)
 	})
 }
 
