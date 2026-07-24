@@ -75,9 +75,9 @@ type DataSource struct {
 	info           *es.DatasourceInfo
 	schemaSettings schemaSettings
 	logger         log.Logger
-	// distribution and versionMajor are the instance gauge labels registered at
-	// creation time, kept so Dispose decrements the same series. Both empty when
-	// the instance was never registered.
+	// distribution and versionMajor are the sanitised instance gauge labels
+	// registered at creation time, kept so Dispose decrements the same series.
+	// Both empty when the instance was never registered.
 	distribution string
 	versionMajor string
 	// disposeOnce caps the gauge decrement at one per instance: the SDK
@@ -236,15 +236,16 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		IncludeFrozen:              includeFrozen,
 		ClusterInfo:                clusterInfo,
 	}
+	distribution := clusterInfo.Distribution()
 	ds := &DataSource{
 		info:           &model,
 		schemaSettings: defaultSchemaSettings(),
 		logger:         log.New().FromContext(ctx),
-		distribution:   clusterInfo.Distribution(),
-		versionMajor:   clusterInfo.VersionMajor(),
+		distribution:   instrumentation.SanitizeDistribution(distribution),
+		versionMajor:   instrumentation.SanitizeVersionMajor(clusterInfo.VersionMajor()),
 	}
 	instrumentation.DatasourceInstances.WithLabelValues(ds.distribution, ds.versionMajor).Inc()
-	ds.logger.Info("Detected cluster distribution", "distribution", ds.distribution, "version", clusterInfo.Version.Number)
+	ds.logger.Info("Detected cluster distribution", "distribution", distribution, "version", clusterInfo.Version.Number)
 	backend.Logger.Info("NewDatasource", "url", ds.info.URL)
 	schemaProvider := NewSchemaProvider(ds)
 	schemaDS := schemas.NewSchemaDatasource(
