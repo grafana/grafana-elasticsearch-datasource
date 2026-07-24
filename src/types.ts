@@ -211,6 +211,7 @@ export interface ElasticDatasourceLike extends DataSourceApi<ElasticsearchDataQu
   query(request: DataQueryRequest<ElasticsearchDataQuery>): Observable<DataQueryResponse>;
   getDatabaseVersion(useCachedData?: boolean): Promise<SemVer | null>;
   getFields(type?: string[], range?: TimeRange): Observable<MetricFindValue[]>;
+  getIndices(): Promise<string[]>;
   index?: string;
 }
 

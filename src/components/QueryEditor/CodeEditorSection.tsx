@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { GrafanaTheme2 } from '@grafana/data';
 import { InlineLabel, useStyles2 } from '@grafana/ui';
 
+import { IndexSelector } from '../IndexSelector';
 import { ElasticsearchDataQuery, QueryType } from '../../dataquery.gen';
 import { useDispatch } from '../../hooks/useStatelessReducer';
 
@@ -11,11 +12,15 @@ import { useDatasource } from './ElasticsearchQueryContext';
 import { EsqlQueryEditor } from './EsqlQueryEditor';
 import { QueryLanguageSelector } from './QueryLanguageSelector';
 import { RawQueryEditor } from './RawQueryEditor';
-import { changeQuery, changeQueryType } from './state';
+import { changeQuery, changeQueryType, changeIndex } from './state';
 
 const getStyles = (theme: GrafanaTheme2) => ({
   root: css({
     display: 'flex',
+  }),
+  queryItem: css({
+    flexGrow: 1,
+    margin: theme.spacing(0, 0.5, 0.5, 0),
   }),
 });
 
@@ -71,6 +76,19 @@ export const CodeEditorSection = ({
           </div>
         </div>
       )}
+
+      <div className={styles.root}>
+        <InlineLabel width={17} tooltip="Optionally override the data source index pattern for this query">
+          Index
+        </InlineLabel>
+        <div className={styles.queryItem}>
+          <IndexSelector
+            value={value.index}
+            onChange={(index) => dispatch(changeIndex(index))}
+            placeholder="Leave empty to use data source index"
+          />
+        </div>
+      </div>
 
       {queryType === 'esql' ? (
         <EsqlQueryEditor {...editorProps} />

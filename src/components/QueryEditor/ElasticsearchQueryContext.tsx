@@ -11,6 +11,7 @@ import { reducer as metricsReducer } from './MetricAggregationsEditor/state/redu
 import {
   aliasPatternReducer,
   editorTypeReducer,
+  indexReducer,
   initQuery,
   preserveQueryReducer,
   queryReducer,
@@ -50,7 +51,7 @@ export const ElasticsearchProvider = ({
   const reducer = combineReducers<
     Pick<
       ElasticsearchDataQuery,
-      'query' | 'queryType' | 'alias' | 'editorType' | 'metrics' | 'bucketAggs' | 'preserveQuery'
+      'query' | 'queryType' | 'alias' | 'editorType' | 'metrics' | 'bucketAggs' | 'index' | 'preserveQuery'
     >
   >({
     query: queryReducer,
@@ -59,6 +60,7 @@ export const ElasticsearchProvider = ({
     editorType: editorTypeReducer,
     metrics: metricsReducer,
     bucketAggs: createBucketAggsReducer(datasource.timeField),
+    index: indexReducer,
     preserveQuery: preserveQueryReducer,
   });
 

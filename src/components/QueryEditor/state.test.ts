@@ -7,8 +7,10 @@ import {
   aliasPatternReducer,
   changeAliasPattern,
   changeEditorTypeAndResetQuery,
+  changeIndex,
   changeQuery,
   changeQueryType,
+  indexReducer,
   initQuery,
   preserveQueryReducer,
   queryReducer,
@@ -238,6 +240,62 @@ describe('Query Type Reducer', () => {
       .givenReducer(queryTypeReducer, initialQueryType)
       .whenActionIsDispatched(initQuery())
       .thenStateShouldEqual('dsl');
+  });
+});
+
+describe('Index Reducer', () => {
+  it('Should correctly set index', () => {
+    const expectedIndex = 'logs-*';
+
+    reducerTester<string | undefined>()
+      .givenReducer(indexReducer, undefined)
+      .whenActionIsDispatched(changeIndex(expectedIndex))
+      .thenStateShouldEqual(expectedIndex);
+  });
+
+  it('Should correctly clear index when set to undefined', () => {
+    const initialIndex = 'logs-*';
+
+    reducerTester<string | undefined>()
+      .givenReducer(indexReducer, initialIndex)
+      .whenActionIsDispatched(changeIndex(undefined))
+      .thenStateShouldEqual(undefined);
+  });
+
+  it('Should maintain index on init if already set', () => {
+    const initialIndex = 'logs-*';
+
+    reducerTester<string | undefined>()
+      .givenReducer(indexReducer, initialIndex)
+      .whenActionIsDispatched(initQuery())
+      .thenStateShouldEqual(initialIndex);
+  });
+
+  it('Should maintain undefined index on init if not set', () => {
+    const initialIndex = undefined;
+
+    reducerTester<string | undefined>()
+      .givenReducer(indexReducer, initialIndex)
+      .whenActionIsDispatched(initQuery())
+      .thenStateShouldEqual(undefined);
+  });
+
+  it('Should reset index to undefined when switching editor types', () => {
+    const initialIndex = 'logs-*';
+
+    reducerTester<string | undefined>()
+      .givenReducer(indexReducer, initialIndex)
+      .whenActionIsDispatched(changeEditorTypeAndResetQuery({ editorType: 'code', queryType: 'dsl' }))
+      .thenStateShouldEqual(undefined);
+  });
+
+  it('Should not change state with other action types', () => {
+    const initialIndex = 'logs-*';
+
+    reducerTester<string | undefined>()
+      .givenReducer(indexReducer, initialIndex)
+      .whenActionIsDispatched({ type: 'THIS ACTION SHOULD NOT HAVE ANY EFFECT IN THIS REDUCER' })
+      .thenStateShouldEqual(initialIndex);
   });
 });
 
