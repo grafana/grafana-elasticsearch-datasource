@@ -343,6 +343,9 @@ func TestBucketScriptParser(t *testing.T) {
 
 	t.Run("CanParse", func(t *testing.T) {
 		assert.True(t, parser.CanParse("bucket_script"))
+		// Any type other than bucket_script works as the negative probe here.
+		// "avg" is used rather than another pipeline type so this file carries
+		// no reference to the removed moving_avg aggregation.
 		assert.False(t, parser.CanParse("avg"))
 	})
 
