@@ -383,6 +383,28 @@ describe('ElasticQueryBuilder', () => {
     expect(firstLevel.aggs['4']).toBe(undefined);
   });
 
+  it('skips removed aggregation types entirely', () => {
+    // moving_avg was removed in Elasticsearch 8.0: saved rows must be skipped,
+    // whether configured or not, rather than emitted for Elasticsearch to reject
+    const metrics = [
+      { id: '3', type: 'sum', field: '@value' },
+      { id: '2', type: 'moving_avg', field: '3' },
+      { id: '4', type: 'moving_avg' },
+    ] as unknown as ElasticsearchDataQuery['metrics'];
+
+    const query = builder.build({
+      refId: 'A',
+      metrics,
+      bucketAggs: [{ type: 'date_histogram', field: '@timestamp', id: '5' }],
+    });
+
+    const firstLevel = query.aggs['5'];
+
+    expect(firstLevel.aggs['3']).not.toBe(undefined);
+    expect(firstLevel.aggs['2']).toBe(undefined);
+    expect(firstLevel.aggs['4']).toBe(undefined);
+  });
+
   it('with top_metrics', () => {
     const query = builder.build({
       refId: 'A',

@@ -151,6 +151,13 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 			continue
 		}
 
+		// Saved queries can carry aggregation types that no longer exist
+		// (moving_avg was removed in Elasticsearch 8.0). Skip them rather
+		// than emit an aggregation Elasticsearch would reject.
+		if _, known := metricAggType[m.Type]; !known {
+			continue
+		}
+
 		if isPipelineAgg(m.Type) {
 			if isPipelineAggWithMultipleBucketPaths(m.Type) {
 				if len(m.PipelineVariables) > 0 {

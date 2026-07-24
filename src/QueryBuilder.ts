@@ -1,6 +1,7 @@
 import { InternalTimeZones } from '@grafana/data';
 
 import {
+  isMetricAggregationType,
   isMetricAggregationWithField,
   isMetricAggregationWithSettings,
   isPipelineAggregation,
@@ -273,6 +274,13 @@ export class ElasticQueryBuilder {
     for (i = 0; i < target.metrics.length; i++) {
       metric = target.metrics[i];
       if (metric.type === 'count') {
+        continue;
+      }
+
+      // Saved queries can carry aggregation types that no longer exist
+      // (moving_avg was removed in Elasticsearch 8.0). Skip them rather
+      // than emit an aggregation Elasticsearch would reject.
+      if (!isMetricAggregationType(metric.type)) {
         continue;
       }
 

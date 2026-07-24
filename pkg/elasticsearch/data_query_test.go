@@ -972,6 +972,34 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, plAgg.BucketPath, "3")
 		})
 
+		t.Run("Removed aggregation types are skipped", func(t *testing.T) {
+			// moving_avg was removed in Elasticsearch 8.0. Saved rows must be
+			// skipped, whether configured or not, rather than emitted for
+			// Elasticsearch to reject.
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{ "id": "3", "type": "sum", "field": "@value" },
+					{ "id": "2", "type": "moving_avg", "field": "3", "pipelineAgg": "3" },
+					{ "id": "5", "type": "moving_avg" }
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			firstLevel := sr.Aggs[0]
+			require.Equal(t, firstLevel.Key, "4")
+			require.Equal(t, firstLevel.Aggregation.Type, "date_histogram")
+
+			require.Len(t, firstLevel.Aggregation.Aggs, 1)
+			sumAgg := firstLevel.Aggregation.Aggs[0]
+			require.Equal(t, sumAgg.Key, "3")
+			require.Equal(t, sumAgg.Aggregation.Type, "sum")
+		})
+
 		t.Run("With top_metrics (from frontend tests)", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
@@ -1622,7 +1650,7 @@ func TestSettingsCasting(t *testing.T) {
 				{ "type": "date_histogram", "field": "@timestamp", "id": "2" }
 			],
 			"metrics": [
-				{ "id": "1", "type": "average", "field": "@value" },
+				{ "id": "1", "type": "avg", "field": "@value" },
 				{
 					"id": "3",
 					"type": "serial_diff",
@@ -1657,7 +1685,7 @@ func TestSettingsCasting(t *testing.T) {
 					}
 				],
 				"metrics": [
-					{ "id": "1", "type": "average", "field": "@value" },
+					{ "id": "1", "type": "avg", "field": "@value" },
 					{
 						"id": "3",
 						"type": "serial_diff",
@@ -1691,7 +1719,7 @@ func TestSettingsCasting(t *testing.T) {
 					}
 				],
 				"metrics": [
-					{ "id": "1", "type": "average", "field": "@value" },
+					{ "id": "1", "type": "avg", "field": "@value" },
 					{
 						"id": "3",
 						"type": "serial_diff",
@@ -1726,7 +1754,7 @@ func TestSettingsCasting(t *testing.T) {
 						}
 					],
 					"metrics": [
-						{ "id": "1", "type": "average", "field": "@value" }
+						{ "id": "1", "type": "avg", "field": "@value" }
 					]
 				}`, from, to)
 				assert.Nil(t, err)
@@ -1751,7 +1779,7 @@ func TestSettingsCasting(t *testing.T) {
 						}
 					],
 					"metrics": [
-						{ "id": "1", "type": "average", "field": "@value" }
+						{ "id": "1", "type": "avg", "field": "@value" }
 					]
 				}`, from, to)
 				assert.Nil(t, err)
