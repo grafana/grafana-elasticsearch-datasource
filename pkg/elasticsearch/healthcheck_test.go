@@ -28,6 +28,50 @@ func Test_Healthcheck_OK(t *testing.T) {
 	assert.Equal(t, "Elasticsearch data source is healthy.", res.Message)
 }
 
+func Test_Healthcheck_UnsupportedVersionWarning(t *testing.T) {
+	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
+	service.info.ClusterInfo = es.ClusterInfo{
+		Version: es.VersionInfo{Number: "7.17.10"},
+		Product: "Elasticsearch",
+	}
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
+		PluginContext: backend.PluginContext{},
+		Headers:       nil,
+	})
+	assert.Equal(t, backend.HealthStatusOk, res.Status)
+	assert.Contains(t, res.Message, "Elasticsearch data source is healthy.")
+	assert.Contains(t, res.Message, "Connected to Elasticsearch 7.17.10, which is no longer supported")
+}
+
+func Test_Healthcheck_NoVersionWarningOnSupportedVersion(t *testing.T) {
+	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
+	service.info.ClusterInfo = es.ClusterInfo{
+		Version: es.VersionInfo{Number: "8.19.2"},
+		Product: "Elasticsearch",
+	}
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
+		PluginContext: backend.PluginContext{},
+		Headers:       nil,
+	})
+	assert.Equal(t, backend.HealthStatusOk, res.Status)
+	assert.Equal(t, "Elasticsearch data source is healthy.", res.Message)
+}
+
+func Test_Healthcheck_NoVersionWarningOnOtherDistribution(t *testing.T) {
+	// A tagline-detected distribution reports its own version numbers, which
+	// are not comparable with Elasticsearch versions and must not warn.
+	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
+	service.info.ClusterInfo = es.ClusterInfo{
+		Version: es.VersionInfo{Number: "2.11.0", Distribution: es.DistributionTagline},
+	}
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
+		PluginContext: backend.PluginContext{},
+		Headers:       nil,
+	})
+	assert.Equal(t, backend.HealthStatusOk, res.Status)
+	assert.Equal(t, "Elasticsearch data source is healthy.", res.Message)
+}
+
 func Test_Healthcheck_Timeout(t *testing.T) {
 	service := GetMockDatasource(http.StatusRequestTimeout, "408 Request Timeout", `{"status":"red"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
 	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{

@@ -2,11 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React, { PropsWithChildren, act } from 'react';
 import { from } from 'rxjs';
-import { SemVer } from 'semver';
 
 import { getDefaultTimeRange } from '@grafana/data';
 
-import { Average, Count, ElasticsearchDataQuery, UniqueCount } from '../../../dataquery.gen';
+import { Average, Count, ElasticsearchDataQuery, MetricAggregation, UniqueCount } from '../../../dataquery.gen';
 import { ElasticDatasource } from '../../../datasource';
 import { defaultBucketAgg } from '../../../queryDef';
 import { ElasticsearchProvider } from '../ElasticsearchQueryContext';
@@ -100,11 +99,9 @@ describe('Metric Editor', () => {
       bucketAggs: [],
     };
 
-    const getDatabaseVersion: ElasticDatasource['getDatabaseVersion'] = jest.fn(() => Promise.resolve(null));
-
     const wrapper = ({ children }: PropsWithChildren<{}>) => (
       <ElasticsearchProvider
-        datasource={{ getDatabaseVersion } as ElasticDatasource}
+        datasource={{} as ElasticDatasource}
         query={query}
         range={getDefaultTimeRange()}
         onChange={() => {}}
@@ -128,27 +125,19 @@ describe('Metric Editor', () => {
     expect(screen.queryByText('Raw Document (deprecated)')).toBeNull();
   });
 
-  // Regression test for https://github.com/grafana/grafana/issues/115127:
-  // SemVer ranges exclude prereleases by default, so versions like
-  // `8.14.0-SNAPSHOT` reported by snapshot builds of Elasticsearch were
-  // filtering every metric type out of the picker.
-  it('Should list metric types for prerelease Elasticsearch versions (e.g. -SNAPSHOT)', async () => {
-    const count: Count = { id: '1', type: 'count' };
+  it('Should render a removed-type row for saved moving_avg queries without crashing', async () => {
+    const movingAvg = { id: '2', type: 'moving_avg', field: '1' } as unknown as MetricAggregation;
 
     const query: ElasticsearchDataQuery = {
       refId: 'A',
       query: '',
-      metrics: [count],
-      bucketAggs: [],
+      metrics: [{ id: '1', type: 'count' }, movingAvg],
+      bucketAggs: [defaultBucketAgg('3')],
     };
-
-    const getDatabaseVersion: ElasticDatasource['getDatabaseVersion'] = jest.fn(() =>
-      Promise.resolve(new SemVer('8.14.0-SNAPSHOT'))
-    );
 
     const wrapper = ({ children }: PropsWithChildren<{}>) => (
       <ElasticsearchProvider
-        datasource={{ getDatabaseVersion } as ElasticDatasource}
+        datasource={{} as ElasticDatasource}
         query={query}
         range={getDefaultTimeRange()}
         onChange={() => {}}
@@ -158,16 +147,8 @@ describe('Metric Editor', () => {
       </ElasticsearchProvider>
     );
 
-    render(<MetricEditor value={count} />, { wrapper });
+    render(<MetricEditor value={movingAvg} />, { wrapper });
 
-    await userEvent.click(screen.getByText('Count'));
-
-    // Base metric types must remain visible for prerelease versions.
-    expect(await screen.findByText('Average')).toBeInTheDocument();
-    expect(screen.getByText('Extended Stats')).toBeInTheDocument();
-
-    // Version-gated `moving_avg` (`<8.0.0`) must still be excluded — the fix
-    // should not regress upper-bound filtering when the version is a prerelease.
-    expect(screen.queryByText('Moving Average')).toBeNull();
+    expect(await screen.findByText('moving_avg (removed)')).toBeInTheDocument();
   });
 });

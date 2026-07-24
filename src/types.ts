@@ -18,14 +18,7 @@ import {
   ExtendedStats,
   MetricAggregation,
   MetricAggregationType,
-  MovingAverageEWMAModelSettings,
-  MovingAverageHoltModelSettings,
-  MovingAverageHoltWintersModelSettings,
-  MovingAverageLinearModelSettings,
-  MovingAverageModel,
-  MovingAverageSimpleModelSettings,
   Logs as SchemaLogs,
-  MovingAverage as SchemaMovingAverage,
 } from './dataquery.gen';
 
 // We want to extend the settings of the Logs query with additional properties that
@@ -41,21 +34,6 @@ export interface Logs extends SchemaLogs {
 }
 
 export type MetricAggregationWithMeta = ExtendedStats;
-
-export type MovingAverageModelSettings<T extends MovingAverageModel = MovingAverageModel> = Partial<
-  Extract<
-    | MovingAverageSimpleModelSettings
-    | MovingAverageLinearModelSettings
-    | MovingAverageEWMAModelSettings
-    | MovingAverageHoltModelSettings
-    | MovingAverageHoltWintersModelSettings,
-    { model: T }
-  >
->;
-
-export interface MovingAverage<T extends MovingAverageModel = MovingAverageModel> extends SchemaMovingAverage {
-  settings?: MovingAverageModelSettings<T>;
-}
 
 export type Interval = 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Yearly';
 
@@ -90,11 +68,6 @@ interface MetricConfiguration<T extends MetricAggregationType> {
   supportsInlineScript: boolean;
   supportsMissing: boolean;
   isPipelineAgg: boolean;
-  /**
-   * A valid semver range for which the metric is known to be available.
-   * If omitted defaults to '*'.
-   */
-  versionRange?: string;
   supportsMultipleBucketPaths: boolean;
   impliedQueryType: QueryType;
   hasSettings: boolean;

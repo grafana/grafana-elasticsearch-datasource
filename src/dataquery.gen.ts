@@ -117,7 +117,7 @@ export interface GeoHashGridSettings {
   precision?: string;
 }
 
-export type PipelineMetricAggregationType = ('moving_avg' | 'moving_fn' | 'derivative' | 'serial_diff' | 'cumulative_sum' | 'bucket_script');
+export type PipelineMetricAggregationType = ('moving_fn' | 'derivative' | 'serial_diff' | 'cumulative_sum' | 'bucket_script');
 
 export type MetricAggregationType = ('count' | 'avg' | 'sum' | 'min' | 'max' | 'extended_stats' | 'percentiles' | 'cardinality' | 'raw_document' | 'raw_data' | 'logs' | 'rate' | 'top_metrics' | PipelineMetricAggregationType);
 
@@ -270,64 +270,6 @@ export const defaultPipelineMetricAggregationWithMultipleBucketPaths: Partial<Pi
   pipelineVariables: [],
 };
 
-export type MovingAverageModel = ('simple' | 'linear' | 'ewma' | 'holt' | 'holt_winters');
-
-export interface MovingAverageModelOption {
-  label: string;
-  value: MovingAverageModel;
-}
-
-export interface BaseMovingAverageModelSettings {
-  model: MovingAverageModel;
-  predict: string;
-  window: string;
-}
-
-export interface MovingAverageSimpleModelSettings extends BaseMovingAverageModelSettings {
-  model: 'simple';
-}
-
-export interface MovingAverageLinearModelSettings extends BaseMovingAverageModelSettings {
-  model: 'linear';
-}
-
-export interface MovingAverageEWMAModelSettings extends BaseMovingAverageModelSettings {
-  minimize: boolean;
-  model: 'ewma';
-  settings?: {
-    alpha?: string;
-  };
-}
-
-export interface MovingAverageHoltModelSettings extends BaseMovingAverageModelSettings {
-  minimize: boolean;
-  model: 'holt';
-  settings: {
-    alpha?: string;
-    beta?: string;
-  };
-}
-
-export interface MovingAverageHoltWintersModelSettings extends BaseMovingAverageModelSettings {
-  minimize: boolean;
-  model: 'holt_winters';
-  settings: {
-    alpha?: string;
-    beta?: string;
-    gamma?: string;
-    period?: string;
-    pad?: boolean;
-  };
-}
-
-/**
- * #MovingAverage's settings are overridden in types.ts
- */
-export interface MovingAverage extends BasePipelineMetricAggregation {
-  settings?: Record<string, unknown>;
-  type: 'moving_avg';
-}
-
 export interface MovingFunction extends BasePipelineMetricAggregation {
   settings?: {
     window?: string;
@@ -374,9 +316,9 @@ export interface TopMetrics extends BaseMetricAggregation {
   type: 'top_metrics';
 }
 
-export type PipelineMetricAggregation = (MovingAverage | Derivative | CumulativeSum | BucketScript);
+export type PipelineMetricAggregation = (Derivative | CumulativeSum | BucketScript);
 
-export type MetricAggregationWithSettings = (BucketScript | CumulativeSum | Derivative | SerialDiff | RawData | RawDocument | UniqueCount | Percentiles | ExtendedStats | Min | Max | Sum | Average | MovingAverage | MovingFunction | Logs | Rate | TopMetrics);
+export type MetricAggregationWithSettings = (BucketScript | CumulativeSum | Derivative | SerialDiff | RawData | RawDocument | UniqueCount | Percentiles | ExtendedStats | Min | Max | Sum | Average | MovingFunction | Logs | Rate | TopMetrics);
 
 export interface ElasticsearchDataQuery extends common.DataQuery {
   /**

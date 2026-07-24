@@ -5,7 +5,6 @@ import {
   ExtendedStat,
   MetricAggregation,
   MetricAggregationType,
-  MovingAverageModelOption,
 } from './dataquery.gen';
 import type { QueryType } from './types';
 
@@ -18,14 +17,6 @@ export const extendedStats: ExtendedStat[] = [
   { label: 'Std Dev', value: 'std_deviation' },
   { label: 'Std Dev Upper', value: 'std_deviation_bounds_upper' },
   { label: 'Std Dev Lower', value: 'std_deviation_bounds_lower' },
-];
-
-export const movingAvgModelOptions: MovingAverageModelOption[] = [
-  { label: 'Simple', value: 'simple' },
-  { label: 'Linear', value: 'linear' },
-  { label: 'Exponentially Weighted', value: 'ewma' },
-  { label: 'Holt Linear', value: 'holt' },
-  { label: 'Holt Winters', value: 'holt_winters' },
 ];
 
 export const highlightTags = {
@@ -75,5 +66,5 @@ export function isPipelineAgg(metricType: MetricAggregationType) {
 }
 
 export function isPipelineAggWithMultipleBucketPaths(metricType: MetricAggregationType) {
-  return !!metricAggregationConfig[metricType].supportsMultipleBucketPaths;
+  return !!metricAggregationConfig[metricType]?.supportsMultipleBucketPaths;
 }

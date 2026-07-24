@@ -151,6 +151,20 @@ describe('Query Reducer', () => {
         .whenActionIsDispatched(changeMetricType({ id: '1', type: 'logs', previousType: 'avg', preserveQuery: false }))
         .thenStateShouldEqual('');
     });
+
+    it('Should preserve query when switching from a removed metric type (moving_avg) to a supported one (moving_fn)', () => {
+      // moving_avg was removed from MetricAggregationType/metricAggregationConfig, but saved
+      // queries may still reference it as `previousType`. It implied `metrics`, same as moving_fn,
+      // so the query should be preserved rather than wiped (see issue #309).
+      const initialQuery: ElasticsearchDataQuery['query'] = 'field:value';
+
+      reducerTester<ElasticsearchDataQuery['query']>()
+        .givenReducer(queryReducer, initialQuery)
+        .whenActionIsDispatched(
+          changeMetricType({ id: '1', type: 'moving_fn', previousType: 'moving_avg' as never })
+        )
+        .thenStateShouldEqual(initialQuery);
+    });
   });
 });
 

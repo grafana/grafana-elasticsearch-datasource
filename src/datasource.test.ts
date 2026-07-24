@@ -1168,9 +1168,9 @@ describe('ElasticDatasource', () => {
       expect(ds.targetContainsTemplate(target)).toBe(true);
     });
     it('returns true when there are variables in the metric aggregation', () => {
-      target.metrics = [{ type: 'moving_avg', id: '1', settings: { window: '$window' } }];
+      target.metrics = [{ type: 'moving_fn', id: '1', settings: { window: '$window' } }];
       expect(ds.targetContainsTemplate(target)).toBe(true);
-      target.metrics = [{ type: 'moving_avg', id: '1', field: '$field' }];
+      target.metrics = [{ type: 'moving_fn', id: '1', field: '$field' }];
       expect(ds.targetContainsTemplate(target)).toBe(true);
       target.metrics = [{ type: 'extended_stats', id: '1', meta: { something: '$something' } }];
       expect(ds.targetContainsTemplate(target)).toBe(true);

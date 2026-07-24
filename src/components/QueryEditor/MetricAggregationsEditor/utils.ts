@@ -113,26 +113,6 @@ export const metricAggregationConfig: MetricsConfiguration = {
     hasMeta: false,
     defaults: {},
   },
-  moving_avg: {
-    // deprecated in 6.4.0, removed in 8.0.0,
-    // recommended replacement is moving_fn
-    label: 'Moving Average',
-    impliedQueryType: 'metrics',
-    requiresField: true,
-    isPipelineAgg: true,
-    versionRange: '<8.0.0',
-    supportsMissing: false,
-    supportsMultipleBucketPaths: false,
-    hasSettings: true,
-    supportsInlineScript: false,
-    hasMeta: false,
-    defaults: {
-      settings: {
-        model: 'simple',
-        window: '5',
-      },
-    },
-  },
   moving_fn: {
     // TODO: Check this
     label: 'Moving Function',
@@ -288,12 +268,6 @@ type PipelineOptions = {
 };
 
 export const pipelineOptions: PipelineOptions = {
-  moving_avg: [
-    { label: 'window', default: 5 },
-    { label: 'model', default: 'simple' },
-    { label: 'predict' },
-    { label: 'minimize', default: false },
-  ],
   moving_fn: [{ label: 'window', default: 5 }, { label: 'script' }],
   derivative: [{ label: 'unit' }],
   serial_diff: [{ label: 'lag' }],

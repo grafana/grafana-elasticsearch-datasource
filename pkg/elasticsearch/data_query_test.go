@@ -770,7 +770,7 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, ghGridAgg.Precision, 3)
 		})
 
-		t.Run("With moving average (from frontend tests)", func(t *testing.T) {
+		t.Run("With moving function (from frontend tests)", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
@@ -780,7 +780,7 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 					{ "id": "3", "type": "sum", "field": "@value" },
 					{
 						"id": "2",
-						"type": "moving_avg",
+						"type": "moving_fn",
 						"field": "3"
 					}
 				]
@@ -797,14 +797,14 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			mAgg := sumAgg.Aggregation.Aggregation.(*es.MetricAggregation)
 			require.Equal(t, mAgg.Field, "@value")
 
-			movingAvgAgg := firstLevel.Aggregation.Aggs[1]
-			require.Equal(t, movingAvgAgg.Key, "2")
-			require.Equal(t, movingAvgAgg.Aggregation.Type, "moving_avg")
-			pl := movingAvgAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			movingFnAgg := firstLevel.Aggregation.Aggs[1]
+			require.Equal(t, movingFnAgg.Key, "2")
+			require.Equal(t, movingFnAgg.Aggregation.Type, "moving_fn")
+			pl := movingFnAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
 			require.Equal(t, pl.BucketPath, "3")
 		})
 
-		t.Run("With moving average", func(t *testing.T) {
+		t.Run("With moving function", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
@@ -814,7 +814,7 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 					{ "id": "3", "type": "sum", "field": "@value" },
 					{
 						"id": "2",
-						"type": "moving_avg",
+						"type": "moving_fn",
 						"field": "3",
 						"pipelineAgg": "3"
 					}
@@ -834,14 +834,14 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			mAgg := sumAgg.Aggregation.Aggregation.(*es.MetricAggregation)
 			require.Equal(t, mAgg.Field, "@value")
 
-			movingAvgAgg := firstLevel.Aggregation.Aggs[1]
-			require.Equal(t, movingAvgAgg.Key, "2")
-			require.Equal(t, movingAvgAgg.Aggregation.Type, "moving_avg")
-			pl := movingAvgAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			movingFnAgg := firstLevel.Aggregation.Aggs[1]
+			require.Equal(t, movingFnAgg.Key, "2")
+			require.Equal(t, movingFnAgg.Aggregation.Type, "moving_fn")
+			pl := movingFnAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
 			require.Equal(t, pl.BucketPath, "3")
 		})
 
-		t.Run("With moving average doc count (from frontend tests)", func(t *testing.T) {
+		t.Run("With moving function doc count (from frontend tests)", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
@@ -851,7 +851,7 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 					{ "id": "3", "type": "count"},
 					{
 						"id": "2",
-						"type": "moving_avg",
+						"type": "moving_fn",
 						"field": "3"
 					}
 				]
@@ -864,14 +864,14 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, firstLevel.Aggregation.Type, "date_histogram")
 			require.Len(t, firstLevel.Aggregation.Aggs, 1)
 
-			movingAvgAgg := firstLevel.Aggregation.Aggs[0]
-			require.Equal(t, movingAvgAgg.Key, "2")
-			require.Equal(t, movingAvgAgg.Aggregation.Type, "moving_avg")
-			pl := movingAvgAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			movingFnAgg := firstLevel.Aggregation.Aggs[0]
+			require.Equal(t, movingFnAgg.Key, "2")
+			require.Equal(t, movingFnAgg.Aggregation.Type, "moving_fn")
+			pl := movingFnAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
 			require.Equal(t, pl.BucketPath, "_count")
 		})
 
-		t.Run("With moving average doc count", func(t *testing.T) {
+		t.Run("With moving function doc count", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
@@ -881,7 +881,7 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 					{ "id": "3", "type": "count", "field": "select field" },
 					{
 						"id": "2",
-						"type": "moving_avg",
+						"type": "moving_fn",
 						"field": "3",
 						"pipelineAgg": "3"
 					}
@@ -895,14 +895,14 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, firstLevel.Aggregation.Type, "date_histogram")
 			require.Len(t, firstLevel.Aggregation.Aggs, 1)
 
-			movingAvgAgg := firstLevel.Aggregation.Aggs[0]
-			require.Equal(t, movingAvgAgg.Key, "2")
-			require.Equal(t, movingAvgAgg.Aggregation.Type, "moving_avg")
-			pl := movingAvgAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			movingFnAgg := firstLevel.Aggregation.Aggs[0]
+			require.Equal(t, movingFnAgg.Key, "2")
+			require.Equal(t, movingFnAgg.Aggregation.Type, "moving_fn")
+			pl := movingFnAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
 			require.Equal(t, pl.BucketPath, "_count")
 		})
 
-		t.Run("With broken moving average (from frontend tests)", func(t *testing.T) {
+		t.Run("With broken moving function (from frontend tests)", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
@@ -912,12 +912,12 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 					{ "id": "3", "type": "sum", "field": "@value" },
 					{
 						"id": "2",
-						"type": "moving_avg",
+						"type": "moving_fn",
 						"field": "3"
 					},
 					{
 						"id": "4",
-						"type": "moving_avg"
+						"type": "moving_fn"
 					}
 				]
 			}`, from, to)
@@ -931,13 +931,13 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			sumAgg := firstLevel.Aggregation.Aggs[0]
 			require.Equal(t, sumAgg.Key, "3")
 
-			movingAvgAgg := firstLevel.Aggregation.Aggs[1]
-			require.Equal(t, movingAvgAgg.Key, "2")
-			plAgg := movingAvgAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			movingFnAgg := firstLevel.Aggregation.Aggs[1]
+			require.Equal(t, movingFnAgg.Key, "2")
+			plAgg := movingFnAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
 			require.Equal(t, plAgg.BucketPath, "3")
 		})
 
-		t.Run("With broken moving average", func(t *testing.T) {
+		t.Run("With broken moving function", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
 				"bucketAggs": [
@@ -947,12 +947,12 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 					{ "id": "3", "type": "sum", "field": "@value" },
 					{
 						"id": "2",
-						"type": "moving_avg",
+						"type": "moving_fn",
 						"pipelineAgg": "3"
 					},
 					{
 						"id": "4",
-						"type": "moving_avg",
+						"type": "moving_fn",
 						"pipelineAgg": "Metric to apply moving average"
 					}
 				]
@@ -966,10 +966,38 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 
 			require.Len(t, firstLevel.Aggregation.Aggs, 2)
 
-			movingAvgAgg := firstLevel.Aggregation.Aggs[1]
-			require.Equal(t, movingAvgAgg.Key, "2")
-			plAgg := movingAvgAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			movingFnAgg := firstLevel.Aggregation.Aggs[1]
+			require.Equal(t, movingFnAgg.Key, "2")
+			plAgg := movingFnAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
 			require.Equal(t, plAgg.BucketPath, "3")
+		})
+
+		t.Run("Removed aggregation types are skipped", func(t *testing.T) {
+			// moving_avg was removed in Elasticsearch 8.0. Saved rows must be
+			// skipped, whether configured or not, rather than emitted for
+			// Elasticsearch to reject.
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{ "id": "3", "type": "sum", "field": "@value" },
+					{ "id": "2", "type": "moving_avg", "field": "3", "pipelineAgg": "3" },
+					{ "id": "5", "type": "moving_avg" }
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			firstLevel := sr.Aggs[0]
+			require.Equal(t, firstLevel.Key, "4")
+			require.Equal(t, firstLevel.Aggregation.Type, "date_histogram")
+
+			require.Len(t, firstLevel.Aggregation.Aggs, 1)
+			sumAgg := firstLevel.Aggregation.Aggs[0]
+			require.Equal(t, sumAgg.Key, "3")
+			require.Equal(t, sumAgg.Aggregation.Type, "sum")
 		})
 
 		t.Run("With top_metrics (from frontend tests)", func(t *testing.T) {
@@ -1590,89 +1618,6 @@ func TestSettingsCasting(t *testing.T) {
 	from := time.Date(2018, 5, 15, 17, 50, 0, 0, time.UTC)
 	to := time.Date(2018, 5, 15, 17, 55, 0, 0, time.UTC)
 
-	t.Run("Correctly casts values in moving_avg (from frontend tests)", func(t *testing.T) {
-		c := newFakeClient()
-		_, err := executeElasticsearchDataQuery(c, `{
-				"metrics": [
-					{ "type": "avg", "id" : "2" },
-					{
-						"type": "moving_avg",
-						"id" : "3",
-						"pipelineAgg": "2",
-						"settings": {
-							"window": "5",
-							"model": "holt_winters",
-							"predict": "10",
-							"settings": {
-								"alpha": "1",
-								"beta": "2",
-								"gamma": "3",
-								"period": "4"
-							}
-						}
-					}
-				],
-				"bucketAggs": [{"type": "date_histogram", "field": "@timestamp", "id": "1"}]
-			}`, from, to)
-		require.NoError(t, err)
-		sr := c.multisearchRequests[0].Requests[0]
-		movingAvgSettings := sr.Aggs[0].Aggregation.Aggs[1].Aggregation.Aggregation.(*es.PipelineAggregation).Settings
-
-		assert.Equal(t, movingAvgSettings["window"], 5.0)
-		assert.Equal(t, movingAvgSettings["predict"], 10.0)
-
-		modelSettings := movingAvgSettings["settings"].(map[string]any)
-
-		assert.Equal(t, modelSettings["alpha"], 1.0)
-		assert.Equal(t, modelSettings["beta"], 2.0)
-		assert.Equal(t, modelSettings["gamma"], 3.0)
-		assert.Equal(t, modelSettings["period"], 4.0)
-	})
-
-	t.Run("Correctly transforms moving_average settings", func(t *testing.T) {
-		// This test is with pipelineAgg and is passing. Same test without pipelineAgg is failing.
-		c := newFakeClient()
-		_, err := executeElasticsearchDataQuery(c, `{
-			"bucketAggs": [
-				{ "type": "date_histogram", "field": "@timestamp", "id": "2" }
-			],
-			"metrics": [
-				{ "id": "1", "type": "average", "field": "@value" },
-				{
-					"id": "3",
-					"type": "moving_avg",
-					"field": "1",
-					"pipelineAgg": "1",
-					"settings": {
-						"model": "holt_winters",
-						"window": "10",
-						"predict": "5",
-						"settings": {
-							"alpha": "0.5",
-							"beta": "0.7",
-							"gamma": "SHOULD NOT CHANGE",
-							"period": "4"
-						}
-					}
-				}
-			]
-		}`, from, to)
-		assert.Nil(t, err)
-		sr := c.multisearchRequests[0].Requests[0]
-
-		movingAvgSettings := sr.Aggs[0].Aggregation.Aggs[1].Aggregation.Aggregation.(*es.PipelineAggregation).Settings
-
-		assert.Equal(t, 10., movingAvgSettings["window"])
-		assert.Equal(t, 5., movingAvgSettings["predict"])
-
-		modelSettings := movingAvgSettings["settings"].(map[string]any)
-
-		assert.Equal(t, .5, modelSettings["alpha"])
-		assert.Equal(t, .7, modelSettings["beta"])
-		assert.Equal(t, "SHOULD NOT CHANGE", modelSettings["gamma"])
-		assert.Equal(t, 4., modelSettings["period"])
-	})
-
 	t.Run("Correctly transforms serial_diff settings (from frontend tests)", func(t *testing.T) {
 		c := newFakeClient()
 		_, err := executeElasticsearchDataQuery(c, `{
@@ -1705,7 +1650,7 @@ func TestSettingsCasting(t *testing.T) {
 				{ "type": "date_histogram", "field": "@timestamp", "id": "2" }
 			],
 			"metrics": [
-				{ "id": "1", "type": "average", "field": "@value" },
+				{ "id": "1", "type": "avg", "field": "@value" },
 				{
 					"id": "3",
 					"type": "serial_diff",
@@ -1740,7 +1685,7 @@ func TestSettingsCasting(t *testing.T) {
 					}
 				],
 				"metrics": [
-					{ "id": "1", "type": "average", "field": "@value" },
+					{ "id": "1", "type": "avg", "field": "@value" },
 					{
 						"id": "3",
 						"type": "serial_diff",
@@ -1774,7 +1719,7 @@ func TestSettingsCasting(t *testing.T) {
 					}
 				],
 				"metrics": [
-					{ "id": "1", "type": "average", "field": "@value" },
+					{ "id": "1", "type": "avg", "field": "@value" },
 					{
 						"id": "3",
 						"type": "serial_diff",
@@ -1809,7 +1754,7 @@ func TestSettingsCasting(t *testing.T) {
 						}
 					],
 					"metrics": [
-						{ "id": "1", "type": "average", "field": "@value" }
+						{ "id": "1", "type": "avg", "field": "@value" }
 					]
 				}`, from, to)
 				assert.Nil(t, err)
@@ -1834,7 +1779,7 @@ func TestSettingsCasting(t *testing.T) {
 						}
 					],
 					"metrics": [
-						{ "id": "1", "type": "average", "field": "@value" }
+						{ "id": "1", "type": "avg", "field": "@value" }
 					]
 				}`, from, to)
 				assert.Nil(t, err)

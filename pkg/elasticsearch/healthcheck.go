@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -139,10 +140,35 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 		successMessage = fmt.Sprintf("%s Warning: %s", successMessage, indexWarningMessage)
 	}
 
+	if versionWarningMessage := unsupportedVersionWarning(ds.info.ClusterInfo); versionWarningMessage != "" {
+		successMessage = fmt.Sprintf("%s Warning: %s", successMessage, versionWarningMessage)
+	}
+
 	return &backend.CheckHealthResult{
 		Status:  backend.HealthStatusOk,
 		Message: successMessage,
 	}, nil
+}
+
+// unsupportedVersionWarning returns a non-fatal warning when the cluster is a
+// genuine Elasticsearch below the supported floor of 8.0. Connections keep
+// working, matching the policy for end-of-life versions. Other distributions
+// report version numbers that are not comparable with Elasticsearch versions,
+// so only a confirmed Elasticsearch distribution is checked.
+func unsupportedVersionWarning(clusterInfo es.ClusterInfo) string {
+	if clusterInfo.Distribution() != es.DistributionElasticsearch {
+		return ""
+	}
+
+	major, err := strconv.Atoi(clusterInfo.VersionMajor())
+	if err != nil || major >= 8 {
+		return ""
+	}
+
+	return fmt.Sprintf(
+		"Connected to Elasticsearch %s, which is no longer supported. Elasticsearch 8.0 or later is required and query behaviour is not guaranteed.",
+		clusterInfo.Version.Number,
+	)
 }
 
 func validateIndex(ctx context.Context, ds *es.DatasourceInfo) (message string, level string) {

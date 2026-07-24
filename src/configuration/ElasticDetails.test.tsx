@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import selectEvent from 'react-select-event';
 
 import { ElasticDetails } from './ElasticDetails';
@@ -53,5 +53,38 @@ describe('ElasticDetails', () => {
     expect(onChangeMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ jsonData: expect.objectContaining({ defaultQueryMode: 'logs' }) })
     );
+  });
+
+  describe('Include Frozen Indices', () => {
+    it('should not render the toggle when includeFrozen is not set', () => {
+      render(<ElasticDetails onChange={() => {}} value={createDefaultConfigOptions()} />);
+      expect(screen.queryByLabelText(/Include Frozen Indices/)).not.toBeInTheDocument();
+    });
+
+    it('should render the deprecated toggle when includeFrozen is enabled', () => {
+      const options = createDefaultConfigOptions();
+      options.jsonData.includeFrozen = true;
+      render(<ElasticDetails onChange={() => {}} value={options} />);
+      expect(screen.getByLabelText('Include Frozen Indices (deprecated)')).toBeInTheDocument();
+    });
+
+    it('should allow toggling the deprecated switch off and hide it once disabled', () => {
+      const onChangeMock = jest.fn();
+      const options = createDefaultConfigOptions();
+      options.jsonData.includeFrozen = true;
+      const { rerender } = render(<ElasticDetails onChange={onChangeMock} value={options} />);
+
+      const switchEl = screen.getByLabelText('Include Frozen Indices (deprecated)');
+      fireEvent.click(switchEl);
+
+      expect(onChangeMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ jsonData: expect.objectContaining({ includeFrozen: false }) })
+      );
+
+      const updatedOptions = onChangeMock.mock.calls[onChangeMock.mock.calls.length - 1][0];
+      rerender(<ElasticDetails onChange={onChangeMock} value={updatedOptions} />);
+
+      expect(screen.queryByLabelText(/Include Frozen Indices/)).toBeNull();
+    });
   });
 });
