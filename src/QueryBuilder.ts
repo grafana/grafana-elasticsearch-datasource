@@ -6,6 +6,7 @@ import {
   isMovingAverageWithModelSettings,
   isPipelineAggregation,
   isPipelineAggregationWithMultipleBucketPaths,
+  isSiblingPipelineAggregation,
 } from './components/QueryEditor/MetricAggregationsEditor/aggregations';
 import {
   DateHistogram,
@@ -17,11 +18,13 @@ import {
   Terms,
 } from './dataquery.gen';
 import {
+  clampSiblingBucketLimit,
   defaultBucketAgg,
   defaultGeoHashPrecisionString,
   findMetricById,
   highlightTags,
   queryTypeToMetricType,
+  SIBLING_INNER_STATS,
 } from './queryDef';
 import { QueryType, TermsQuery } from './types';
 import { convertOrderByToMetricId, getScriptValue } from './utils';
@@ -65,12 +68,19 @@ export class ElasticQueryBuilder {
     const size = aggDef.settings?.size ? parseInt(aggDef.settings.size, 10) : 500;
     queryNode.terms.size = size === 0 ? 500 : size;
 
-    if (aggDef.settings.orderBy !== void 0) {
+    // An empty-string orderBy must be treated like an absent one, matching the
+    // backend's orderBy != "" guard: it would otherwise emit "order": {"": ...},
+    // which Elasticsearch rejects as an unparseable order field.
+    if (aggDef.settings.orderBy) {
+      // Default the direction like the backend does (MustString("desc")): an
+      // undefined order would be dropped by JSON serialisation, leaving the
+      // empty "order": {} object Elasticsearch 9 rejects.
+      const order = aggDef.settings.order ?? 'desc';
       queryNode.terms.order = {};
       if (aggDef.settings.orderBy === '_term') {
-        queryNode.terms.order['_key'] = aggDef.settings.order;
+        queryNode.terms.order['_key'] = order;
       } else {
-        queryNode.terms.order[aggDef.settings.orderBy] = aggDef.settings.order;
+        queryNode.terms.order[aggDef.settings.orderBy] = order;
       }
 
       // if metric ref, look it up and add it to this agg level
@@ -79,7 +89,13 @@ export class ElasticQueryBuilder {
         for (let metric of target.metrics || []) {
           if (metric.id === metricId) {
             if (metric.type === 'count') {
-              queryNode.terms.order = { _count: aggDef.settings.order };
+              queryNode.terms.order = { _count: order };
+            } else if (isSiblingPipelineAggregation(metric)) {
+              // Sibling composites (sum_bucket, max_bucket, ...) are hidden terms+pipeline
+              // pairs, not a metric that exists inside this terms bucket. Ordering by one
+              // would emit an invalid nested aggregation, so drop the order entirely,
+              // matching the backend's omitempty behaviour.
+              delete queryNode.terms.order;
             } else if (isMetricAggregationWithField(metric)) {
               queryNode.aggs = {};
               queryNode.aggs[metric.id] = {
@@ -274,6 +290,27 @@ export class ElasticQueryBuilder {
     for (i = 0; i < target.metrics.length; i++) {
       metric = target.metrics[i];
       if (metric.type === 'count') {
+        continue;
+      }
+
+      if (isSiblingPipelineAggregation(metric)) {
+        // Composite sibling aggregation: hidden terms agg grouping by
+        // settings.groupBy with the inner stat nested inside, plus the
+        // sibling pipeline agg combining per-group results.
+        if (!metric.settings?.groupBy || !metric.field) {
+          continue;
+        }
+
+        const requestedStat = metric.settings.metric ?? '';
+        const innerStat = SIBLING_INNER_STATS.includes(requestedStat) ? requestedStat : 'max';
+
+        nestedAggs.aggs[`${metric.id}_groupby`] = {
+          terms: { field: metric.settings.groupBy, size: clampSiblingBucketLimit(metric.settings.limit) },
+          aggs: { [`${metric.id}_inner`]: { [innerStat]: { field: metric.field } } },
+        };
+        nestedAggs.aggs[metric.id] = {
+          [metric.type]: { buckets_path: `${metric.id}_groupby>${metric.id}_inner` },
+        };
         continue;
       }
 

@@ -115,6 +115,22 @@ func getFieldName(dataField data.Field, target *Query, metricTypeCount int) stri
 				}
 			}
 		}
+	} else if isSiblingPipelineAgg(metricType) {
+		metricID := dataField.Labels["metricId"]
+		for _, metric := range target.Metrics {
+			if metric.ID != metricID {
+				continue
+			}
+			inner := metric.Settings.Get("metric").MustString()
+			if _, ok := validSiblingInnerStats[inner]; !ok {
+				inner = defaultSiblingInnerStat
+			}
+			metricName = siblingAggOuterName[metricType] + " of " + getMetricName(inner) + " " + field
+			if groupBy := metric.Settings.Get("groupBy").MustString(); groupBy != "" {
+				metricName += " per " + groupBy
+			}
+			break
+		}
 	} else if field != "" {
 		metricName += " " + field
 	}
