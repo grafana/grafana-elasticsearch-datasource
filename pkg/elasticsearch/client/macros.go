@@ -30,7 +30,10 @@ var searchBodyMacros = macropro.MacroMap[struct{}]{
 // interpolateSearchBody expands interval macros in an encoded search request
 // body. Comment stripping is disabled because the body is JSON rather than
 // SQL, and macros must expand wherever they appear, including inside JSON
-// string values.
+// string values. The macros are declared zero-argument because the body is
+// JSON or painless rather than SQL: a '(' after a macro token belongs to the
+// surrounding text (e.g. a painless expression), and consuming it as an
+// argument list would silently corrupt the query.
 func interpolateSearchBody(body string, interval time.Duration) (string, error) {
 	intervalMS := interval.Milliseconds()
 	if intervalMS <= 0 {
@@ -39,5 +42,5 @@ func interpolateSearchBody(body string, interval time.Duration) (string, error) 
 	return macropro.Interpolate(body, searchBodyMacros, macropro.QueryContext[struct{}]{
 		Interval:   interval,
 		IntervalMS: intervalMS,
-	}, macropro.WithComments(0))
+	}, macropro.WithComments(0), macropro.WithZeroArgMacros("interval", "interval_ms", "interval_msms"))
 }
