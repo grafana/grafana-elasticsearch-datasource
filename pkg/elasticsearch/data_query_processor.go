@@ -151,15 +151,15 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 			continue
 		}
 
-		if isSiblingPipelineAgg(m.Type) {
-			addSiblingPipelineAgg(aggBuilder, m)
+		// Saved queries can carry aggregation types that no longer exist
+		// (moving_avg was removed in Elasticsearch 8.0). Skip them before any
+		// type-specific handling below performs an unguarded config lookup.
+		if _, known := metricAggType[m.Type]; !known {
 			continue
 		}
 
-		// Saved queries can carry aggregation types that no longer exist
-		// (moving_avg was removed in Elasticsearch 8.0). Skip them rather
-		// than emit an aggregation Elasticsearch would reject.
-		if _, known := metricAggType[m.Type]; !known {
+		if isSiblingPipelineAgg(m.Type) {
+			addSiblingPipelineAgg(aggBuilder, m)
 			continue
 		}
 
