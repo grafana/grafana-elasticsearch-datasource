@@ -151,6 +151,11 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 			continue
 		}
 
+		if isSiblingPipelineAgg(m.Type) {
+			addSiblingPipelineAgg(aggBuilder, m)
+			continue
+		}
+
 		if isPipelineAgg(m.Type) {
 			if isPipelineAggWithMultipleBucketPaths(m.Type) {
 				if len(m.PipelineVariables) > 0 {
@@ -224,6 +229,42 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 			})
 		}
 	}
+}
+
+// addSiblingPipelineAgg emits the pair of aggregations behind a composite
+// metric such as Sum Bucket: a hidden terms aggregation grouping documents by
+// the groupBy field (with the inner stat nested inside), and the sibling
+// pipeline aggregation combining the per-group results. The hidden terms
+// aggregation is not part of the query model's bucket aggregations, so the
+// response parser never recurses into it.
+func addSiblingPipelineAgg(aggBuilder es.AggBuilder, m *MetricAgg) {
+	groupBy := m.Settings.Get("groupBy").MustString()
+	if groupBy == "" || m.Field == "" {
+		// An empty groupBy or field would produce an invalid Elasticsearch query.
+		return
+	}
+
+	innerStat := m.Settings.Get("metric").MustString()
+	if _, ok := validSiblingInnerStats[innerStat]; !ok {
+		innerStat = defaultSiblingInnerStat
+	}
+
+	limit := stringToIntWithDefaultValue(m.Settings.Get("limit").MustString(), defaultSiblingBucketLimit)
+	if limit < 1 {
+		limit = defaultSiblingBucketLimit
+	}
+	if limit > maxSiblingBucketLimit {
+		limit = maxSiblingBucketLimit
+	}
+
+	groupByID := m.ID + "_groupby"
+	innerID := m.ID + "_inner"
+
+	aggBuilder.Terms(groupByID, groupBy, func(a *es.TermsAggregation, b es.AggBuilder) {
+		a.Size = limit
+		b.Metric(innerID, innerStat, m.Field, nil)
+	})
+	aggBuilder.Pipeline(m.ID, m.Type, groupByID+">"+innerID, nil)
 }
 
 func applyBoolFilters(bf *BoolFilterSet, b *es.SearchRequestBuilder) {

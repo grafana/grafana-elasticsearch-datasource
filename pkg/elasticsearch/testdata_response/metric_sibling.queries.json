@@ -1,0 +1,39 @@
+[
+  {
+    "alias": "",
+    "bucketAggs": [
+      {
+        "field": "testtime",
+        "id": "2",
+        "settings": {
+          "interval": "1m"
+        },
+        "type": "date_histogram"
+      }
+    ],
+    "datasource": {
+      "type": "elasticsearch",
+      "uid": "haha"
+    },
+    "datasourceId": 42,
+    "expression": "",
+    "hide": false,
+    "intervalMs": 60000,
+    "maxDataPoints": 1248,
+    "metrics": [
+      {
+        "field": "storage_used",
+        "id": "1",
+        "settings": {
+          "groupBy": "host",
+          "limit": "500",
+          "metric": "max"
+        },
+        "type": "sum_bucket"
+      }
+    ],
+    "query": "",
+    "refId": "a",
+    "window": ""
+  }
+]

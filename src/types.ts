@@ -91,6 +91,13 @@ interface MetricConfiguration<T extends MetricAggregationType> {
   supportsMissing: boolean;
   isPipelineAgg: boolean;
   /**
+   * True for composite sibling pipeline aggregations (Sum/Max/Min/Average
+   * Bucket) that emit a hidden terms aggregation plus an Elasticsearch
+   * sibling pipeline aggregation. Unlike isPipelineAgg types, these do not
+   * reference other metric rows.
+   */
+  isSiblingPipelineAgg?: boolean;
+  /**
    * A valid semver range for which the metric is known to be available.
    * If omitted defaults to '*'.
    */

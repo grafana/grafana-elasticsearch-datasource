@@ -119,7 +119,9 @@ export interface GeoHashGridSettings {
 
 export type PipelineMetricAggregationType = ('moving_avg' | 'moving_fn' | 'derivative' | 'serial_diff' | 'cumulative_sum' | 'bucket_script');
 
-export type MetricAggregationType = ('count' | 'avg' | 'sum' | 'min' | 'max' | 'extended_stats' | 'percentiles' | 'cardinality' | 'raw_document' | 'raw_data' | 'logs' | 'rate' | 'top_metrics' | PipelineMetricAggregationType);
+export type SiblingPipelineMetricAggregationType = ('sum_bucket' | 'max_bucket' | 'min_bucket' | 'avg_bucket');
+
+export type MetricAggregationType = ('count' | 'avg' | 'sum' | 'min' | 'max' | 'extended_stats' | 'percentiles' | 'cardinality' | 'raw_document' | 'raw_data' | 'logs' | 'rate' | 'top_metrics' | PipelineMetricAggregationType | SiblingPipelineMetricAggregationType);
 
 export interface BaseMetricAggregation {
   hide?: boolean;
@@ -374,9 +376,43 @@ export interface TopMetrics extends BaseMetricAggregation {
   type: 'top_metrics';
 }
 
+export interface BaseSiblingPipelineMetricAggregation extends MetricAggregationWithField {
+  settings?: {
+    /**
+     * The inner stat calculated per group before combining (max, min, sum or avg)
+     */
+    metric?: string;
+    /**
+     * Field whose values define the groups, e.g. the host name
+     */
+    groupBy?: string;
+    /**
+     * Maximum number of groups (terms size)
+     */
+    limit?: string;
+  };
+  type: SiblingPipelineMetricAggregationType;
+}
+
+export interface SumBucket extends BaseSiblingPipelineMetricAggregation {
+  type: 'sum_bucket';
+}
+
+export interface MaxBucket extends BaseSiblingPipelineMetricAggregation {
+  type: 'max_bucket';
+}
+
+export interface MinBucket extends BaseSiblingPipelineMetricAggregation {
+  type: 'min_bucket';
+}
+
+export interface AvgBucket extends BaseSiblingPipelineMetricAggregation {
+  type: 'avg_bucket';
+}
+
 export type PipelineMetricAggregation = (MovingAverage | Derivative | CumulativeSum | BucketScript);
 
-export type MetricAggregationWithSettings = (BucketScript | CumulativeSum | Derivative | SerialDiff | RawData | RawDocument | UniqueCount | Percentiles | ExtendedStats | Min | Max | Sum | Average | MovingAverage | MovingFunction | Logs | Rate | TopMetrics);
+export type MetricAggregationWithSettings = (BucketScript | CumulativeSum | Derivative | SerialDiff | RawData | RawDocument | UniqueCount | Percentiles | ExtendedStats | Min | Max | Sum | Average | MovingAverage | MovingFunction | Logs | Rate | TopMetrics | SumBucket | MaxBucket | MinBucket | AvgBucket);
 
 export interface ElasticsearchDataQuery extends common.DataQuery {
   /**

@@ -1,0 +1,68 @@
+//  🌟 This was machine generated.  Do not edit. 🌟
+//  
+//  Frame[0] {
+//      "type": "timeseries-multi",
+//      "typeVersion": [
+//          0,
+//          0
+//      ]
+//  }
+//  Name: Sum of Max storage_used per host
+//  Dimensions: 2 Fields by 2 Rows
+//  +-------------------------------+------------------+
+//  | Name: Time                    | Name: Value      |
+//  | Labels:                       | Labels:          |
+//  | Type: []time.Time             | Type: []*float64 |
+//  +-------------------------------+------------------+
+//  | 2023-03-17 13:53:00 +0000 UTC | 48               |
+//  | 2023-03-17 13:54:00 +0000 UTC | 44               |
+//  +-------------------------------+------------------+
+//  
+//  
+//  🌟 This was machine generated.  Do not edit. 🌟
+{
+  "status": 200,
+  "frames": [
+    {
+      "schema": {
+        "name": "Sum of Max storage_used per host",
+        "meta": {
+          "type": "timeseries-multi",
+          "typeVersion": [
+            0,
+            0
+          ]
+        },
+        "fields": [
+          {
+            "name": "Time",
+            "type": "time",
+            "typeInfo": {
+              "frame": "time.Time"
+            }
+          },
+          {
+            "name": "Value",
+            "type": "number",
+            "typeInfo": {
+              "frame": "float64",
+              "nullable": true
+            }
+          }
+        ]
+      },
+      "data": {
+        "values": [
+          [
+            1679061180000,
+            1679061240000
+          ],
+          [
+            48,
+            44
+          ]
+        ]
+      }
+    }
+  ]
+}

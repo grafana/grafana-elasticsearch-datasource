@@ -166,6 +166,10 @@ const (
 	MetricAggregationTypeSerialDiff    MetricAggregationType = "serial_diff"
 	MetricAggregationTypeCumulativeSum MetricAggregationType = "cumulative_sum"
 	MetricAggregationTypeBucketScript  MetricAggregationType = "bucket_script"
+	MetricAggregationTypeSumBucket     MetricAggregationType = "sum_bucket"
+	MetricAggregationTypeMaxBucket     MetricAggregationType = "max_bucket"
+	MetricAggregationTypeMinBucket     MetricAggregationType = "min_bucket"
+	MetricAggregationTypeAvgBucket     MetricAggregationType = "avg_bucket"
 )
 
 type PipelineMetricAggregationType string

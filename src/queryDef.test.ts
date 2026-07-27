@@ -1,4 +1,5 @@
-import { isPipelineAgg, isPipelineAggWithMultipleBucketPaths, queryTypeToMetricType } from './queryDef';
+import { isSiblingPipelineAggregation } from './components/QueryEditor/MetricAggregationsEditor/aggregations';
+import { clampSiblingBucketLimit, isPipelineAgg, isPipelineAggWithMultipleBucketPaths, queryTypeToMetricType } from './queryDef';
 import type { QueryType } from './types';
 
 describe('ElasticQueryDef', () => {
@@ -80,6 +81,41 @@ describe('ElasticQueryDef', () => {
           queryTypeToMetricType('invalid_type' as QueryType);
         }).toThrow('invalid query type: invalid_type');
       });
+    });
+  });
+
+  describe('clampSiblingBucketLimit', () => {
+    test('defaults to 500 when unset or invalid', () => {
+      expect(clampSiblingBucketLimit(undefined)).toBe(500);
+      expect(clampSiblingBucketLimit('')).toBe(500);
+      expect(clampSiblingBucketLimit('abc')).toBe(500);
+      expect(clampSiblingBucketLimit('0')).toBe(500);
+      expect(clampSiblingBucketLimit('-5')).toBe(500);
+    });
+
+    test('rejects partial numeric strings for parity with the backend strconv.Atoi', () => {
+      expect(clampSiblingBucketLimit('500abc')).toBe(500);
+      expect(clampSiblingBucketLimit('1e3')).toBe(500);
+      expect(clampSiblingBucketLimit('50.5')).toBe(500);
+    });
+
+    test('passes through valid values and clamps to the elasticsearch maximum', () => {
+      expect(clampSiblingBucketLimit('50')).toBe(50);
+      expect(clampSiblingBucketLimit('65535')).toBe(65535);
+      expect(clampSiblingBucketLimit('999999')).toBe(65535);
+    });
+  });
+
+  describe('isSiblingPipelineAggregation', () => {
+    test('true for the four sibling bucket types', () => {
+      for (const type of ['sum_bucket', 'max_bucket', 'min_bucket', 'avg_bucket'] as const) {
+        expect(isSiblingPipelineAggregation({ id: '1', type })).toBe(true);
+      }
+    });
+
+    test('false for parent pipeline and plain metrics', () => {
+      expect(isSiblingPipelineAggregation({ id: '1', type: 'derivative' })).toBe(false);
+      expect(isSiblingPipelineAggregation({ id: '1', type: 'avg' })).toBe(false);
     });
   });
 });
