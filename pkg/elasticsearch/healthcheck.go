@@ -13,7 +13,6 @@ import (
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/config"
 )
 
 const ErrorBodyMaxSize = 200
@@ -118,21 +117,13 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 	successMessage := "Elasticsearch data source is healthy."
 	indexWarningMessage := ""
 
-	// validate index and time field
-	cfg := config.GrafanaConfigFromContext(ctx)
-	crossClusterSearchEnabled := cfg.FeatureToggles().IsEnabled("elasticsearchCrossClusterSearch")
-
-	if crossClusterSearchEnabled {
-		message, level := validateIndex(ctx, ds.info)
-		if level == "warning" {
-			indexWarningMessage = message
-		}
-		if level == "error" {
-			return &backend.CheckHealthResult{
-				Status:  backend.HealthStatusError,
-				Message: message,
-			}, nil
-		}
+	// validate index and time field. A failed validation is reported as a
+	// warning, not a failure: the cluster health check above is the pass/fail
+	// signal, and datasources that never enabled index validation (it was
+	// gated behind the elasticsearchCrossClusterSearch feature toggle) must
+	// not start failing "Save & test" over index metadata.
+	if message := validateIndex(ctx, ds.info); message != "" {
+		indexWarningMessage = message
 	}
 
 	if indexWarningMessage != "" {
@@ -145,11 +136,14 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 	}, nil
 }
 
-func validateIndex(ctx context.Context, ds *es.DatasourceInfo) (message string, level string) {
+// validateIndex checks that the configured index exists and has the configured
+// time field with a date type. It returns a warning message, or an empty string
+// when validation passes.
+func validateIndex(ctx context.Context, ds *es.DatasourceInfo) string {
 	// validate that the index exist and has date field
 	ip, err := es.NewIndexPattern(ds.Interval, ds.Database)
 	if err != nil {
-		return fmt.Sprintf("Failed to get build index pattern: %s", err), "error"
+		return fmt.Sprintf("Failed to get build index pattern: %s", err)
 	}
 
 	indices, err := ip.GetIndices(backend.TimeRange{
@@ -157,7 +151,7 @@ func validateIndex(ctx context.Context, ds *es.DatasourceInfo) (message string, 
 		To:   time.Now().UTC(),
 	})
 	if err != nil {
-		return fmt.Sprintf("Failed to get index pattern: %s", err), "error"
+		return fmt.Sprintf("Failed to get index pattern: %s", err)
 	}
 
 	indexList := strings.Join(indices, ",")
@@ -169,11 +163,11 @@ func validateIndex(ctx context.Context, ds *es.DatasourceInfo) (message string, 
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, validateUrl, nil)
 	if err != nil {
-		return fmt.Sprint("Failed to create request", "error", err, "url", validateUrl), "error"
+		return fmt.Sprint("Failed to create request", "error", err, "url", validateUrl)
 	}
 	response, err := ds.HTTPClient.Do(request)
 	if err != nil {
-		return fmt.Sprint("Failed to fetch field capabilities", "error", err, "url", validateUrl), "error"
+		return fmt.Sprint("Failed to fetch field capabilities", "error", err, "url", validateUrl)
 	}
 	defer func() {
 		if err := response.Body.Close(); err != nil {
@@ -184,41 +178,44 @@ func validateIndex(ctx context.Context, ds *es.DatasourceInfo) (message string, 
 	fieldCaps := map[string]any{}
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "Could not read response body while checking time field", "error"
+		return "Could not read response body while checking time field"
 	}
 	err = json.Unmarshal(body, &fieldCaps)
 	if err != nil {
-		return "Failed to unmarshal field capabilities response", "error"
+		return "Failed to unmarshal field capabilities response"
 	}
 	if fieldCaps["error"] != nil {
 		errorMap, ok := fieldCaps["error"].(map[string]any)
 		if !ok {
-			return "Error validating index", "warning"
+			return "Error validating index"
 		}
 		errorMessage, ok := errorMap["reason"].(string)
 		if !ok {
-			return "Error validating index", "warning"
+			return "Error validating index"
 		}
-		return fmt.Sprintf("Error validating index: %s", errorMessage), "warning"
+		return fmt.Sprintf("Error validating index: %s", errorMessage)
 	}
 
 	fields, ok := fieldCaps["fields"].(map[string]any)
 	if !ok {
-		return "Failed to parse fields from response", "error"
+		return "Failed to parse fields from response"
 	}
 	if len(fields) == 0 {
-		return fmt.Sprintf("Could not find field %s in index", ds.ConfiguredFields.TimeField), "warning"
+		return fmt.Sprintf("Could not find field %s in index", ds.ConfiguredFields.TimeField)
 	}
 
 	timeFieldInfo, ok := fields[ds.ConfiguredFields.TimeField].(map[string]any)
 	if !ok {
-		return "Failed to parse time field info from response", "error"
+		return "Failed to parse time field info from response"
 	}
 
-	dateTypeField, ok := timeFieldInfo["date"].(map[string]any)
-	if !ok || dateTypeField == nil {
-		return fmt.Sprintf("Could not find time field '%s' with type date in index", ds.ConfiguredFields.TimeField), "warning"
+	// The field caps response keys each capability by the field's type; both
+	// date and date_nanos are valid types for the configured time field.
+	_, hasDate := timeFieldInfo["date"].(map[string]any)
+	_, hasDateNanos := timeFieldInfo["date_nanos"].(map[string]any)
+	if !hasDate && !hasDateNanos {
+		return fmt.Sprintf("Could not find time field '%s' with type date or date_nanos in index", ds.ConfiguredFields.TimeField)
 	}
 
-	return "", ""
+	return ""
 }
