@@ -4,11 +4,11 @@
 //
 // Grafana instance feature toggles (GF_INSTANCE_FEATURE_TOGGLES_ENABLE) are a
 // separate system: a flag defined only in GOFF never appears there, so plugin
-// backends evaluate GOFF flags over OFREP directly. Flag definitions live in
-// grafana/deployment_tools under
-// ksonnet/environments/hosted-grafana/waves/feature-toggles/goff/datasources/
-// and must be deployed (disabled) to every wave before code evaluating them
-// ships, because undefined flags cause an uncached error on every evaluation.
+// backends evaluate GOFF flags over OFREP directly. Flag definitions are
+// managed centrally in Grafana Cloud's feature-flag configuration and roll
+// out wave by wave. A flag must exist (disabled) in every wave before code
+// evaluating it ships, because undefined flags cause an uncached error on
+// every evaluation.
 //
 // Evaluation fails closed: any transport or evaluation error yields false, so
 // environments with no reachable GOFF service (OSS, self-managed, local
