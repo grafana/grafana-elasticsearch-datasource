@@ -9,14 +9,14 @@ import (
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 )
 
-// dataplaneFeatureToggle gates emission of Grafana dataplane-compliant logs
-// frames. When enabled, logs responses are tagged with data.FrameTypeLogLines
-// and carry the canonical timestamp/body/severity/id/labels/labelTypes fields
-// described in https://github.com/grafana/dataplane/blob/main/docs/contract/logs.md.
+// Dataplane-compliant logs frames are gated behind the featureflags.LogsDataplane
+// GOFF flag (see pkg/elasticsearch/featureflags). When enabled, logs responses
+// are tagged with data.FrameTypeLogLines and carry the canonical
+// timestamp/body/severity/id/labels/labelTypes fields described in
+// https://github.com/grafana/dataplane/blob/main/docs/contract/logs.md.
 //
-// The toggle is scoped to logs specifically to leave room for a separate
-// metrics-dataplane toggle later (mirroring lokiLogsDataplane / lokiMetricDataplane).
-const dataplaneFeatureToggle = "elasticsearchLogsDataplane"
+// The flag is scoped to logs specifically to leave room for a separate
+// metrics-dataplane flag later (mirroring lokiLogsDataplane / lokiMetricDataplane).
 
 // labelTypeField marks a label as a regular log field (from _source).
 const labelTypeField = "Field"
