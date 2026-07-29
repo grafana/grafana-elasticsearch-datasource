@@ -61,15 +61,15 @@ func GetClusterInfo(ctx context.Context, httpCli *http.Client, url string) (clus
 		return ClusterInfo{}, fmt.Errorf("error getting ES cluster info: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return ClusterInfo{}, fmt.Errorf("unexpected status code %d getting ES cluster info", resp.StatusCode)
-	}
-
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil && err == nil {
 			err = fmt.Errorf("error closing response body: %w", closeErr)
 		}
 	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return ClusterInfo{}, fmt.Errorf("unexpected status code %d getting ES cluster info", resp.StatusCode)
+	}
 
 	err = json.NewDecoder(resp.Body).Decode(&clusterInfo)
 	if err != nil {

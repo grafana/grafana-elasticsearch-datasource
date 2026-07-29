@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -343,4 +344,42 @@ func TestClusterInfo_IsServerless(t *testing.T) {
 		clusterInfo := ClusterInfo{}
 		assert.False(t, clusterInfo.IsServerless())
 	})
+}
+
+type closeTrackingBody struct {
+	io.Reader
+	closed bool
+}
+
+func (b *closeTrackingBody) Close() error {
+	b.closed = true
+	return nil
+}
+
+// Guards against leaking the response body when the root endpoint answers
+// with a non-200 status, which the health check hits on every re-detection
+// attempt against a cluster that rejects the request.
+func TestGetClusterInfo_ClosesBodyOnNon200(t *testing.T) {
+	body := &closeTrackingBody{Reader: strings.NewReader(`{"error":"forbidden"}`)}
+	httpClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusForbidden,
+				Status:     "403 Forbidden",
+				Body:       body,
+				Header:     http.Header{},
+			}, nil
+		}),
+	}
+
+	_, err := GetClusterInfo(context.Background(), httpClient, "http://es.example.com")
+
+	require.Error(t, err)
+	assert.True(t, body.closed, "response body must be closed on non-200 responses")
+}
+
+type roundTripperFunc func(req *http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
