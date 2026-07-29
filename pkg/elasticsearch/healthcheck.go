@@ -29,7 +29,7 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 		}, nil
 	}
 
-	clusterInfo := ds.info.ClusterInfo
+	clusterInfo := ds.info.ClusterInfo()
 	if clusterInfo.IsEmpty() {
 		// Cluster info detection failed when the instance was created, for
 		// example because the root endpoint was unreachable at that point, so
@@ -41,6 +41,11 @@ func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthR
 			logger.Warn("Failed to get Elasticsearch cluster info during health check", "error", err)
 		} else {
 			clusterInfo = refetched
+			// Persist the detection so the query path stops treating a
+			// serverless cluster as stateful: serverless rejects the
+			// max_concurrent_shard_requests parameter on _msearch with a 400,
+			// so a misclassified instance fails every query.
+			ds.info.SetClusterInfo(refetched)
 		}
 	}
 

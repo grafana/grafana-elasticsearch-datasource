@@ -234,8 +234,8 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		ConfiguredFields:           configuredFields,
 		Interval:                   interval,
 		IncludeFrozen:              includeFrozen,
-		ClusterInfo:                clusterInfo,
 	}
+	model.SetClusterInfo(clusterInfo)
 	distribution := clusterInfo.Distribution()
 	ds := &DataSource{
 		info:           &model,

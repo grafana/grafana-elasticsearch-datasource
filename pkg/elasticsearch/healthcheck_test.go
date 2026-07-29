@@ -128,15 +128,16 @@ func newHealthCheckDatasource(t *testing.T, url string, clusterInfo es.ClusterIn
 	t.Helper()
 	httpClient, err := httpclient.New(httpclient.Options{})
 	require.NoError(t, err)
-	return &DataSource{
-		info: &es.DatasourceInfo{
-			URL:        url,
-			HTTPClient: httpClient,
-			ConfiguredFields: es.ConfiguredFields{
-				TimeField: "timestamp",
-			},
-			ClusterInfo: clusterInfo,
+	info := &es.DatasourceInfo{
+		URL:        url,
+		HTTPClient: httpClient,
+		ConfiguredFields: es.ConfiguredFields{
+			TimeField: "timestamp",
 		},
+	}
+	info.SetClusterInfo(clusterInfo)
+	return &DataSource{
+		info:   info,
 		logger: log.New(),
 	}
 }
@@ -233,6 +234,45 @@ func Test_Healthcheck_EmptyClusterInfo_RefetchDetectsServerless(t *testing.T) {
 	assert.Equal(t, backend.HealthStatusOk, res.Status)
 	assert.Equal(t, "Elasticsearch Serverless data source is healthy.", res.Message)
 	assert.NotContains(t, *paths, "/_cluster/health")
+	// The re-detected cluster info must be persisted so the query path stops
+	// sending max_concurrent_shard_requests, which serverless rejects with a
+	// 400 on every _msearch.
+	assert.True(t, service.info.ClusterInfo().IsServerless())
+}
+
+// Exercises the health check re-detection write against concurrent readers,
+// mirroring query goroutines reading cluster info while a health check runs.
+// Fails under the race detector if the write is not synchronised.
+func Test_Healthcheck_ClusterInfoWriteBack_Concurrent(t *testing.T) {
+	server, _ := newHealthCheckServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			_, _ = w.Write([]byte(rootServerlessResponse))
+		default:
+			_, _ = w.Write([]byte(fieldCapsOKResponse))
+		}
+	})
+	service := newHealthCheckDatasource(t, server.URL, es.ClusterInfo{})
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				_ = service.info.ClusterInfo().IsServerless()
+			}
+		}
+	}()
+
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{})
+	close(stop)
+	<-done
+	assert.Equal(t, backend.HealthStatusOk, res.Status)
+	assert.True(t, service.info.ClusterInfo().IsServerless())
 }
 
 func Test_Healthcheck_EmptyClusterInfo_RefetchStateful(t *testing.T) {
@@ -302,12 +342,12 @@ func GetMockDatasource(statusCode int, status string, elasticSearchResponse stri
 		ConfiguredFields: es.ConfiguredFields{
 			TimeField: "timestamp",
 		},
-		// Stateful cluster info so the health check does not re-detect the
-		// cluster, which would consume the first canned transport response.
-		ClusterInfo: es.ClusterInfo{
-			Version: es.VersionInfo{Number: "8.0.0", BuildFlavor: "default"},
-		},
 	}
+	// Stateful cluster info so the health check does not re-detect the
+	// cluster, which would consume the first canned transport response.
+	dsInfo.SetClusterInfo(es.ClusterInfo{
+		Version: es.VersionInfo{Number: "8.0.0", BuildFlavor: "default"},
+	})
 
 	return &DataSource{
 		info:   &dsInfo,
