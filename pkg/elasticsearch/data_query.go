@@ -12,9 +12,9 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-plugin-sdk-go/config"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
+	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/featureflags"
 )
 
 const (
@@ -32,12 +32,15 @@ type elasticsearchDataQuery struct {
 	aggregationParserDSLRawQuery AggregationParser
 }
 
+// isDataplaneEnabled evaluates the logs-dataplane GOFF flag; a var so tests
+// can stub the evaluation without an OFREP server.
+var isDataplaneEnabled = func(ctx context.Context) bool {
+	return featureflags.IsEnabled(ctx, featureflags.LogsDataplane)
+}
+
 var newElasticsearchDataQuery = func(ctx context.Context, client es.Client, req *backend.QueryDataRequest, logger log.Logger, datasourceIndex string) *elasticsearchDataQuery {
 	_, fromAlert := req.Headers[headerFromAlert]
 	fromExpression := req.GetHTTPHeader(headerFromExpression) != ""
-
-	cfg := config.GrafanaConfigFromContext(ctx)
-	dataplaneEnabled := cfg.FeatureToggles().IsEnabled(dataplaneFeatureToggle)
 
 	return &elasticsearchDataQuery{
 		client:          client,
@@ -48,7 +51,7 @@ var newElasticsearchDataQuery = func(ctx context.Context, client es.Client, req 
 		// To maintain backward compatibility, it is necessary to keep labels in responses for alerting and expressions queries.
 		// Historically, these labels have been used in alerting rules and transformations.
 		keepLabelsInResponse: fromAlert || fromExpression,
-		dataplaneEnabled:     dataplaneEnabled,
+		dataplaneEnabled:     isDataplaneEnabled(ctx),
 
 		aggregationParserDSLRawQuery: NewAggregationParser(),
 	}
