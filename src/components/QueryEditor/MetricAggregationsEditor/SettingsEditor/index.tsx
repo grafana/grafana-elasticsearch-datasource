@@ -2,7 +2,7 @@ import { uniqueId } from 'lodash';
 import * as React from 'react';
 import { ComponentProps, useId, useMemo, useState } from 'react';
 
-import { InlineField, InlineSwitch, Input, Select } from '@grafana/ui';
+import { Combobox, InlineField, InlineSwitch, Input } from '@grafana/ui';
 import { ExtendedStat, MetricAggregation } from '../../../../dataquery.gen';
 
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
@@ -131,7 +131,7 @@ export const SettingsEditor = ({ metric, previousMetrics }: Props) => {
       {metric.type === 'rate' && (
         <>
           <InlineField label="Unit" {...inlineFieldProps} data-testid="unit-select" htmlFor={unitFieldId}>
-            <Select
+            <Combobox
               id={unitFieldId}
               onChange={(e) => dispatch(changeMetricSetting({ metric, settingName: 'unit', newValue: e.value }))}
               options={rateAggUnitOptions}
@@ -140,7 +140,7 @@ export const SettingsEditor = ({ metric, previousMetrics }: Props) => {
           </InlineField>
 
           <InlineField label="Mode" {...inlineFieldProps} data-testid="mode-select" htmlFor={modeFieldId}>
-            <Select
+            <Combobox
               id={modeFieldId}
               onChange={(e) => dispatch(changeMetricSetting({ metric, settingName: 'mode', newValue: e.value }))}
               options={rateAggModeOptions}

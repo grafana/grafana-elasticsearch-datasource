@@ -1,4 +1,5 @@
-import { InternalTimeZones, SelectableValue } from '@grafana/data';
+import { InternalTimeZones } from '@grafana/data';
+import { ComboboxOption } from '@grafana/ui';
 
 import { defaultGeoHashPrecisionString } from '../../../queryDef';
 import { BucketsConfiguration } from '../../../types';
@@ -55,12 +56,12 @@ export const bucketAggregationConfig: BucketsConfiguration = {
   },
 };
 
-export const orderByOptions: Array<SelectableValue<string>> = [
+export const orderByOptions: Array<ComboboxOption<string>> = [
   { label: 'Term value', value: '_term' },
   { label: 'Doc Count', value: '_count' },
 ];
 
-export const orderOptions: Array<SelectableValue<string>> = [
+export const orderOptions: Array<ComboboxOption<string>> = [
   { label: 'Top', value: 'desc' },
   { label: 'Bottom', value: 'asc' },
 ];

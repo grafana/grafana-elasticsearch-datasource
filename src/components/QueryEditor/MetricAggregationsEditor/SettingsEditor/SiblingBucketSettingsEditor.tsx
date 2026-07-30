@@ -1,7 +1,7 @@
 import { css } from '@emotion/css';
 import React, { useId } from 'react';
 
-import { InlineField, SegmentAsync, Select } from '@grafana/ui';
+import { Combobox, InlineField, SegmentAsync } from '@grafana/ui';
 
 import { BaseSiblingPipelineMetricAggregation } from '../../../../dataquery.gen';
 import { useFields } from '../../../../hooks/useFields';
@@ -32,7 +32,7 @@ export const SiblingBucketSettingsEditor = ({ metric }: Props) => {
         tooltip="The statistic calculated per group before the results are combined"
         htmlFor={metricFieldId}
       >
-        <Select
+        <Combobox
           id={metricFieldId}
           onChange={(e) => dispatch(changeMetricSetting({ metric, settingName: 'metric', newValue: e.value }))}
           options={siblingInnerStatOptions}
