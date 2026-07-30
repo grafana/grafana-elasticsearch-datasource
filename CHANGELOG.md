@@ -1,5 +1,29 @@
 # Changelog
 
+## 12.8.0
+
+- Feature: Support sum of max and max of max via sibling bucket aggregations [#364](https://github.com/grafana/grafana-elasticsearch-datasource/pull/364)
+- Feature: Add option to preserve the query when switching between query types [#365](https://github.com/grafana/grafana-elasticsearch-datasource/pull/365)
+- Feature: Detect cluster distribution and expose an active instance metric [#368](https://github.com/grafana/grafana-elasticsearch-datasource/pull/368)
+- Feature: Remove `elasticsearchCrossClusterSearch` feature toggle, making cross-cluster search always available [#360](https://github.com/grafana/grafana-elasticsearch-datasource/pull/360)
+- Fix: Stop the health check failing with 410 Gone on Elastic Cloud Serverless [#389](https://github.com/grafana/grafana-elasticsearch-datasource/pull/389)
+- Fix: Keep numeric epoch keys as variable values for date buckets [#407](https://github.com/grafana/grafana-elasticsearch-datasource/pull/407)
+- Fix: Widen auto interval when nested aggregations would exceed `max_buckets` [#386](https://github.com/grafana/grafana-elasticsearch-datasource/pull/386)
+- Fix: Omit empty terms order object rejected by Elasticsearch [#387](https://github.com/grafana/grafana-elasticsearch-datasource/pull/387)
+- Fix: Keep named `buckets_path` references in raw DSL `bucket_script` aggregations [#392](https://github.com/grafana/grafana-elasticsearch-datasource/pull/392)
+- Fix: Stop interval macros consuming parenthesised text in search bodies [#391](https://github.com/grafana/grafana-elasticsearch-datasource/pull/391)
+- Fix: Bound datasource instance gauge label values to known sets [#393](https://github.com/grafana/grafana-elasticsearch-datasource/pull/393)
+- Fix: Restore monospace font in the Lucene query box [#395](https://github.com/grafana/grafana-elasticsearch-datasource/pull/395)
+- Fix(esql): Validate queries before time-range injection can rewrite them [#394](https://github.com/grafana/grafana-elasticsearch-datasource/pull/394)
+- Fix(esql): Detect PromQL metrics queries behind leading comments [#390](https://github.com/grafana/grafana-elasticsearch-datasource/pull/390)
+- Refactor: Use macropro for backend macro interpolation [#367](https://github.com/grafana/grafana-elasticsearch-datasource/pull/367)
+- Chore(e2e): Bump plugin-e2e to 3.10.0 and drop redundant flag override [#401](https://github.com/grafana/grafana-elasticsearch-datasource/pull/401)
+- CI: Add stale issue and PR workflow [#382](https://github.com/grafana/grafana-elasticsearch-datasource/pull/382)
+- CI: Use shared reusable stale workflow [#397](https://github.com/grafana/grafana-elasticsearch-datasource/pull/397)
+- CI: Use shared reusable add-to-project workflow [#398](https://github.com/grafana/grafana-elasticsearch-datasource/pull/398)
+- Dependency updates:
+  - Chore(deps): Bump `@grafana/*` packages to v13.1.1 and update dependencies [#404](https://github.com/grafana/grafana-elasticsearch-datasource/pull/404)
+
 ## 12.7.0
 
 - Feature: Remove `elasticsearchRawDSLQuery` and `elasticsearchESQLQuery` feature toggles — raw DSL and ES|QL editors are now always available [#358](https://github.com/grafana/grafana-elasticsearch-datasource/pull/358)
