@@ -210,7 +210,7 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		includeFrozen = false
 	}
 
-	clusterInfo, err := es.GetClusterInfo(httpCli, settings.URL)
+	clusterInfo, err := es.GetClusterInfo(ctx, httpCli, settings.URL)
 	if err != nil {
 		// Log warning but continue with default (non-serverless) behavior
 		// This handles cases where users don't have permission to access the root endpoint (403)
@@ -234,8 +234,8 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		ConfiguredFields:           configuredFields,
 		Interval:                   interval,
 		IncludeFrozen:              includeFrozen,
-		ClusterInfo:                clusterInfo,
 	}
+	model.SetClusterInfo(clusterInfo)
 	distribution := clusterInfo.Distribution()
 	ds := &DataSource{
 		info:           &model,
