@@ -260,8 +260,8 @@ describe('ElasticDatasource', () => {
           refId: 'A',
           status: 500,
         };
-        expect(received[0].error).toEqual(errorData);
         expect(received[0].state).toBe(LoadingState.Error);
+        expect(received[0].errors).toHaveLength(1);
         expect(received[0].errors?.[0]).toEqual(errorData);
       });
     });
