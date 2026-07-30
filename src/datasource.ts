@@ -865,12 +865,15 @@ export class ElasticDatasource
         const buckets = res.responses[0].aggregations['1'].buckets;
         return _map(buckets, (bucket) => {
           const keyString = String(bucket.key);
-          // Elasticsearch returns `key_as_string` for typed fields (boolean, date, ip)
-          // alongside the raw `key`. For a boolean `true`, `key === 1` and
-          // `key_as_string === "true"`. Use the human-readable form for both text and
-          // value so variable substitution doesn't produce literals like `1,true`.
+          // Elasticsearch returns `key_as_string` alongside the raw `key` for typed
+          // fields. For booleans (`key` 0/1, `key_as_string` "false"/"true") value must
+          // be the human-readable form: substituting the raw 0/1 breaks queries against
+          // the field (issue #106053). For dates the opposite holds: `key` is epoch
+          // milliseconds, the only machine-usable form, so it must stay the value with
+          // `key_as_string` used only for display (issue #406).
           const text = bucket.key_as_string || keyString;
-          const value = bucket.key_as_string ?? (isTagValueQuery ? keyString : bucket.key);
+          const isBooleanBucket = bucket.key_as_string === 'true' || bucket.key_as_string === 'false';
+          const value = isBooleanBucket ? bucket.key_as_string : isTagValueQuery ? keyString : bucket.key;
           return { text, value };
         });
       })

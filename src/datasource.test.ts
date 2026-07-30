@@ -145,6 +145,16 @@ describe('ElasticDatasource', () => {
                     doc_count: 30,
                     key: 7,
                   },
+                  {
+                    doc_count: 5,
+                    key: 1,
+                    key_as_string: 'true',
+                  },
+                  {
+                    doc_count: 2,
+                    key: 1782907200000,
+                    key_as_string: '2026-07-01T12:00:00.000Z',
+                  },
                 ],
               },
             },
@@ -155,18 +165,27 @@ describe('ElasticDatasource', () => {
       const values = await ds.getTagValues({ key: 'test', timeRange: timeRangeMock, filters: [] });
       expect(postResource).toHaveBeenCalledTimes(1);
 
-      expect(values.length).toBe(3);
+      expect(values.length).toBe(5);
       expect(values[0].text).toBe('foo');
       expect(values[0].value).toBe('foo');
 
-      // When ES returns `key_as_string` (typed fields: boolean, date, ip), text
-      // and value must align on the human-readable form so ad-hoc filter URLs
-      // don't end up as `field|=|<raw>,<text>`. See issue #106053.
+      // Non-boolean buckets with a `key_as_string` (dates, formatted numerics)
+      // keep the raw key as value — the string form is display-only. See issue #406.
       expect(values[1].text).toBe('six');
-      expect(values[1].value).toBe('six');
+      expect(values[1].value).toBe('6');
 
       expect(values[2].text).toBe('7');
       expect(values[2].value).toBe('7');
+
+      // Boolean buckets align value on `key_as_string` so ad-hoc filter URLs
+      // don't end up as `field|=|1,true` — querying a boolean field with the
+      // raw 0/1 key breaks the query. See issue #106053.
+      expect(values[3].text).toBe('true');
+      expect(values[3].value).toBe('true');
+
+      // Date buckets keep the epoch-millisecond key as value. See issue #406.
+      expect(values[4].text).toBe('2026-07-01T12:00:00.000Z');
+      expect(values[4].value).toBe('1782907200000');
     });
   });
 
@@ -1461,13 +1480,14 @@ describe('ElasticDatasource', () => {
     });
 
     // Regression test for https://github.com/grafana/grafana/issues/106053:
-    // For typed-field buckets (boolean/date/ip) Elasticsearch returns a numeric
-    // `key` alongside a human-readable `key_as_string`. The variable system
+    // For boolean buckets Elasticsearch returns a numeric `key` (0/1) alongside
+    // a human-readable `key_as_string` ("false"/"true"). The variable system
     // serialises both `text` and `value` into the URL, so when value was the
     // raw `key` (e.g. `1` for boolean true) ad-hoc filters ended up like
-    // `tag.error|=|1,true` and broke the query. Both must align on the
-    // human-readable form.
-    it('should align value with key_as_string for typed-field buckets (issue #106053)', async () => {
+    // `tag.error|=|1,true`, and querying a boolean field with the raw 0/1
+    // breaks. Both must align on the human-readable form for booleans only —
+    // see the date test below for why this must not apply to other types.
+    it('should align value with key_as_string for boolean buckets (issue #106053)', async () => {
       const data = {
         responses: [
           {
@@ -1496,6 +1516,38 @@ describe('ElasticDatasource', () => {
         { text: 'true', value: 'true' },
         { text: 'false', value: 'false' },
         { text: 'plain-string', value: 'plain-string' },
+      ]);
+    });
+
+    // Regression test for issue #406: for `date` buckets Elasticsearch returns
+    // the epoch-millisecond `key` alongside a formatted `key_as_string`. The
+    // numeric key is the only machine-usable form (e.g. variables feeding
+    // arithmetic in transformations), so it must stay the option value, with
+    // `key_as_string` used only for the display text.
+    it('should keep the numeric epoch key as value for date buckets (issue #406)', async () => {
+      const data = {
+        responses: [
+          {
+            aggregations: {
+              '1': {
+                buckets: [
+                  { doc_count: 1, key: 1782907200000, key_as_string: '2026-07-01T12:00:00.000Z' },
+                  { doc_count: 2, key: 1782993600000, key_as_string: '2026-07-02T12:00:00.000Z' },
+                ],
+              },
+            },
+          },
+        ],
+      };
+
+      const ds = createElasticDatasource();
+      jest.spyOn(ds, 'postResource').mockResolvedValue(data);
+
+      const results = await ds.metricFindQuery('{"find": "terms", "field": "event.start_time"}');
+
+      expect(results).toEqual([
+        { text: '2026-07-01T12:00:00.000Z', value: 1782907200000 },
+        { text: '2026-07-02T12:00:00.000Z', value: 1782993600000 },
       ]);
     });
 
