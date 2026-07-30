@@ -131,7 +131,9 @@ export class ElasticDatasource
     this.name = instanceSettings.name;
     this.isProxyAccess = instanceSettings.access === 'proxy';
     const settingsData = instanceSettings.jsonData || {};
-    // instanceSettings.database is deprecated and should be removed in the future
+    // Deprecated `database` must stay as a read fallback for datasources saved
+    // before the index moved to jsonData, mirroring the backend's settings parsing.
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     this.index = settingsData.index ?? instanceSettings.database ?? '';
     this.timeField = settingsData.timeField;
     this.indexPattern = new IndexPattern(this.index, settingsData.interval);
@@ -1320,9 +1322,14 @@ export function enhanceDataFrameWithDataLinks(dataFrame: DataFrame, dataLinks: D
 }
 
 function generateDataLink(linkConfig: DataLinkConfig): DataLink {
+  // The non-deprecated replacement (getDataSourceInstanceSettings from
+  // @grafana/runtime/unstable) is async and only exists from Grafana 13.1,
+  // but this synchronous call site must work on Grafana >=12.2.
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   const dataSourceSrv = getDataSourceSrv();
 
   if (linkConfig.datasourceUid) {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     const dsSettings = dataSourceSrv.getInstanceSettings(linkConfig.datasourceUid);
 
     return {
