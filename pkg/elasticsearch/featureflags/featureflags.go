@@ -58,8 +58,8 @@ const (
 	cacheTTL = time.Minute
 
 	// tenantIDMetadataKey is the gRPC metadata key carrying the tenant
-	// namespace (stacks-<id>) on multi-tenant requests, the same key the
-	// plugin SDK's tenant middleware reads.
+	// identifier on multi-tenant requests (the bare numeric stack id), the
+	// same key the plugin SDK's tenant middleware reads.
 	tenantIDMetadataKey = "tenantID"
 )
 
@@ -129,17 +129,18 @@ func (c *Client) IsEnabled(ctx context.Context, flag string) bool {
 }
 
 // evaluationContext builds the OFREP targeting attributes available to the
-// plugin backend. Multi-tenant requests carry the stack namespace in gRPC
+// plugin backend. Multi-tenant requests carry the tenant identifier in gRPC
 // metadata; single-tenant cloud instances are identified by the stack slug in
 // the Grafana app URL. Elsewhere (OSS, self-managed) no attributes exist and
 // only a flag's default rule can match.
 func evaluationContext(ctx context.Context) openfeature.FlattenedContext {
 	evalCtx := openfeature.FlattenedContext{}
 
-	if namespace := tenantNamespace(ctx); namespace != "" {
+	if tenant := tenantFromMetadata(ctx); tenant != "" {
+		namespace, stackID := tenantAttributes(tenant)
 		evalCtx[openfeature.TargetingKey] = namespace
 		evalCtx["namespace"] = namespace
-		if stackID, ok := strings.CutPrefix(namespace, "stacks-"); ok && stackID != "" {
+		if stackID != "" {
 			evalCtx["stackId"] = stackID
 		}
 		return evalCtx
@@ -156,9 +157,9 @@ func evaluationContext(ctx context.Context) openfeature.FlattenedContext {
 	return evalCtx
 }
 
-// tenantNamespace returns the tenant namespace from incoming gRPC metadata,
-// or "" outside multi-tenant deployments.
-func tenantNamespace(ctx context.Context) string {
+// tenantFromMetadata returns the raw tenant identifier from incoming gRPC
+// metadata, or "" outside multi-tenant deployments.
+func tenantFromMetadata(ctx context.Context) string {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return ""
@@ -167,6 +168,33 @@ func tenantNamespace(ctx context.Context) string {
 		return values[0]
 	}
 	return ""
+}
+
+// tenantAttributes normalises a tenant identifier into the stacks-<id>
+// namespace form (the host's OpenFeature targeting key) and the bare stack
+// id. The multi-tenant runner puts the bare numeric stack id on the wire;
+// the stacks-<id> namespace form is accepted defensively. Anything else is
+// used as the namespace verbatim with no stack id.
+func tenantAttributes(tenant string) (namespace, stackID string) {
+	if id, ok := strings.CutPrefix(tenant, "stacks-"); ok {
+		return tenant, id
+	}
+	if isAllDigits(tenant) {
+		return "stacks-" + tenant, tenant
+	}
+	return tenant, ""
+}
+
+func isAllDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // slugFromAppURL extracts the stack slug from a Grafana Cloud app URL
