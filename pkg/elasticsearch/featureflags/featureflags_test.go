@@ -145,7 +145,16 @@ func TestEvaluationContext(t *testing.T) {
 		expected map[string]any
 	}{
 		{
-			name: "multi-tenant request targets by stack namespace",
+			name: "multi-tenant bare stack id normalises to stack namespace",
+			ctx:  metadata.NewIncomingContext(context.Background(), metadata.Pairs(tenantIDMetadataKey, "123456")),
+			expected: map[string]any{
+				"targetingKey": "stacks-123456",
+				"namespace":    "stacks-123456",
+				"stackId":      "123456",
+			},
+		},
+		{
+			name: "stacks-prefixed tenant accepted as-is",
 			ctx:  metadata.NewIncomingContext(context.Background(), metadata.Pairs(tenantIDMetadataKey, "stacks-123456")),
 			expected: map[string]any{
 				"targetingKey": "stacks-123456",
@@ -177,7 +186,7 @@ func TestEvaluationContext(t *testing.T) {
 				config.WithGrafanaConfig(context.Background(), config.NewGrafanaCfg(map[string]string{
 					config.AppURL: "https://myslug.grafana.net/",
 				})),
-				metadata.Pairs(tenantIDMetadataKey, "stacks-9"),
+				metadata.Pairs(tenantIDMetadataKey, "9"),
 			),
 			expected: map[string]any{
 				"targetingKey": "stacks-9",
@@ -219,7 +228,7 @@ func TestEvaluationRequestCarriesContext(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(tenantIDMetadataKey, "stacks-42"))
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(tenantIDMetadataKey, "42"))
 	require.True(t, NewClient(server.URL).IsEnabled(ctx, LogsDataplane))
 
 	evalCtx, ok := captured["context"].(map[string]any)
