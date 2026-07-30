@@ -1658,7 +1658,7 @@ describe('ElasticDatasource', () => {
             data: {},
           });
         }
-        return throwError({ status: 500 });
+        return throwError(() => ({ status: 500 }));
       });
 
       const timeRange = { from: 1, to: 2 } as unknown as TimeRange;
@@ -1675,7 +1675,7 @@ describe('ElasticDatasource', () => {
       });
 
       ds.getResource = jest.fn().mockImplementation(() => {
-        return throwError({ status: 404 });
+        return throwError(() => ({ status: 404 }));
       });
 
       const timeRange = createTimeRange(dateTime().subtract(2, 'week'), dateTime());
