@@ -1,6 +1,7 @@
 import { lastValueFrom } from 'rxjs';
 
-import { MetricFindValue, SelectableValue } from '@grafana/data';
+import { MetricFindValue } from '@grafana/data';
+import { ComboboxOption } from '@grafana/ui';
 
 import { useState } from 'react';
 import { isBucketAggregationType } from '../components/QueryEditor/BucketAggregationsEditor/aggregations';
@@ -42,7 +43,7 @@ const getFilter = (type: AggregationType) => {
   return [];
 };
 
-const toSelectableValue = ({ text }: MetricFindValue): SelectableValue<string> => ({
+const toComboboxOption = ({ text }: MetricFindValue): ComboboxOption<string> => ({
   label: text,
   value: text,
 });
@@ -68,6 +69,6 @@ export const useFields = (type: AggregationType | string[]) => {
       setRawFields(latestRawFields);
     }
 
-    return latestRawFields.filter(({ text }) => q === undefined || text.includes(q)).map(toSelectableValue);
+    return latestRawFields.filter(({ text }) => q === undefined || text.includes(q)).map(toComboboxOption);
   };
 };

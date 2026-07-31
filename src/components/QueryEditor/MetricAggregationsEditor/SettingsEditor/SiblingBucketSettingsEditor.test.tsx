@@ -7,12 +7,16 @@ import { getDefaultTimeRange, MetricFindValue } from '@grafana/data';
 import { ElasticsearchDataQuery, SumBucket } from '../../../../dataquery.gen';
 
 import { ElasticDatasource } from '../../../../datasource';
-import { selectOptionInTest } from '../../../../test/helpers/selectOptionInTest';
+import { mockComboboxRect } from '../../../../test/helpers/mockCombobox';
 import { ElasticsearchProvider } from '../../ElasticsearchQueryContext';
 
 import { SettingsEditor } from '.';
 
 describe('SiblingBucketSettingsEditor', () => {
+  beforeAll(() => {
+    mockComboboxRect();
+  });
+
   const metric: SumBucket = {
     id: '1',
     type: 'sum_bucket',
@@ -135,7 +139,7 @@ describe('SiblingBucketSettingsEditor', () => {
     fireEvent.click(settingsButton);
 
     expect(screen.queryByText('cardinality')).not.toBeInTheDocument();
-    expect(screen.getByText('Max')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Max')).toBeInTheDocument();
   });
 
   it('shows the effective limit in the description when the raw value would be clamped', () => {
@@ -180,9 +184,8 @@ describe('SiblingBucketSettingsEditor', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Metric: max, Group by: host, Limit: 500/i }));
 
-    // The Metric row hosts the only combobox in the open panel (Group By is a SegmentAsync).
-    // getByLabelText cannot be used as the Select id lands on a wrapper div, not the input.
-    await selectOptionInTest(screen.getByRole('combobox'), 'Sum');
+    await userEvent.click(screen.getByLabelText('Metric'));
+    await userEvent.click(await screen.findByRole('option', { name: 'Sum' }));
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({

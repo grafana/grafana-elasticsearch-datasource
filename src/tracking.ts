@@ -1,4 +1,4 @@
-import { CoreApp, DashboardLoadedEvent, DataQueryRequest, DataQueryResponse } from '@grafana/data';
+import { CoreApp, DashboardLoadedEvent, DataQueryRequest, DataQueryResponse, LoadingState } from '@grafana/data';
 import { config, reportInteraction } from '@grafana/runtime';
 
 import { ElasticsearchDataQuery } from './dataquery.gen';
@@ -131,7 +131,9 @@ export function trackQuery(
       editor_type: query.editorType || 'builder',
       grafana_version: config.buildInfo.version,
       has_data: response.data.some((frame) => frame.length > 0),
-      has_error: response.error !== undefined || (response.errors?.length ?? 0) > 0,
+      // `errors` alone misses transport failures: toDataQueryResponse puts those
+      // in the deprecated `error` field only, but always sets state to Error.
+      has_error: response.state === LoadingState.Error || (response.errors?.length ?? 0) > 0,
       line_limit: getLineLimit(query),
       query_language: query.queryType,
       query_type: getQueryType(query),
