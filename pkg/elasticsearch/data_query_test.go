@@ -2562,3 +2562,21 @@ func findSubAggByKey(t *testing.T, aggs es.AggArray, key string) *es.Agg {
 	}
 	return nil
 }
+
+func TestDataplaneFlagGatesQueryConstruction(t *testing.T) {
+	c := newFakeClient()
+	dataRequest := backend.QueryDataRequest{
+		Queries: []backend.DataQuery{
+			{JSON: json.RawMessage(`{}`), RefID: "A"},
+		},
+	}
+
+	original := isDataplaneEnabled
+	t.Cleanup(func() { isDataplaneEnabled = original })
+
+	for _, enabled := range []bool{true, false} {
+		isDataplaneEnabled = func(context.Context) bool { return enabled }
+		query := newElasticsearchDataQuery(context.Background(), c, &dataRequest, log.New(), "")
+		require.Equal(t, enabled, query.dataplaneEnabled)
+	}
+}
