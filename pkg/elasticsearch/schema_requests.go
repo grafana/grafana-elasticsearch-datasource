@@ -49,7 +49,7 @@ func listIndicesViaCat(ctx context.Context, info *es.DatasourceInfo, s *schemaSe
 	if err != nil {
 		return nil, err
 	}
-	resp, err := info.HTTPClient.Do(req)
+	resp, err := info.ESClient.Perform(req)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func listIndicesViaResolve(ctx context.Context, info *es.DatasourceInfo, s *sche
 	if err != nil {
 		return nil, err
 	}
-	resp, err := info.HTTPClient.Do(req)
+	resp, err := info.ESClient.Perform(req)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func fetchFieldCapsColumns(ctx context.Context, info *es.DatasourceInfo, index s
 	if err != nil {
 		return nil, err
 	}
-	resp, err := info.HTTPClient.Do(req)
+	resp, err := info.ESClient.Perform(req)
 	if err != nil {
 		return nil, err
 	}
