@@ -5,6 +5,10 @@ import { ElasticsearchOptions } from '../src/types';
 
 const PLUGIN_TYPE = 'elasticsearch';
 
+// GRAFANA_URL is set only by the Cloud cron workflow (playwright-cloud); its presence signals
+// a run against the shared Cloud instance rather than local/PR CI.
+const isCloudRun = !!process.env.GRAFANA_URL;
+
 // Resolves the Elasticsearch URL for an ad-hoc datasource health check: the injected Cloud
 // URL when present, else the docker-compose backend in CI, else localhost.
 function resolveElasticsearchUrl(env = process.env) {
@@ -67,6 +71,12 @@ test.describe('Config editor', () => {
   });
 
   test.describe('provisioned datasource', () => {
+    // The shared Cloud instance doesn't apply the local provisioning/datasources/datasources.yml,
+    // so these assertions of provisioned values can't run there (grafana/clickhouse-datasource#1934).
+    test.beforeEach(() => {
+      test.skip(isCloudRun, 'Provisioned-datasource assertions require local provisioning, not applied on Cloud.');
+    });
+
     test('should load provisioned Elasticsearch details', async ({
       readProvisionedDataSource,
       gotoDataSourceConfigPage,
@@ -99,6 +109,7 @@ test.describe('Config editor', () => {
       readProvisionedDataSource,
       gotoDataSourceConfigPage,
     }) => {
+      test.skip(isCloudRun, 'Health-checks the locally-provisioned datasource, not applied on Cloud.');
       const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
       const configPage = await gotoDataSourceConfigPage(ds.uid);
 
@@ -136,6 +147,12 @@ test.describe('Config editor', () => {
       test.skip(
         !process.env.CI && !process.env.DS_INSTANCE_URL,
         'Elasticsearch must be reachable; set DS_INSTANCE_URL or run in CI'
+      );
+      // Ad-hoc save & test doesn't complete against the managed Cloud backend (network path
+      // differs), so it is covered by local/PR CI (grafana/clickhouse-datasource#1934).
+      test.skip(
+        isCloudRun,
+        'Ad-hoc save & test is unreliable against the managed Cloud backend, covered by local/PR CI.'
       );
 
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
