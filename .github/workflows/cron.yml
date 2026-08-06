@@ -27,13 +27,10 @@ jobs:
     with:
       # Nightly Cloud E2E run, labelled with the DER run_stage vocabulary.
       run-stage: nightly
-      # TODO(onboarding): map this datasource's Elasticsearch backend secrets from Vault,
-      # in get-vault-secrets repo_secrets format (cf clickhouse-datasource cron.yml). e.g.:
-      # repo-secrets: |
-      #   DS_INSTANCE_HOST=ds-instance:host
-      #   DS_INSTANCE_PASSWORD=ds-instance:password
-      #   DS_INSTANCE_PORT=ds-instance:port
-      #   DS_INSTANCE_USERNAME=ds-instance:username
-      # TODO(onboarding): set the PDC network name if this datasource is PDC-connected,
-      # otherwise omit. See the datasource's Cloud instance config.
-      # pdc-network-name: <datasources-pdc-network-...>
+      # The provisioned Elasticsearch test instance (9.1, self-hosted) is reached over PDC.
+      pdc-network-name: datasources-pdc-network-aws-datasourcese2e
+      # Connection URL, published to the data-sources Vault mount and read via
+      # get-vault-secrets (outputKey `elasticSearch9_1`). Security is disabled on
+      # the test instance, so the URL is the only connection detail needed.
+      repo-secrets: |
+        DS_INSTANCE_URL=elasticSearch9_1:url
