@@ -1,8 +1,23 @@
 import { expect, test } from '@grafana/plugin-e2e';
+import { Page } from '@playwright/test';
 
 import { ElasticsearchOptions } from '../src/types';
 
 const PLUGIN_TYPE = 'elasticsearch';
+
+// Resolves the Elasticsearch URL for an ad-hoc datasource health check: the injected Cloud
+// URL when present, else the docker-compose backend in CI, else localhost.
+function resolveElasticsearchUrl(env = process.env) {
+  return env.CI ? env.DS_INSTANCE_URL || 'http://elasticsearch:9200' : 'http://localhost:9200';
+}
+
+// Selects a Private Data Source Connect network in the datasource config editor. The
+// combobox is a Grafana-core element, present only when PDC is available on the instance
+// (i.e. the shared Cloud instance), so it is called only when a network name is injected.
+async function configurePDC(page: Page, networkName: string) {
+  await page.getByRole('combobox', { name: 'Private data source connect' }).click();
+  await page.getByText(networkName).click();
+}
 
 test.describe('Config editor', () => {
   test.describe('rendering', () => {
@@ -111,6 +126,27 @@ test.describe('Config editor', () => {
       await page.getByLabel('Data source connection URL').fill('http://localhost:19200');
       await configPage.saveAndTest();
       await expect(configPage).toHaveAlert('error');
+    });
+
+    test('valid credentials should pass the health check', async ({ createDataSourceConfigPage, page }) => {
+      // Ad-hoc datasource health check against a reachable backend: the docker-compose
+      // Elasticsearch in local/PR CI, or DS_INSTANCE_URL when injected by the Cloud cron
+      // (playwright-cloud) via Vault repo-secrets. Requires a reachable backend, so skipped
+      // when neither CI nor DS_INSTANCE_URL is set.
+      test.skip(
+        !process.env.CI && !process.env.DS_INSTANCE_URL,
+        'Elasticsearch must be reachable; set DS_INSTANCE_URL or run in CI'
+      );
+
+      const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+      await page.getByLabel('Data source connection URL').fill(resolveElasticsearchUrl());
+
+      if (process.env.DS_PDC_NETWORK_NAME) {
+        await configurePDC(page, process.env.DS_PDC_NETWORK_NAME);
+      }
+
+      await expect(configPage.saveAndTest()).toBeOK();
+      await expect(configPage).toHaveAlert('success');
     });
   });
 });
