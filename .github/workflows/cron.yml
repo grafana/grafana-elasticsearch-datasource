@@ -1,0 +1,36 @@
+name: Scheduled Cloud E2E tests
+
+on:
+  # Run nightly against the shared Cloud instance
+  schedule:
+    - cron: '0 9 * * *' # Daily at 09:00 UTC
+
+  # Allow engineers to run Cloud E2E on-demand (useful for debugging)
+  workflow_dispatch:
+
+# Reusable workflows can only narrow caller permissions, not escalate.
+# `id-token: write` is needed by the Vault OIDC step in playwright-cloud.yml.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  playwright-cloud:
+    # Intentionally pinned to @main: data-sources-ci-workflows does not
+    # publish versioned tags for this workflow yet. Allowed by the zizmor
+    # policy (`grafana/*: any`); review periodically.
+    uses: grafana/data-sources-ci-workflows/.github/workflows/playwright-cloud.yml@main
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      # Nightly Cloud E2E run, labelled with the DER run_stage vocabulary.
+      run-stage: nightly
+      # The provisioned Elasticsearch test instance (9.1, self-hosted) is reached over PDC.
+      pdc-network-name: datasources-pdc-network-aws-datasourcese2e
+      # Connection URL, published to the data-sources Vault mount and read via
+      # get-vault-secrets (outputKey `elasticSearch9_1`). Security is disabled on
+      # the test instance, so the URL is the only connection detail needed.
+      repo-secrets: |
+        DS_INSTANCE_URL=elasticSearch9_1:url
