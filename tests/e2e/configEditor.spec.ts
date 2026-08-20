@@ -2,12 +2,9 @@ import { expect, test } from '@grafana/plugin-e2e';
 import { Page } from '@playwright/test';
 
 import { ElasticsearchOptions } from '../src/types';
+import { healthPathFor, isCloudRun } from './testEnv';
 
 const PLUGIN_TYPE = 'elasticsearch';
-
-// GRAFANA_URL is set only by the Cloud cron workflow (playwright-cloud); its presence signals
-// a run against the shared Cloud instance rather than local/PR CI.
-const isCloudRun = !!process.env.GRAFANA_URL;
 
 // Resolves the Elasticsearch URL for an ad-hoc datasource health check: the injected Cloud
 // URL when present, else the docker-compose backend in CI, else localhost.
@@ -114,7 +111,7 @@ test.describe('Config editor', () => {
       const configPage = await gotoDataSourceConfigPage(ds.uid);
 
       // toBeOK() takes a Promise<Response> — pass the unawaited call
-      await expect(configPage.saveAndTest()).toBeOK();
+      await expect(configPage.saveAndTest({ path: healthPathFor(ds.uid) })).toBeOK();
       await expect(configPage).toHaveAlert('success');
     });
 
@@ -126,7 +123,7 @@ test.describe('Config editor', () => {
       await page.getByLabel('Data source connection URL').fill('http://elasticsearch:9200');
       await configPage.mockHealthCheckResponse({ message: 'Failed to connect to Elasticsearch', status: 'ERROR' }, 400);
 
-      await configPage.saveAndTest();
+      await configPage.saveAndTest({ path: healthPathFor(configPage.datasource.uid) });
       await expect(configPage).toHaveAlert('error');
     });
 
@@ -135,7 +132,7 @@ test.describe('Config editor', () => {
 
       // Point at a port nothing is listening on — the backend health check will fail for real
       await page.getByLabel('Data source connection URL').fill('http://localhost:19200');
-      await configPage.saveAndTest();
+      await configPage.saveAndTest({ path: healthPathFor(configPage.datasource.uid) });
       await expect(configPage).toHaveAlert('error');
     });
 
@@ -148,13 +145,14 @@ test.describe('Config editor', () => {
         !process.env.CI && !process.env.DS_INSTANCE_URL,
         'Elasticsearch must be reachable; set DS_INSTANCE_URL or run in CI'
       );
-      // Ad-hoc save & test doesn't complete against the managed Cloud backend (network path
-      // differs), so it is covered by local/PR CI (grafana/clickhouse-datasource#1934).
+      // Verified against the Cloud instance: an ad-hoc datasource pointed at the managed backend
+      // health-checks inconsistently — HTTP 400 on one attempt, no health response at all on the
+      // next, while the managed datasource itself stays healthy. Specific to configuring PDC on a
+      // datasource created mid-test (grafana/clickhouse-datasource#1934).
       test.skip(
         isCloudRun,
-        'Ad-hoc save & test is unreliable against the managed Cloud backend, covered by local/PR CI.'
+        'Ad-hoc save & test against the managed Cloud backend is unreliable; covered by local/PR CI.'
       );
-
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
       await page.getByLabel('Data source connection URL').fill(resolveElasticsearchUrl());
 
@@ -162,7 +160,7 @@ test.describe('Config editor', () => {
         await configurePDC(page, process.env.DS_PDC_NETWORK_NAME);
       }
 
-      await expect(configPage.saveAndTest()).toBeOK();
+      await expect(configPage.saveAndTest({ path: healthPathFor(configPage.datasource.uid) })).toBeOK();
       await expect(configPage).toHaveAlert('success');
     });
   });
