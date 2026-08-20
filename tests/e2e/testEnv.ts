@@ -169,21 +169,31 @@ export const DASHBOARD_VARIABLES_UI_UNAVAILABLE = isCloudRun;
 export const DASHBOARD_VARIABLES_UI_SKIP_REASON =
   'Grafana 13 moved dashboard variable editing out of the settings tab that @grafana/plugin-e2e drives; covered by PR CI.';
 
-// Grafana 13 routes query traffic from the browser through the query apiserver
-// (/apis/query.grafana.app/<version>/namespaces/<ns>/query) rather than /api/ds/query. The
-// request and response bodies are unchanged, so tests that wait on a query only need to
-// recognise both URLs. Older Grafana versions, and any direct API call a spec makes itself,
-// still use the legacy path.
-const APISERVER_QUERY_PATH = /\/apis\/query\.grafana\.app\/[^/]+\/namespaces\/[^/]+\/query(\?|$)/;
+// Some Grafana deployments route query traffic from the browser through a query apiserver
+// (/apis/<group>/<version>/namespaces/<ns>/query) rather than /api/ds/query. Which of the two a
+// page actually calls is decided in the frontend from configuration, not from the Grafana
+// version, and some configurations are deliberately kept on the legacy path — so both forms have
+// to be recognised indefinitely rather than until some version floor is reached.
+//
+// The API group is matched as a wildcard on purpose. The group behind this endpoint has already
+// been renamed once and is expected to change again, and it is held as an experimental API with
+// no backward-compatibility guarantee. Pinning a group name here would fail silently: the wait
+// would simply never resolve, which reads as a hung test rather than a wrong URL.
+//
+// Request and response bodies are identical across both routes, so recognising the URL is the
+// only change tests need. A direct `request.post('/api/ds/query', …)` from a spec still works —
+// only the browser's choice of route moved.
+const APISERVER_QUERY_PATH = /\/apis\/[a-z0-9.-]+\.grafana\.app\/[^/]+\/namespaces\/[^/]+\/query(\?|$)/;
 
 export function isQueryRequestUrl(url: string): boolean {
   return url.includes('/api/ds/query') || APISERVER_QUERY_PATH.test(url);
 }
 
-// Grafana 13 saves and health-checks datasources through the apiserver route
-// (/apis/<group>/<version>/namespaces/<ns>/datasources/<uid>/health) while @grafana/plugin-e2e
+// Datasource save and health-check traffic moved the same way: the browser may call
+// /apis/<group>/<version>/namespaces/<ns>/datasources/<uid>/health while @grafana/plugin-e2e
 // waits on the legacy /api/datasources/uid/<uid>/health. Matching on the uid-scoped suffix
-// resolves against both, so saveAndTest() returns instead of timing out.
+// resolves against both and stays correct whatever the API group is called, so saveAndTest()
+// returns instead of timing out.
 export function healthPathFor(uid: string): string {
   return `${uid}/health`;
 }
