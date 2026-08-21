@@ -21,9 +21,9 @@ import (
 
 func unwrapTestDatasource(t *testing.T, instance instancemgmt.Instance) *DataSource {
 	t.Helper()
-	iw, ok := instance.(*instanceWithSchema)
-	require.True(t, ok, "expected *instanceWithSchema")
-	return iw.DataSource
+	ds, ok := instance.(*DataSource)
+	require.True(t, ok, "expected *DataSource")
+	return ds
 }
 
 // contextWithForwardedHeader simulates what the SDK's headerMiddleware does:
@@ -117,7 +117,7 @@ func TestNewDatasource_ForwardHTTPHeaders(t *testing.T) {
 
 		instance, err := NewDatasource(context.Background(), dsSettings)
 		require.NoError(t, err)
-		ds := instance.(*instanceWithSchema)
+		ds := instance.(*DataSource)
 
 		// Simulate the SDK's headerMiddleware: it reads OAuth headers from
 		// req.GetHTTPHeaders() and injects them into the context via

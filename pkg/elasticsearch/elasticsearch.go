@@ -20,47 +20,10 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	schemas "github.com/grafana/schemads"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/instrumentation"
 )
-
-// instanceWithSchema wraps the Elasticsearch datasource with schemads (dsabstraction) schema discovery
-// and applies grafanaSql query normalization before QueryData.
-type instanceWithSchema struct {
-	*DataSource
-	schemaDS *schemas.SchemaDatasource
-}
-
-func (i *instanceWithSchema) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	req, rejected := normalizeGrafanaSQLRequest(i.logger.FromContext(ctx), i.DataSource, req)
-
-	var resp *backend.QueryDataResponse
-	var err error
-	if req != nil && len(req.Queries) > 0 {
-		resp, err = i.DataSource.QueryData(ctx, req)
-		if err != nil {
-			return resp, err
-		}
-	}
-	if resp == nil {
-		resp = &backend.QueryDataResponse{}
-	}
-	if len(rejected) > 0 {
-		if resp.Responses == nil {
-			resp.Responses = backend.Responses{}
-		}
-		for refID, rerr := range rejected {
-			resp.Responses[refID] = backend.DataResponse{Error: rerr}
-		}
-	}
-	return resp, nil
-}
-
-func (i *instanceWithSchema) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
-	return i.schemaDS.CallResource(ctx, req, sender)
-}
 
 const (
 	// headerFromExpression is used by data sources to identify expression queries
@@ -72,9 +35,8 @@ const (
 )
 
 type DataSource struct {
-	info           *es.DatasourceInfo
-	schemaSettings schemaSettings
-	logger         log.Logger
+	info   *es.DatasourceInfo
+	logger log.Logger
 	// distribution and versionMajor are the sanitised instance gauge labels
 	// registered at creation time, kept so Dispose decrements the same series.
 	// Both empty when the instance was never registered.
@@ -238,37 +200,22 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	model.SetClusterInfo(clusterInfo)
 	distribution := clusterInfo.Distribution()
 	ds := &DataSource{
-		info:           &model,
-		schemaSettings: defaultSchemaSettings(),
-		logger:         log.New().FromContext(ctx),
-		distribution:   instrumentation.SanitizeDistribution(distribution),
-		versionMajor:   instrumentation.SanitizeVersionMajor(clusterInfo.VersionMajor()),
+		info:         &model,
+		logger:       log.New().FromContext(ctx),
+		distribution: instrumentation.SanitizeDistribution(distribution),
+		versionMajor: instrumentation.SanitizeVersionMajor(clusterInfo.VersionMajor()),
 	}
 	instrumentation.DatasourceInstances.WithLabelValues(ds.distribution, ds.versionMajor).Inc()
 	ds.logger.Info("Detected cluster distribution", "distribution", distribution, "version", clusterInfo.Version.Number)
 	backend.Logger.Info("NewDatasource", "url", ds.info.URL)
-	schemaProvider := NewSchemaProvider(ds)
-	schemaDS := schemas.NewSchemaDatasource(
-		schemaProvider,
-		schemaProvider,
-		schemaProvider,
-		schemaProvider,
-		nil,
-		backend.CallResourceHandlerFunc(func(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
-			return ds.callResourcePassthrough(ctx, req, sender)
-		}),
-	)
-	return &instanceWithSchema{
-		DataSource: ds,
-		schemaDS:   schemaDS,
-	}, nil
+	return ds, nil
 }
 
 func isFieldCaps(url string) bool {
 	return strings.HasSuffix(url, "/_field_caps") || url == "_field_caps"
 }
 
-func (ds *DataSource) callResourcePassthrough(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
+func (ds *DataSource) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
 	logger := ds.logger.FromContext(ctx)
 	// allowed paths for resource calls:
 	// - empty string for fetching db version
