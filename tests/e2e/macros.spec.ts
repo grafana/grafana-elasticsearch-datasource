@@ -1,14 +1,21 @@
 import { expect, test } from '@grafana/plugin-e2e';
 import { type APIRequestContext } from '@playwright/test';
 
-// Fixture data (tests/e2e/fixtures/*.ndjson) covers 2026-03-17T21:25:47Z – 2026-03-18T00:44:47Z UTC.
-const FIXTURE_FROM_ISO = '2026-03-17T21:00:00.000Z';
-const FIXTURE_TO_ISO = '2026-03-18T01:00:00.000Z';
-
-const HTTPLOGS_DS_UID = 'httplogs-e2e';
-const HTTPLOGS_DOC_COUNT = 200;
+import { env } from './testEnv';
 
 const INTERVAL_MS = 20000;
+
+// Locally the logs index is a fixed fixture, so the exact document count is asserted. On Cloud
+// the same index is filled continuously by a datagen sidecar, so only "the query matched
+// documents" holds — the macro expansion under test is proven by the bucket spacing and the
+// frame shape either way.
+function expectLogsDocCount(total: number): void {
+  if (env.logsDocCount === null) {
+    expect(total).toBeGreaterThan(0);
+  } else {
+    expect(total).toBe(env.logsDocCount);
+  }
+}
 
 interface Frame {
   schema?: { name?: string; fields?: Array<{ name: string }> };
@@ -25,12 +32,12 @@ interface Frame {
 async function runQuery(request: APIRequestContext, target: Record<string, unknown>) {
   return request.post('/api/ds/query', {
     data: {
-      from: String(new Date(FIXTURE_FROM_ISO).getTime()),
-      to: String(new Date(FIXTURE_TO_ISO).getTime()),
+      from: String(new Date(env.from).getTime()),
+      to: String(new Date(env.to).getTime()),
       queries: [
         {
           refId: 'A',
-          datasource: { type: 'elasticsearch', uid: HTTPLOGS_DS_UID },
+          datasource: { type: 'elasticsearch', uid: env.logsUid },
           intervalMs: INTERVAL_MS,
           maxDataPoints: 780,
           ...target,
@@ -71,12 +78,12 @@ test.describe('backend macro handling', () => {
 
     const counts = (frames[0].data?.values[1] ?? []) as Array<number | null>;
     const total = counts.reduce<number>((sum, v) => sum + (v ?? 0), 0);
-    expect(total).toBe(HTTPLOGS_DOC_COUNT);
+    expectLogsDocCount(total);
   });
 
   test('raw DSL query expands $__interval and $__interval_ms', async ({ request }) => {
-    const from = new Date(FIXTURE_FROM_ISO).getTime();
-    const to = new Date(FIXTURE_TO_ISO).getTime();
+    const from = new Date(env.from).getTime();
+    const to = new Date(env.to).getTime();
     // The avg metric's painless script is the expanded $__interval_ms itself, so every
     // bucket's value equals the interval in milliseconds — the expansion is read back
     // directly from the data.
@@ -127,7 +134,7 @@ test.describe('backend macro handling', () => {
   test('ES|QL query expands $__index to the configured index', async ({ request }) => {
     const response = await runQuery(request, {
       queryType: 'esql',
-      query: 'FROM $__index | STATS c = COUNT(*) BY method | SORT method',
+      query: `FROM $__index | STATS c = COUNT(*) BY ${env.logs.esqlGroupBy} | SORT ${env.logs.esqlGroupBy}`,
     });
     expect(response.ok()).toBe(true);
 
@@ -136,14 +143,19 @@ test.describe('backend macro handling', () => {
 
     const fieldNames = (frames[0].schema?.fields ?? []).map((f) => f.name);
     expect(fieldNames).toContain('c');
-    expect(fieldNames).toContain('method');
+    expect(fieldNames).toContain(env.logs.esqlGroupBy);
 
     const counts = (frames[0].data?.values[fieldNames.indexOf('c')] ?? []) as number[];
     const total = counts.reduce((sum, v) => sum + v, 0);
-    expect(total).toBe(HTTPLOGS_DOC_COUNT);
+    expectLogsDocCount(total);
   });
 
   test('ES|QL query expands $__index at every occurrence', async ({ request }) => {
+    const single = await runQuery(request, { queryType: 'esql', query: 'FROM $__index | STATS c = COUNT(*)' });
+    expect(single.ok()).toBe(true);
+    const singleCount = ((await framesForA(single))[0]?.data?.values[0] ?? [])[0] as number;
+    expect(singleCount).toBeGreaterThan(0);
+
     const response = await runQuery(request, {
       queryType: 'esql',
       query: 'FROM $__index,$__index | STATS c = COUNT(*)',
@@ -154,12 +166,12 @@ test.describe('backend macro handling', () => {
     expect(frames.length).toBeGreaterThan(0);
     const counts = (frames[0].data?.values[0] ?? []) as number[];
     // Repeating the same index in FROM does not double-count documents.
-    expect(counts[0]).toBe(HTTPLOGS_DOC_COUNT);
+    expect(counts[0]).toBe(singleCount);
   });
 
   test('tokens that merely start with a macro name are not expanded', async ({ request }) => {
     // Guards the parser semantics: $__indexes must NOT be treated as $__index + "es"
-    // (the pre-macropro substring replacement would have produced "httplogses").
+    // (the pre-macropro substring replacement would have produced "<index>es").
     const response = await runQuery(request, {
       queryType: 'esql',
       query: 'FROM $__indexes | LIMIT 1',
@@ -169,6 +181,6 @@ test.describe('backend macro handling', () => {
     const body = (await response.json()) as { results?: Record<string, { error?: string }> };
     const error = body.results?.['A']?.error ?? '';
     expect(error).toContain('$__indexes');
-    expect(error).not.toContain('httplogses');
+    expect(error).not.toContain(`${env.logsIndex}es`);
   });
 });

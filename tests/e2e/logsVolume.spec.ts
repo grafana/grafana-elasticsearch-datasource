@@ -1,5 +1,7 @@
 import { expect, test } from '@grafana/plugin-e2e';
 
+import { env, externalPluginIsLoaded } from './testEnv';
+
 // Regression coverage for https://github.com/grafana/grafana/issues/90436.
 //
 // The bug: when running a Logs query against a datasource with `logLevelField`
@@ -20,31 +22,14 @@ import { expect, test } from '@grafana/plugin-e2e';
 // logLevelField=level.keyword to match ES's default `text` + `.keyword`
 // multi-field mapping).
 
-const FIXTURE_FROM_ISO = '2026-03-17T21:00:00.000Z';
-const FIXTURE_TO_ISO = '2026-03-18T01:00:00.000Z';
-
-// The fix lives in the externalised plugin's `query()` override (it attaches
-// `level` labels to supplementary log-volume frames). Some Grafana versions
-// (observed: 11.6.x) still load the bundled core elasticsearch datasource even
-// with `as_external = true` in grafana.ini — `/api/plugins/elasticsearch/settings`
-// reports `module: core:plugin/elasticsearch` rather than
-// `public/plugins/elasticsearch/module.js`. On those versions this test would
-// correctly detect the upstream bug, but there is no fix to apply from this
-// repo. Skip in that scenario rather than fail.
-async function externalPluginIsLoaded(page: import('@playwright/test').Page): Promise<boolean> {
-  const resp = await page.request.get('/api/plugins/elasticsearch/settings');
-  if (!resp.ok()) {
-    return false;
-  }
-  const settings = (await resp.json()) as { module?: string };
-  return typeof settings.module === 'string' && settings.module.startsWith('public/plugins/');
-}
+const FIXTURE_FROM_ISO = env.from;
+const FIXTURE_TO_ISO = env.to;
 
 const exploreUrl = (query: Record<string, unknown>): string => {
   const panes = JSON.stringify({
     explore: {
-      datasource: 'app-logs-e2e',
-      queries: [{ refId: 'A', datasource: { type: 'elasticsearch', uid: 'app-logs-e2e' }, ...query }],
+      datasource: env.appLogsUid,
+      queries: [{ refId: 'A', datasource: { type: 'elasticsearch', uid: env.appLogsUid }, ...query }],
       range: { from: FIXTURE_FROM_ISO, to: FIXTURE_TO_ISO },
     },
   });

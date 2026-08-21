@@ -18,3 +18,22 @@ jobs:
     with:
       plugin-version-suffix: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
       run-playwright: true
+
+  # Publishes each main build to the internal dev Plugin Catalog and deploys it to the shared
+  # Cloud instance the nightly Cloud E2E lane runs against. Without this the lane tests whichever
+  # build was last published by hand, not what is on main.
+  publish-and-deploy:
+    name: Publish to dev catalog
+    if: github.ref == 'refs/heads/main'
+    needs: ci
+    # Intentionally pinned to @main: data-sources-ci-workflows does not publish versioned tags
+    # for cd-dev.yml yet. Allowed by the zizmor policy (`grafana/*: any`); review periodically.
+    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@main # zizmor: ignore[unpinned-uses]
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+      pull-requests: read
+    with:
+      go-version: '1.26.3'
+      golangci-lint-version: '2.10.1'
