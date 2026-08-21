@@ -62,9 +62,9 @@ jobs:
   publish-dev:
     name: Publish to Dev Catalog and Deploy
     needs: cicd
-    # Normal pushes to main publish the latest build to the dev catalog. Skipped
-    # when release-please cut a release, because cicd already published that
-    # version to prod.
+    # Publishes each main build to the internal dev Plugin Catalog and deploys it to the
+    # shared Cloud instance the nightly Cloud E2E lane runs against. Skipped when
+    # release-please cut a release, because cicd already published that version to prod.
     if: github.ref == 'refs/heads/main' && needs.cicd.outputs.release_created != 'true'
     # Intentionally pinned to @main: see the note on cicd above.
     uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@main # zizmor: ignore[unpinned-uses]

@@ -1,13 +1,20 @@
 import { expect, test } from '@grafana/plugin-e2e';
 import { type APIRequestContext } from '@playwright/test';
 
-// Fixture data (tests/e2e/fixtures/*.ndjson) covers 2026-03-17T21:25:47Z – 2026-03-18T00:44:47Z UTC.
-// Variable preview / query-execution tests that need real data use this window; UI-only
-// tests can rely on mocked responses.
-const FIXTURE_FROM_ISO = '2026-03-17T21:00:00.000Z';
-const FIXTURE_TO_ISO = '2026-03-18T01:00:00.000Z';
+import {
+  DASHBOARD_VARIABLES_UI_SKIP_REASON,
+  DASHBOARD_VARIABLES_UI_UNAVAILABLE,
+  env,
+  isQueryRequestUrl,
+} from './testEnv';
 
-const HTTPLOGS_DS_UID = 'httplogs-e2e';
+// Variable preview / query-execution tests that need real data use this window; UI-only tests
+// can rely on mocked responses. Locally it is the fixture window, on Cloud the last few hours of
+// continuously generated data.
+const FIXTURE_FROM_ISO = env.from;
+const FIXTURE_TO_ISO = env.to;
+
+const HTTPLOGS_DS_UID = env.logsUid;
 
 type LegacyVariable = {
   name: string;
@@ -104,9 +111,13 @@ function mockVariablePreviewFrame(fields: Array<{ name: string; values: unknown[
 
 test.describe('Variable query editor', () => {
   test.describe('new editor rendering', () => {
+    test.beforeEach(() => {
+      test.skip(DASHBOARD_VARIABLES_UI_UNAVAILABLE, DASHBOARD_VARIABLES_UI_SKIP_REASON);
+    });
+
     test.beforeEach(async ({ variableEditPage }) => {
       await variableEditPage.setVariableType('Query');
-      await variableEditPage.datasource.set('elasticsearch');
+      await variableEditPage.datasource.set(env.defaultDatasourceName);
     });
 
     test(
@@ -141,6 +152,10 @@ test.describe('Variable query editor', () => {
   });
 
   test.describe('field mapping', () => {
+    test.beforeEach(() => {
+      test.skip(DASHBOARD_VARIABLES_UI_UNAVAILABLE, DASHBOARD_VARIABLES_UI_SKIP_REASON);
+    });
+
     // The FieldMapping preview query fires the moment the datasource is picked.
     // Grafana UI's Combobox snapshots its menu items at open time and does not
     // refresh while open, so any test that asserts on options must wait for the
@@ -148,7 +163,7 @@ test.describe('Variable query editor', () => {
     // and the assertions race against a setChoices() that comes too late.
     const waitForFieldMappingResponse = (page: import('@playwright/test').Page) =>
       page.waitForResponse((resp) => {
-        if (!resp.url().includes('/api/ds/query') || resp.request().method() !== 'POST') {
+        if (!isQueryRequestUrl(resp.url()) || resp.request().method() !== 'POST') {
           return false;
         }
         try {
@@ -179,7 +194,7 @@ test.describe('Variable query editor', () => {
       );
       const responsePromise = waitForFieldMappingResponse(page);
       await variableEditPage.setVariableType('Query');
-      await variableEditPage.datasource.set('elasticsearch');
+      await variableEditPage.datasource.set(env.defaultDatasourceName);
       await responsePromise;
 
       const valueCombobox = comboboxForField(page, 'Value Field');
@@ -201,7 +216,7 @@ test.describe('Variable query editor', () => {
       await variableEditPage.mockQueryDataResponse(mockVariablePreviewFrame([]));
       const responsePromise = waitForFieldMappingResponse(page);
       await variableEditPage.setVariableType('Query');
-      await variableEditPage.datasource.set('elasticsearch');
+      await variableEditPage.datasource.set(env.defaultDatasourceName);
       await responsePromise;
 
       const valueCombobox = comboboxForField(page, 'Value Field');
@@ -231,7 +246,7 @@ test.describe('Variable query editor', () => {
         200
       );
       await variableEditPage.setVariableType('Query');
-      await variableEditPage.datasource.set('elasticsearch');
+      await variableEditPage.datasource.set(env.defaultDatasourceName);
 
       const alert = page.getByRole('alert').filter({ hasText: 'Query error' });
       await expect(alert).toBeVisible();
@@ -240,6 +255,10 @@ test.describe('Variable query editor', () => {
   });
 
   test.describe('legacy query migration (PR #231)', () => {
+    test.beforeEach(() => {
+      test.skip(DASHBOARD_VARIABLES_UI_UNAVAILABLE, DASHBOARD_VARIABLES_UI_SKIP_REASON);
+    });
+
     // Each test creates a dashboard whose template variable query is stored in the
     // pre-externalisation legacy format, then opens the variable editor. That
     // triggers migrateVariableQuery(), which determines which UI is rendered:
@@ -403,7 +422,7 @@ test.describe('Variable query editor', () => {
           {
             type: 'terms',
             id: '2',
-            field: 'method.keyword',
+            field: env.logs.termsField,
             settings: { size: '10', order: 'desc', orderBy: '_count' },
           },
         ],
@@ -424,6 +443,10 @@ test.describe('Variable query editor', () => {
   });
 
   test.describe('persistence', () => {
+    test.beforeEach(() => {
+      test.skip(DASHBOARD_VARIABLES_UI_UNAVAILABLE, DASHBOARD_VARIABLES_UI_SKIP_REASON);
+    });
+
     test('persists value/text field mapping across reloads', async ({ page, request }) => {
       const { uid, url } = await createDashboard(request, {
         title: `E2E persistence ${Date.now()}`,

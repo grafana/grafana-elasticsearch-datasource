@@ -21,12 +21,11 @@ type Query struct {
 	TimeRange            backend.TimeRange
 	EditorType           *string `json:"editorType"`
 	IncludeRuntimeFields bool    `json:"includeRuntimeFields"`
-	// Index is an optional concrete index (or comma-separated list) for msearch / ES|QL target; used by grafanaSql normalization.
+	// Index is an optional concrete index (or comma-separated list) for msearch / ES|QL target.
 	Index string `json:"index,omitempty"`
-	// SourceIncludes limits _source to specific fields (SELECT pushdown).
+	// SourceIncludes limits _source to specific fields.
 	SourceIncludes []string `json:"sourceIncludes,omitempty"`
-	// BoolFilters holds structured bool query clauses (filter + must_not)
-	// injected by grafanaSql normalization for the Lucene path.
+	// BoolFilters holds structured bool query clauses (filter + must_not) for the Lucene path.
 	BoolFilters *BoolFilterSet `json:"-"`
 }
 
