@@ -51,7 +51,9 @@ const dslLogsQuery = {
 // elements) into a single string for substring assertions.
 async function readVolumeLegendText(page: import('@playwright/test').Page): Promise<string> {
   const legendEntries = page.locator('[class*="legend"], [class*="Legend"]').filter({ hasText: /Total:/ });
-  await expect(legendEntries.first()).toBeVisible({ timeout: 15000 });
+  // 30s: the first supplementary volume query after a backend deploy pays cold-start
+  // costs on the shared instance, and 15s was not always enough.
+  await expect(legendEntries.first()).toBeVisible({ timeout: 30000 });
   return (await legendEntries.allTextContents()).join('|');
 }
 
