@@ -1,5 +1,30 @@
 # Changelog
 
+## [12.8.1](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.8.0...v12.8.1) (2026-08-27)
+
+
+### 🐛 Bug Fixes
+
+* **e2e:** make the nightly Cloud E2E suite run on the shared instance ([#415](https://github.com/grafana/grafana-elasticsearch-datasource/issues/415)) ([8494bd8](https://github.com/grafana/grafana-elasticsearch-datasource/commit/8494bd8346362fbbd8954db0ae3f3ac17ce94309))
+* **e2e:** resolve the auth state file from GRAFANA_ADMIN_USER ([#413](https://github.com/grafana/grafana-elasticsearch-datasource/issues/413)) ([f1fa900](https://github.com/grafana/grafana-elasticsearch-datasource/commit/f1fa9008cb09be4212a580d26327d3f9cfbe1cdc))
+
+
+### ♻️ Code Refactoring
+
+* resolve typescript-eslint no-deprecated warnings across the frontend ([#408](https://github.com/grafana/grafana-elasticsearch-datasource/issues/408)) ([341448d](https://github.com/grafana/grafana-elasticsearch-datasource/commit/341448dcce7cdc988acbe10194d912c5ebf32e44))
+
+
+### ✅ Tests
+
+* **e2e:** tolerate live ingest and cold starts on the shared instance ([#422](https://github.com/grafana/grafana-elasticsearch-datasource/issues/422)) ([844d2b7](https://github.com/grafana/grafana-elasticsearch-datasource/commit/844d2b74729cf3913ffba68af33f7d6a72c6c643))
+
+
+### 🤖 Continuous Integration
+
+* add a dispatch-only caller for the bundled image pipeline ([#419](https://github.com/grafana/grafana-elasticsearch-datasource/issues/419)) ([b4a5aa1](https://github.com/grafana/grafana-elasticsearch-datasource/commit/b4a5aa15e0fa2c52afef60930a043089ab783ff2))
+* enrol in release-please and conventional commits ([#417](https://github.com/grafana/grafana-elasticsearch-datasource/issues/417)) ([dc2605b](https://github.com/grafana/grafana-elasticsearch-datasource/commit/dc2605b45ca169b41b03feeb74673d6c64128447))
+* onboard to the shared Cloud E2E workflow ([#411](https://github.com/grafana/grafana-elasticsearch-datasource/issues/411)) ([61fcb93](https://github.com/grafana/grafana-elasticsearch-datasource/commit/61fcb937545e9848387a82bdf075a13887c5cbeb))
+
 ## 12.8.0
 
 - Feature: Support sum of max and max of max via sibling bucket aggregations [#364](https://github.com/grafana/grafana-elasticsearch-datasource/pull/364)
