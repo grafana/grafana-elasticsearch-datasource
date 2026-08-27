@@ -165,8 +165,11 @@ test.describe('backend macro handling', () => {
     const frames = await framesForA(response);
     expect(frames.length).toBeGreaterThan(0);
     const counts = (frames[0].data?.values[0] ?? []) as number[];
-    // Repeating the same index in FROM does not double-count documents.
-    expect(counts[0]).toBe(singleCount);
+    // Repeating the same index in FROM must not double-count documents. The shared Cloud
+    // index ingests continuously, so the two counts straddle live writes: assert "not
+    // doubled" with headroom rather than exact equality.
+    expect(counts[0]).toBeGreaterThan(singleCount * 0.5);
+    expect(counts[0]).toBeLessThan(singleCount * 1.5);
   });
 
   test('tokens that merely start with a macro name are not expanded', async ({ request }) => {
