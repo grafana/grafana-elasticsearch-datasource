@@ -1,5 +1,13 @@
 # Changelog
 
+## [12.8.2](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.8.1...v12.8.2) (2026-08-27)
+
+
+### 🤖 Continuous Integration
+
+* ship every merge to dev0 through the bundled pipeline ([#425](https://github.com/grafana/grafana-elasticsearch-datasource/issues/425)) ([b029d3d](https://github.com/grafana/grafana-elasticsearch-datasource/commit/b029d3def9a14f0a3ca8a9d39aa45ce139726585))
+* trigger the full bundled rollout when a release is published ([#423](https://github.com/grafana/grafana-elasticsearch-datasource/issues/423)) ([c34adc8](https://github.com/grafana/grafana-elasticsearch-datasource/commit/c34adc84395470d9e396cc04cce90cd4ff356663))
+
 ## [12.8.1](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.8.0...v12.8.1) (2026-08-27)
 
 
