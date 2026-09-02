@@ -16,6 +16,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Test_Healthcheck_RedStatus verifies the response body-level red status path
+// (distinct from non-2xx HTTP status codes already covered above).
+func Test_Healthcheck_RedStatus(t *testing.T) {
+	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"red"}`, `{}`)
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{})
+	assert.Equal(t, backend.HealthStatusError, res.Status)
+	assert.Contains(t, res.Message, "not healthy")
+}
+
+// Test_Healthcheck_MalformedBody verifies that a non-JSON body yields an
+// unknown status with a truncated snippet echoed back for debugging.
+func Test_Healthcheck_MalformedBody(t *testing.T) {
+	service := GetMockDatasource(http.StatusOK, "200 OK", `not-json-here`, `{}`)
+	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{})
+	assert.Equal(t, backend.HealthStatusUnknown, res.Status)
+	assert.Contains(t, res.Message, "Failed to parse response")
+	assert.Contains(t, res.Message, "not-json-here")
+}
+
 func Test_Healthcheck_OK(t *testing.T) {
 	service := GetMockDatasource(http.StatusOK, "200 OK", `{"status":"green"}`, `{"fields":{"timestamp":{"date":{"metadata_field":true}}}}`)
 	res, _ := service.CheckHealth(context.Background(), &backend.CheckHealthRequest{
@@ -118,6 +137,9 @@ func newHealthCheckServer(t *testing.T, handler http.HandlerFunc) (*httptest.Ser
 	paths := &[]string{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		*paths = append(*paths, r.URL.Path)
+		// The official SDK verifies the X-Elastic-Product response header and
+		// rejects servers that omit it, so every mock response must send it.
+		w.Header().Set("X-Elastic-Product", "Elasticsearch")
 		handler(w, r)
 	}))
 	t.Cleanup(server.Close)
@@ -128,9 +150,12 @@ func newHealthCheckDatasource(t *testing.T, url string, clusterInfo es.ClusterIn
 	t.Helper()
 	httpClient, err := httpclient.New(httpclient.Options{})
 	require.NoError(t, err)
+	esClient, err := es.NewESClient(httpClient, url)
+	require.NoError(t, err)
 	info := &es.DatasourceInfo{
 		URL:        url,
 		HTTPClient: httpClient,
+		ESClient:   esClient,
 		ConfiguredFields: es.ConfiguredFields{
 			TimeField: "timestamp",
 		},
@@ -330,6 +355,9 @@ func (fakeRoundTripper *FakeRoundTripper) RoundTrip(req *http.Request) (*http.Re
 			Body:       io.NopCloser(bytes.NewBufferString(fakeRoundTripper.fieldCapsResponse)),
 		}
 	}
+	// Satisfy the go-elasticsearch client's product check.
+	res.Header = http.Header{}
+	res.Header.Set("X-Elastic-Product", "Elasticsearch")
 	return res, nil
 }
 
@@ -337,8 +365,10 @@ func GetMockDatasource(statusCode int, status string, elasticSearchResponse stri
 	httpClient, _ := httpclient.New(httpclient.Options{})
 	httpClient.Transport = &FakeRoundTripper{statusCode: statusCode, status: status, elasticSearchResponse: elasticSearchResponse, fieldCapsResponse: fieldCapsResponse, index: 0}
 
+	esClient, _ := es.NewESClient(httpClient, "http://localhost:9200")
+
 	dsInfo := es.DatasourceInfo{
-		HTTPClient: httpClient,
+		ESClient: esClient,
 		ConfiguredFields: es.ConfiguredFields{
 			TimeField: "timestamp",
 		},
