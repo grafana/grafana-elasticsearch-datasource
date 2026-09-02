@@ -3,14 +3,25 @@ import { gte, SemVer } from 'semver';
 import { isMetricAggregationWithField } from './components/QueryEditor/MetricAggregationsEditor/aggregations';
 import { metricAggregationConfig } from './components/QueryEditor/MetricAggregationsEditor/utils';
 import { ElasticsearchDataQuery, MetricAggregation, MetricAggregationWithInlineScript } from './dataquery.gen';
+import { QueryType } from './types';
+
+// Saved queries can carry a metric `type` that has since been removed from
+// `MetricAggregationType` (e.g. `moving_avg`), so the config lookup can miss.
+export const metricAggregationLabel = (type: MetricAggregation['type']): string =>
+  metricAggregationConfig[type]?.label ?? `${type} (removed)`;
+
+// Removed aggregation types (e.g. moving_avg) were all metrics aggregations, so
+// unknown types default to metrics.
+export const impliedQueryType = (type: MetricAggregation['type']): QueryType =>
+  metricAggregationConfig[type]?.impliedQueryType ?? 'metrics';
 
 export const describeMetric = (metric: MetricAggregation) => {
   if (!isMetricAggregationWithField(metric)) {
-    return metricAggregationConfig[metric.type].label;
+    return metricAggregationLabel(metric.type);
   }
 
   // TODO: field might be undefined
-  return `${metricAggregationConfig[metric.type].label} ${metric.field}`;
+  return `${metricAggregationLabel(metric.type)} ${metric.field}`;
 };
 
 /**
@@ -92,15 +103,11 @@ export const getScriptValue = (metric: MetricAggregationWithInlineScript) =>
   (typeof metric.settings?.script === 'object' ? metric.settings?.script?.inline : metric.settings?.script) || '';
 
 export const isSupportedVersion = (version: SemVer): boolean => {
-  if (gte(version, '7.16.0')) {
-    return true;
-  }
-
-  return false;
+  return gte(version, '8.0.0');
 };
 
 export const unsupportedVersionMessage =
-  'Support for Elasticsearch versions after their end-of-life (currently versions < 7.16) was removed. Using unsupported version of Elasticsearch may lead to unexpected and incorrect results.';
+  'Support for Elasticsearch versions after their end-of-life (currently versions below 8.0) was removed. Using unsupported version of Elasticsearch may lead to unexpected and incorrect results.';
 
 // To be considered a time series query, the last bucked aggregation must be a Date Histogram
 export const isTimeSeriesQuery = (query: ElasticsearchDataQuery): boolean => {
