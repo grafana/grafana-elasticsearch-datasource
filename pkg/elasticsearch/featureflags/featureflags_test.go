@@ -10,6 +10,9 @@ import (
 	"testing"
 
 	"github.com/grafana/grafana-plugin-sdk-go/config"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 )
@@ -267,6 +270,55 @@ func TestSlugFromAppURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%q", tt.appURL), func(t *testing.T) {
 			require.Equal(t, tt.expected, slugFromAppURL(tt.appURL))
+		})
+	}
+}
+
+func TestClientEvaluationMetrics(t *testing.T) {
+	tests := []struct {
+		name        string
+		flag        string
+		status      int
+		body        func(flag string) map[string]any
+		wantOutcome string
+	}{
+		{
+			name:        "miss then hit",
+			flag:        "test.metrics-miss-then-hit",
+			status:      http.StatusOK,
+			body:        enabledResponse,
+			wantOutcome: outcomeMiss,
+		},
+		{
+			name:   "evaluation error",
+			flag:   "test.metrics-error",
+			status: http.StatusNotFound,
+			body: func(flag string) map[string]any {
+				return map[string]any{"key": flag, "errorCode": "FLAG_NOT_FOUND"}
+			},
+			wantOutcome: outcomeError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The counters are package globals on the default registry, so each
+			// case uses its own flag key and reads only its own label children.
+			var requests atomic.Int64
+			server := httptest.NewServer(ofrepHandler(t, tt.status, tt.body(tt.flag), &requests))
+			t.Cleanup(server.Close)
+
+			client := NewClient(server.URL)
+			client.IsEnabled(context.Background(), tt.flag)
+			client.IsEnabled(context.Background(), tt.flag)
+
+			require.Equal(t, float64(1), testutil.ToFloat64(evaluationsTotal.WithLabelValues(tt.flag, tt.wantOutcome)))
+			require.Equal(t, float64(1), testutil.ToFloat64(evaluationsTotal.WithLabelValues(tt.flag, outcomeHit)))
+			hist, err := requestDurationSeconds.GetMetricWithLabelValues(tt.flag)
+			require.NoError(t, err)
+			var m dto.Metric
+			require.NoError(t, hist.(prometheus.Metric).Write(&m))
+			require.Equal(t, uint64(1), m.GetHistogram().GetSampleCount())
 		})
 	}
 }
