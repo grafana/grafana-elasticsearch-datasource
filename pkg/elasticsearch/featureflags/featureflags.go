@@ -111,15 +111,21 @@ func (c *Client) IsEnabled(ctx context.Context, flag string) bool {
 	entry, ok := c.cache[key]
 	c.mu.RUnlock()
 	if ok && time.Now().Before(entry.expires) {
+		evaluationsTotal.WithLabelValues(flag, outcomeHit).Inc()
 		return entry.value
 	}
 
 	value, _, _ := c.group.Do(key, func() (any, error) {
+		start := time.Now()
 		detail := c.provider.BooleanEvaluation(ctx, flag, false, evalCtx)
+		requestDurationSeconds.WithLabelValues(flag).Observe(time.Since(start).Seconds())
+		outcome := outcomeMiss
 		if detail.Reason == openfeature.ErrorReason {
+			outcome = outcomeError
 			c.logger.FromContext(ctx).Warn("Feature flag evaluation failed, defaulting to off",
 				"flag", flag, "error", detail.ResolutionError.Error())
 		}
+		evaluationsTotal.WithLabelValues(flag, outcome).Inc()
 		c.mu.Lock()
 		c.cache[key] = cacheEntry{value: detail.Value, expires: time.Now().Add(cacheTTL)}
 		c.mu.Unlock()
