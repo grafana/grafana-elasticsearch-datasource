@@ -38,8 +38,7 @@ import (
 const LogsDataplane = "elasticsearch.logs-dataplane"
 
 const (
-	// defaultOFREPURL is the unauthenticated GOFF relay proxy reachable from
-	// hosted-grafana and grafana-datasources namespace pods. Anywhere else the
+	// defaultOFREPURL is the unauthenticated GOFF relay proxy. Anywhere else the
 	// host does not resolve and evaluations fail closed.
 	defaultOFREPURL = "http://go-feature-flag.hosted-grafana.svc.cluster.local"
 
@@ -47,8 +46,8 @@ const (
 	// end-to-end tests.
 	ofrepURLEnvVar = "GF_PLUGIN_ELASTICSEARCH_OFREP_URL"
 
-	// requestTimeout matches the goff_request_timeout used by hosted-grafana
-	// services talking to the same relay proxy.
+	// requestTimeout matches the timeout other in-cluster services use against
+	// the same relay proxy.
 	requestTimeout = 5 * time.Second
 
 	// cacheTTL matches the interval at which the relay proxy reloads flag
