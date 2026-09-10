@@ -102,7 +102,8 @@ func IsEnabled(ctx context.Context, flag string) bool {
 // IsEnabled evaluates flag with targeting attributes derived from ctx,
 // returning false on any error. Results, including failures, are cached for
 // cacheTTL per flag and targeting key, with concurrent lookups for the same
-// key collapsed into one request.
+// key collapsed into one request. The OFREP request does not inherit ctx's
+// cancellation, because its result is shared with every caller in the window.
 func (c *Client) IsEnabled(ctx context.Context, flag string) bool {
 	evalCtx := evaluationContext(ctx)
 	key := cacheKey(flag, evalCtx)
@@ -116,8 +117,13 @@ func (c *Client) IsEnabled(ctx context.Context, flag string) bool {
 	}
 
 	value, _, _ := c.group.Do(key, func() (any, error) {
+		// A query canceled mid-evaluation must not cache a spurious failure
+		// for the tenant's whole TTL window, so the request runs detached from
+		// the caller's cancellation. The provider's request timeout still
+		// bounds it.
+		detached := context.WithoutCancel(ctx)
 		start := time.Now()
-		detail := c.provider.BooleanEvaluation(ctx, flag, false, evalCtx)
+		detail := c.provider.BooleanEvaluation(detached, flag, false, evalCtx)
 		requestDurationSeconds.WithLabelValues(flag).Observe(time.Since(start).Seconds())
 		outcome := outcomeMiss
 		if detail.Reason == openfeature.ErrorReason {
