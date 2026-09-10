@@ -59,7 +59,12 @@ const (
 
 	// tenantIDMetadataKey is the gRPC metadata key carrying the tenant
 	// identifier on multi-tenant requests (the bare numeric stack id), the
-	// same key the plugin SDK's tenant middleware reads.
+	// same key the plugin SDK's tenant middleware reads. The SDK keeps its
+	// getter internal and no request field carries the tenant yet, so this
+	// read is a bridge. Replace it with the host-asserted evaluation context
+	// from the SDK's OpenFeature discovery config (grafana-plugin-sdk-go#1618,
+	// tracked in #317) once that ships. If the key changes, targeting falls
+	// back to the app URL slug or the flag's default rule.
 	tenantIDMetadataKey = "tenantID"
 )
 
