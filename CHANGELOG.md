@@ -1,5 +1,19 @@
 # Changelog
 
+## [12.8.2](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.8.1...v12.8.2) (2026-09-09)
+
+
+### 🐛 Bug Fixes
+
+* **deps:** bump transitive npm packages for CVE remediation ([#431](https://github.com/grafana/grafana-elasticsearch-datasource/issues/431)) ([13a444f](https://github.com/grafana/grafana-elasticsearch-datasource/commit/13a444f766370bce3f254d3530e7c5cb68b386dd))
+* **deps:** update backend dependencies ([#429](https://github.com/grafana/grafana-elasticsearch-datasource/issues/429)) ([030d4fa](https://github.com/grafana/grafana-elasticsearch-datasource/commit/030d4fa8385cced31f6354ddd86573b435f2e8b2))
+
+
+### 🤖 Continuous Integration
+
+* ship every merge to dev0 through the bundled pipeline ([#425](https://github.com/grafana/grafana-elasticsearch-datasource/issues/425)) ([b029d3d](https://github.com/grafana/grafana-elasticsearch-datasource/commit/b029d3def9a14f0a3ca8a9d39aa45ce139726585))
+* trigger the full bundled rollout when a release is published ([#423](https://github.com/grafana/grafana-elasticsearch-datasource/issues/423)) ([c34adc8](https://github.com/grafana/grafana-elasticsearch-datasource/commit/c34adc84395470d9e396cc04cce90cd4ff356663))
+
 ## [12.8.1](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.8.0...v12.8.1) (2026-08-27)
 
 
