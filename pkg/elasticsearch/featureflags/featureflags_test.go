@@ -3,6 +3,7 @@ package featureflags
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -124,6 +125,20 @@ func TestClientCachesEvaluations(t *testing.T) {
 			require.Equal(t, int64(1), requests.Load())
 		})
 	}
+}
+
+func TestClientCanceledCallerDoesNotPoisonCache(t *testing.T) {
+	var requests atomic.Int64
+	server := httptest.NewServer(ofrepHandler(t, http.StatusOK, enabledResponse(LogsDataplane), &requests))
+	t.Cleanup(server.Close)
+
+	canceled, cancel := context.WithCancelCause(context.Background())
+	cancel(errors.New("caller abandoned the query"))
+
+	client := NewClient(server.URL)
+	require.True(t, client.IsEnabled(canceled, LogsDataplane))
+	require.True(t, client.IsEnabled(context.Background(), LogsDataplane))
+	require.Equal(t, int64(1), requests.Load())
 }
 
 func TestClientCachesPerTenant(t *testing.T) {
