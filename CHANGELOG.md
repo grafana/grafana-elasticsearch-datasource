@@ -1,5 +1,12 @@
 # Changelog
 
+## [12.8.3](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.8.2...v12.8.3) (2026-09-10)
+
+
+### 🤖 Continuous Integration
+
+* forward the bundled pipeline's ref input on manual dispatch ([#427](https://github.com/grafana/grafana-elasticsearch-datasource/issues/427)) ([2a81451](https://github.com/grafana/grafana-elasticsearch-datasource/commit/2a814512e9f18e9d95664210687132267819d78a))
+
 ## [12.8.2](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.8.1...v12.8.2) (2026-09-09)
 
 
