@@ -43,7 +43,7 @@ const (
 var searchWordsRegex = regexp.MustCompile(regexp.QuoteMeta(es.HighlightPreTagsString) + `(.*?)` + regexp.QuoteMeta(es.HighlightPostTagsString))
 var aliasPatternRegex = regexp.MustCompile(`\{\{([\s\S]+?)\}\}`)
 
-func parseResponse(ctx context.Context, responses []*es.SearchResponse, targets []*Query, configuredFields es.ConfiguredFields, keepLabelsInResponse bool, logger log.Logger) (*backend.QueryDataResponse, error) {
+func parseResponse(ctx context.Context, responses []*es.SearchResponse, targets []*Query, configuredFields es.ConfiguredFields, keepLabelsInResponse bool, dataplaneEnabled bool, logger log.Logger) (*backend.QueryDataResponse, error) {
 	result := backend.QueryDataResponse{
 		Responses: backend.Responses{},
 	}
@@ -102,7 +102,7 @@ func parseResponse(ctx context.Context, responses []*es.SearchResponse, targets 
 			}
 			result.Responses[target.RefID] = queryRes
 		} else if isLogsQuery(target) {
-			err := logsProcessor.processLogsResponse(res, target, configuredFields, &queryRes)
+			err := logsProcessor.processLogsResponse(res, target, configuredFields, dataplaneEnabled, &queryRes)
 			if err != nil {
 				// TODO: This error never happens so we should remove it
 				return &backend.QueryDataResponse{}, err
