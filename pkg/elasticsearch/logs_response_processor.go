@@ -121,7 +121,7 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 
 	if dataplaneEnabled {
 		canonical := buildLogLinesCanonicalFields(docs, configuredFields, metadataKeys)
-		fields = append(canonical, fields...)
+		fields = prependLogLinesCanonicalFields(canonical, fields)
 	}
 
 	frames := data.Frames{}

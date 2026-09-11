@@ -74,7 +74,7 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 		// ES|QL columns have no _source/fields distinction, so all keys are
 		// regular Field-category labels; pass nil metadata for every row.
 		canonical := buildLogLinesCanonicalFields(docs, configuredFields, nil)
-		fields = append(canonical, fields...)
+		fields = prependLogLinesCanonicalFields(canonical, fields)
 	}
 
 	frame := data.NewFrame(target.RefID, fields...)

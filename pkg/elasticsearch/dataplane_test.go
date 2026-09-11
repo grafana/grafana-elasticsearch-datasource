@@ -45,6 +45,18 @@ func fieldByName(t *testing.T, frame *data.Frame, name string) *data.Field {
 	return nil
 }
 
+func countFieldsNamed(frame *data.Frame, name string) int {
+	n := 0
+	for _, f := range frame.Fields {
+		if f.Name == name {
+			n++
+		}
+	}
+	return n
+}
+
+var logLinesCanonicalNames = []string{"timestamp", "body", "severity", "id", "labels", "labelTypes"}
+
 func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 	configuredFields := dataplaneConfiguredFields()
 
@@ -126,6 +138,9 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 		require.Equal(t, "id", frame.Fields[3].Name)
 		require.Equal(t, "labels", frame.Fields[4].Name)
 		require.Equal(t, "labelTypes", frame.Fields[5].Name)
+		for _, name := range logLinesCanonicalNames {
+			require.Equalf(t, 1, countFieldsNamed(frame, name), "canonical field %q must appear exactly once", name)
+		}
 
 		bodyField := fieldByName(t, frame, "body")
 		require.Equal(t, "hello world", bodyField.At(0).(string))
@@ -212,6 +227,9 @@ func TestEsqlLogsResponseProcessor_Dataplane(t *testing.T) {
 		require.Equal(t, "timestamp", frame.Fields[0].Name)
 		require.Equal(t, "body", frame.Fields[1].Name)
 		require.Equal(t, "labelTypes", frame.Fields[5].Name)
+		for _, name := range logLinesCanonicalNames {
+			require.Equalf(t, 1, countFieldsNamed(frame, name), "canonical field %q must appear exactly once", name)
+		}
 
 		bodyField := fieldByName(t, frame, "body")
 		require.Equal(t, "esql line one", bodyField.At(0).(string))
@@ -276,6 +294,44 @@ func TestLogsResponseProcessor_DataplaneBodyDoesNotFallBackToSource(t *testing.T
 
 	bodyField := fieldByName(t, frame, "body")
 	require.Equal(t, "", bodyField.At(0).(string), "body must be empty (not _source JSON) when LogMessageField is unset")
+}
+
+func TestLogsResponseProcessor_DataplaneCanonicalNameWinsOverLegacy(t *testing.T) {
+	// A source whose time and message fields are literally named "timestamp"
+	// and "body" would otherwise produce two fields of each name.
+	configuredFields := es.ConfiguredFields{
+		TimeField:       "timestamp",
+		LogMessageField: "body",
+	}
+	hits := []map[string]interface{}{
+		{
+			"_id":    "doc-1",
+			"_index": "logs-000001",
+			"_source": map[string]interface{}{
+				"timestamp": "2024-01-02T03:04:05.123Z",
+				"body":      "hello world",
+			},
+		},
+	}
+	searchResponse := &es.SearchResponse{
+		Hits: &es.SearchResponseHits{
+			Hits:  hits,
+			Total: &es.SearchResponseHitsTotal{Value: 1, Relation: "eq"},
+		},
+	}
+
+	processor := newLogsResponseProcessor(log.New())
+	queryRes := backend.DataResponse{}
+	err := processor.processLogsResponse(searchResponse, newLogsDataplaneQuery(t), configuredFields, true, &queryRes)
+	require.NoError(t, err)
+	frame := queryRes.Frames[0]
+
+	for _, name := range logLinesCanonicalNames {
+		require.Equalf(t, 1, countFieldsNamed(frame, name), "canonical field %q must appear exactly once", name)
+	}
+	expected, _ := time.Parse(time.RFC3339Nano, "2024-01-02T03:04:05.123Z")
+	require.Equal(t, expected, fieldByName(t, frame, "timestamp").At(0).(time.Time), "the non-nullable canonical timestamp must be the one that survives")
+	require.Equal(t, "hello world", fieldByName(t, frame, "body").At(0).(string))
 }
 
 func TestBuildLogLabelsAndTypes_EmptyWhenNothingRemains(t *testing.T) {

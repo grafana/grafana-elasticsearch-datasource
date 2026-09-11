@@ -106,6 +106,28 @@ func buildLogLinesCanonicalFields(docs []map[string]interface{}, configuredField
 	}
 }
 
+// prependLogLinesCanonicalFields returns the canonical fields followed by the
+// legacy fields, minus any legacy field that shares a canonical name. The
+// contract binds each role to the first field with that name, so a same-named
+// legacy field is never read and only shows up as a duplicate column or extra
+// field. Its value survives in the canonical field it collided with, or in
+// labels when it came from the document.
+func prependLogLinesCanonicalFields(canonical, legacy []*data.Field) []*data.Field {
+	names := make(map[string]struct{}, len(canonical))
+	for _, f := range canonical {
+		names[f.Name] = struct{}{}
+	}
+	fields := make([]*data.Field, 0, len(canonical)+len(legacy))
+	fields = append(fields, canonical...)
+	for _, f := range legacy {
+		if _, taken := names[f.Name]; taken {
+			continue
+		}
+		fields = append(fields, f)
+	}
+	return fields
+}
+
 // parseDocTimeValue parses a time value out of a doc field, handling both the
 // plain RFC3339Nano string case and the single-element array case that
 // Elasticsearch's "fields" response uses.
