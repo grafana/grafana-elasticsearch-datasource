@@ -57,7 +57,8 @@ func setLogLinesFrameMeta(frame *data.Frame) {
 // (e.g. ES|QL responses, where all keys are Field-equivalent columns).
 //
 // timestamp and body are non-nullable per the spec; rows with no parsable
-// time stay at the zero time.Time and rows with no body stay at "".
+// time stay at the zero time.Time (whether to omit them with a notice instead
+// is tracked in #317) and rows with no body stay at "".
 func buildLogLinesCanonicalFields(docs []map[string]interface{}, rowIDs []string, configuredFields es.ConfiguredFields, metadataKeys []map[string]struct{}) []*data.Field {
 	size := len(docs)
 	timestamps := make([]time.Time, size)
@@ -140,24 +141,25 @@ func prependLogLinesCanonicalFields(canonical, legacy []*data.Field) []*data.Fie
 	return fields
 }
 
-// parseDocTimeValue parses a time value out of a doc field, handling both the
-// plain RFC3339Nano string case and the single-element array case that
-// Elasticsearch's "fields" response uses.
+// parseDocTimeValue parses a time value out of a doc field: an RFC3339Nano
+// string, the single-element array Elasticsearch's "fields" response uses, or
+// the epoch-millis number the default date mapping accepts and raw DSL
+// queries read back from _source unchanged.
 func parseDocTimeValue(v interface{}) (time.Time, bool) {
-	s, ok := v.(string)
-	if !ok {
-		if arr, arrOk := v.([]interface{}); arrOk && len(arr) == 1 {
-			s, ok = arr[0].(string)
+	if arr, ok := v.([]interface{}); ok && len(arr) == 1 {
+		v = arr[0]
+	}
+	switch value := v.(type) {
+	case string:
+		t, err := time.Parse(time.RFC3339Nano, value)
+		if err != nil {
+			return time.Time{}, false
 		}
+		return t, true
+	case float64:
+		return time.UnixMilli(int64(value)).UTC(), true
 	}
-	if !ok {
-		return time.Time{}, false
-	}
-	t, err := time.Parse(time.RFC3339Nano, s)
-	if err != nil {
-		return time.Time{}, false
-	}
-	return t, true
+	return time.Time{}, false
 }
 
 // scalarString returns the string form of a scalar document value. Level

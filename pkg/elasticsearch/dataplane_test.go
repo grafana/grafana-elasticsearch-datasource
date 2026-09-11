@@ -647,3 +647,42 @@ func TestLogsResponseProcessor_DataplaneUnconfiguredLevelAttributeStaysALabel(t 
 		require.Equal(t, wantLabel[i], labels["level"], "row %d", i)
 	}
 }
+
+func TestParseDocTimeValue(t *testing.T) {
+	want := time.Date(2024, 1, 2, 3, 4, 5, 123000000, time.UTC)
+	tests := []struct {
+		name  string
+		value interface{}
+		want  time.Time
+		ok    bool
+	}{
+		{name: "RFC3339Nano string", value: "2024-01-02T03:04:05.123Z", want: want, ok: true},
+		{name: "single-element fields array", value: []interface{}{"2024-01-02T03:04:05.123Z"}, want: want, ok: true},
+		{name: "epoch millis from _source", value: float64(1704164645123), want: want, ok: true},
+		{name: "custom date format", value: "09/02/2023"},
+		{name: "multi-valued array", value: []interface{}{"2024-01-02T03:04:05.123Z", "2024-01-02T03:04:06.456Z"}},
+		{name: "absent", value: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := parseDocTimeValue(tt.value)
+			require.Equal(t, tt.ok, ok)
+			require.True(t, tt.want.Equal(got), "got %s", got)
+		})
+	}
+}
+
+func TestBuildLogLinesCanonicalFields_UnparsableTimeStaysZero(t *testing.T) {
+	// Documented behaviour, pinned so any change is deliberate: timestamp is
+	// non-nullable, and a row whose time is absent or in a format the parser
+	// does not know keeps the zero time.Time. Whether such rows should be
+	// omitted with a notice instead is tracked in #317.
+	docs := []map[string]interface{}{
+		{"@timestamp": "09/02/2023", "message": "custom format"},
+		{"message": "no time at all"},
+	}
+	fields := buildLogLinesCanonicalFields(docs, []string{"a", "b"}, dataplaneConfiguredFields(), nil)
+	require.Equal(t, "timestamp", fields[0].Name)
+	require.True(t, fields[0].At(0).(time.Time).IsZero())
+	require.True(t, fields[0].At(1).(time.Time).IsZero())
+}
