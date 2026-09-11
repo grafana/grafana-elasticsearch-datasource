@@ -2,6 +2,7 @@ package elasticsearch
 
 import (
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
@@ -79,14 +80,20 @@ func buildLogLinesCanonicalFields(docs []map[string]interface{}, rowIDs []string
 			}
 		}
 
-		// severity mirrors the "level" field already populated upstream from
-		// configuredFields.LogLevelField. Pass-through: values are expected to
-		// already match Grafana's log-level enum (critical/error/warning/info/
-		// debug/trace) — this contract is enforced by data-source config, not
-		// here. Left nil when absent per spec.
-		if v, ok := doc["level"].(string); ok {
-			vv := v
-			severities[i] = &vv
+		// severity reads the configured level field directly, like timestamp
+		// and body, so a value that only arrives via hit["fields"] is seen and
+		// a document's own "level" attribute cannot shadow the configured one.
+		// Without a configured field the document's "level" is used, which is
+		// what legacy frames exposed. The value passes through unchanged:
+		// Grafana matches it case-insensitively against its level aliases and
+		// the numeric levels 0-7, so only non-string scalars need converting to
+		// reach this string field. Left nil when absent per spec.
+		levelKey := "level"
+		if configuredFields.LogLevelField != "" {
+			levelKey = configuredFields.LogLevelField
+		}
+		if s, ok := scalarString(doc[levelKey]); ok {
+			severities[i] = &s
 		}
 
 		if i < len(rowIDs) && rowIDs[i] != "" {
@@ -153,25 +160,43 @@ func parseDocTimeValue(v interface{}) (time.Time, bool) {
 	return t, true
 }
 
+// scalarString returns the string form of a scalar document value. Level
+// fields are commonly numeric (syslog severity codes, OTel SeverityNumber),
+// and JSON numbers decode as float64, so they are formatted without a
+// fractional part.
+func scalarString(v interface{}) (string, bool) {
+	switch value := v.(type) {
+	case string:
+		return value, true
+	case float64:
+		return strconv.FormatFloat(value, 'f', -1, 64), true
+	}
+	return "", false
+}
+
 // buildLogLabelsAndTypes marshals a doc's non-canonical fields into two JSON
 // objects: the `labels` payload (a Record<string,any> of key→value) and the
 // `labelTypes` payload (a Record<string,string> of key→category).
 //
-// Excluded keys: the configured time, message, and level source fields (those
-// are promoted to canonical fields); the internal "level" mirror; "_source"
-// (the whole-document JSON blob, which would duplicate every other field); and
-// the hit envelope keys "_type", "sort" and "highlight", which describe the
-// search response rather than the document. "_type" is absent on
-// Elasticsearch 8 and later, so it would surface as null. A document's own
-// "id" attribute stays: the canonical id comes from the hit envelope, not
-// from it.
+// Excluded keys: the configured time and message fields (promoted to the
+// canonical timestamp and body, which consumers read from there); the
+// internal "level" mirror when it copies a differently named configured
+// field; "_source" (the whole-document JSON blob, which would duplicate
+// every other field); and the hit envelope keys "_type", "sort" and
+// "highlight", which describe the search response rather than the document.
+// "_type" is absent on Elasticsearch 8 and later, so it would surface as null.
+//
+// The configured level field stays a label even though it also feeds
+// severity: Grafana's Log Details for LogLines frames lists labels only, so
+// this is what keeps the level visible and click-filterable there. A
+// document's own "id" attribute stays too; the canonical id comes from the
+// hit envelope, not from it.
 //
 // metadataKeys names the keys that originated from hit["fields"] (doc-value
 // returns) rather than _source. Those become "Metadata"; values whose runtime
 // type is an array become "ArrayField"; everything else is "Field".
 func buildLogLabelsAndTypes(doc map[string]interface{}, configuredFields es.ConfiguredFields, metadataKeys map[string]struct{}) (json.RawMessage, json.RawMessage) {
 	excluded := map[string]struct{}{
-		"level":     {},
 		"_source":   {},
 		"_type":     {},
 		"sort":      {},
@@ -183,8 +208,8 @@ func buildLogLabelsAndTypes(doc map[string]interface{}, configuredFields es.Conf
 	if configuredFields.LogMessageField != "" {
 		excluded[configuredFields.LogMessageField] = struct{}{}
 	}
-	if configuredFields.LogLevelField != "" {
-		excluded[configuredFields.LogLevelField] = struct{}{}
+	if configuredFields.LogLevelField != "" && configuredFields.LogLevelField != "level" {
+		excluded["level"] = struct{}{}
 	}
 
 	filtered := make(map[string]interface{}, len(doc))

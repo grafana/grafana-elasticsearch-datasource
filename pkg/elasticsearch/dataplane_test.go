@@ -169,8 +169,8 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 		require.Equal(t, "us-east-1", labels["region"], "doc-value field should be unwrapped from its array")
 		require.NotContains(t, labels, "@timestamp")
 		require.NotContains(t, labels, "message")
-		require.NotContains(t, labels, "lvl")
-		require.NotContains(t, labels, "level")
+		require.Equal(t, "info", labels["lvl"], "the configured level field stays a label so Log Details can show and filter on it")
+		require.NotContains(t, labels, "level", "the internal level mirror is not a document attribute")
 		require.NotContains(t, labels, "id")
 		require.NotContains(t, labels, "_source")
 		for _, k := range []string{"_type", "sort", "highlight"} {
@@ -246,7 +246,7 @@ func TestEsqlLogsResponseProcessor_Dataplane(t *testing.T) {
 		require.Equal(t, "host-a", labels["host"])
 		require.NotContains(t, labels, "@timestamp")
 		require.NotContains(t, labels, "message")
-		require.NotContains(t, labels, "lvl")
+		require.Equal(t, "warn", labels["lvl"], "the configured level field stays a label")
 
 		labelTypesField := fieldByName(t, frame, "labelTypes")
 		rawTypes := labelTypesField.At(0).(json.RawMessage)
@@ -339,7 +339,6 @@ func TestBuildLogLabelsAndTypes_EmptyWhenNothingRemains(t *testing.T) {
 	doc := map[string]interface{}{
 		"@timestamp": "2024-01-02T00:00:00Z",
 		"message":    "m",
-		"lvl":        "info",
 		"level":      "info",
 		"_source":    "{}",
 		"_type":      "_doc",
@@ -464,4 +463,187 @@ func TestEsqlLogsResponseProcessor_DataplaneIDFromMetadataColumns(t *testing.T) 
 	require.NoError(t, json.Unmarshal(fieldByName(t, frame, "labels").At(0).(json.RawMessage), &labels))
 	require.Equal(t, float64(1), labels["id"], "a column named id stays a label")
 	require.Equal(t, "abc", labels["_id"])
+}
+
+func TestBuildLogLabelsAndTypes_KeepsLevelSourceAndDocumentID(t *testing.T) {
+	// The configured level field is what Log Details shows and filters on,
+	// and a document's own `id` is an ordinary attribute now that the
+	// canonical id comes from the hit envelope.
+	labels, types := buildLogLabelsAndTypes(map[string]interface{}{
+		"lvl":   "info",
+		"level": "info",
+		"id":    float64(42),
+	}, dataplaneConfiguredFields(), nil)
+	require.JSONEq(t, `{"lvl":"info","id":42}`, string(labels))
+	require.JSONEq(t, `{"lvl":"Field","id":"Field"}`, string(types))
+}
+
+func TestBuildLogLabelsAndTypes_LevelStaysWhenItIsTheConfiguredField(t *testing.T) {
+	labels, _ := buildLogLabelsAndTypes(map[string]interface{}{"level": "info"}, es.ConfiguredFields{LogLevelField: "level"}, nil)
+	require.JSONEq(t, `{"level":"info"}`, string(labels))
+}
+
+func TestLogsResponseProcessor_DataplaneSeverityReadsConfiguredField(t *testing.T) {
+	configuredFields := es.ConfiguredFields{
+		TimeField:       "@timestamp",
+		LogMessageField: "message",
+		LogLevelField:   "sev",
+	}
+	hits := []map[string]interface{}{
+		{
+			// Numeric levels (syslog codes, OTel SeverityNumber) decode as float64.
+			"_id":    "doc-1",
+			"_index": "idx",
+			"_source": map[string]interface{}{
+				"@timestamp": "2024-01-02T03:04:05.123Z",
+				"message":    "numeric level",
+				"sev":        float64(3),
+			},
+		},
+		{
+			// _source disabled, or a runtime field configured as the level
+			// field: the value arrives only via hit.fields.
+			"_id":    "doc-2",
+			"_index": "idx",
+			"fields": map[string]interface{}{
+				"@timestamp": []interface{}{"2024-01-02T03:04:06.456Z"},
+				"message":    []interface{}{"fields only"},
+				"sev":        []interface{}{"error"},
+			},
+		},
+		{
+			// A document's own `level` attribute must not shadow the configured field.
+			"_id":    "doc-3",
+			"_index": "idx",
+			"_source": map[string]interface{}{
+				"@timestamp": "2024-01-02T03:04:07.789Z",
+				"message":    "both keys",
+				"sev":        "warn",
+				"level":      "from-level",
+			},
+		},
+	}
+	searchResponse := &es.SearchResponse{
+		Hits: &es.SearchResponseHits{
+			Hits:  hits,
+			Total: &es.SearchResponseHitsTotal{Value: len(hits), Relation: "eq"},
+		},
+	}
+
+	processor := newLogsResponseProcessor(log.New())
+	queryRes := backend.DataResponse{}
+	err := processor.processLogsResponse(searchResponse, newLogsDataplaneQuery(t), configuredFields, true, &queryRes)
+	require.NoError(t, err)
+	frame := queryRes.Frames[0]
+
+	severityField := fieldByName(t, frame, "severity")
+	for i, want := range []string{"3", "error", "warn"} {
+		got := severityField.At(i).(*string)
+		require.NotNil(t, got, "row %d", i)
+		require.Equal(t, want, *got, "row %d", i)
+	}
+
+	var labels map[string]interface{}
+	require.NoError(t, json.Unmarshal(fieldByName(t, frame, "labels").At(0).(json.RawMessage), &labels))
+	require.Equal(t, float64(3), labels["sev"], "the configured level field stays a label")
+	require.NotContains(t, labels, "level", "the internal level mirror is not a document attribute")
+}
+
+func TestLogsResponseProcessor_DataplaneSeverityFromKeywordSubfield(t *testing.T) {
+	// A common configuration points LogLevelField at a keyword multi-field,
+	// which never appears in _source and only arrives via hit.fields.
+	configuredFields := es.ConfiguredFields{
+		TimeField:       "@timestamp",
+		LogMessageField: "message",
+		LogLevelField:   "lvl.keyword",
+	}
+	hits := []map[string]interface{}{
+		{
+			"_id":    "doc-1",
+			"_index": "idx",
+			"_source": map[string]interface{}{
+				"@timestamp": "2024-01-02T03:04:05.123Z",
+				"message":    "keyword level",
+				"lvl":        "error",
+			},
+			"fields": map[string]interface{}{
+				"lvl.keyword": []interface{}{"error"},
+			},
+		},
+	}
+	searchResponse := &es.SearchResponse{
+		Hits: &es.SearchResponseHits{
+			Hits:  hits,
+			Total: &es.SearchResponseHitsTotal{Value: 1, Relation: "eq"},
+		},
+	}
+
+	processor := newLogsResponseProcessor(log.New())
+	queryRes := backend.DataResponse{}
+	err := processor.processLogsResponse(searchResponse, newLogsDataplaneQuery(t), configuredFields, true, &queryRes)
+	require.NoError(t, err)
+	frame := queryRes.Frames[0]
+
+	got := fieldByName(t, frame, "severity").At(0).(*string)
+	require.NotNil(t, got)
+	require.Equal(t, "error", *got)
+	var labels map[string]interface{}
+	require.NoError(t, json.Unmarshal(fieldByName(t, frame, "labels").At(0).(json.RawMessage), &labels))
+	require.Equal(t, "error", labels["lvl.keyword"])
+}
+
+func TestLogsResponseProcessor_DataplaneUnconfiguredLevelAttributeStaysALabel(t *testing.T) {
+	// With no LogLevelField, a document's own `level` is what legacy frames
+	// exposed and what Grafana read as the level. It is promoted to severity
+	// and kept as a label so Log Details still shows it.
+	configuredFields := es.ConfiguredFields{
+		TimeField:       "@timestamp",
+		LogMessageField: "message",
+	}
+	hits := []map[string]interface{}{
+		{
+			"_id":    "doc-1",
+			"_index": "idx",
+			"_source": map[string]interface{}{
+				"@timestamp": "2024-01-02T03:04:05.123Z",
+				"message":    "upper-case level",
+				"level":      "INFO",
+			},
+		},
+		{
+			"_id":    "doc-2",
+			"_index": "idx",
+			"_source": map[string]interface{}{
+				"@timestamp": "2024-01-02T03:04:06.456Z",
+				"message":    "numeric level",
+				"level":      float64(3),
+			},
+		},
+	}
+	searchResponse := &es.SearchResponse{
+		Hits: &es.SearchResponseHits{
+			Hits:  hits,
+			Total: &es.SearchResponseHitsTotal{Value: len(hits), Relation: "eq"},
+		},
+	}
+
+	processor := newLogsResponseProcessor(log.New())
+	queryRes := backend.DataResponse{}
+	err := processor.processLogsResponse(searchResponse, newLogsDataplaneQuery(t), configuredFields, true, &queryRes)
+	require.NoError(t, err)
+	frame := queryRes.Frames[0]
+
+	severityField := fieldByName(t, frame, "severity")
+	labelsField := fieldByName(t, frame, "labels")
+	wantSeverity := []string{"INFO", "3"}
+	wantLabel := []interface{}{"INFO", float64(3)}
+	for i := range hits {
+		got := severityField.At(i).(*string)
+		require.NotNil(t, got, "row %d", i)
+		require.Equal(t, wantSeverity[i], *got, "row %d", i)
+
+		var labels map[string]interface{}
+		require.NoError(t, json.Unmarshal(labelsField.At(i).(json.RawMessage), &labels))
+		require.Equal(t, wantLabel[i], labels["level"], "row %d", i)
+	}
 }
