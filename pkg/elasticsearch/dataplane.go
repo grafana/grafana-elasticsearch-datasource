@@ -132,17 +132,22 @@ func parseDocTimeValue(v interface{}) (time.Time, bool) {
 //
 // Excluded keys: the configured time, message, and level source fields (those
 // are promoted to canonical fields); the internally computed "id" and "level"
-// mirrors; and "_source" (the whole-document JSON blob, which would duplicate
-// every other field).
+// mirrors; "_source" (the whole-document JSON blob, which would duplicate
+// every other field); and the hit envelope keys "_type", "sort" and
+// "highlight", which describe the search response rather than the document.
+// "_type" is absent on Elasticsearch 8 and later, so it would surface as null.
 //
 // metadataKeys names the keys that originated from hit["fields"] (doc-value
 // returns) rather than _source. Those become "Metadata"; values whose runtime
 // type is an array become "ArrayField"; everything else is "Field".
 func buildLogLabelsAndTypes(doc map[string]interface{}, configuredFields es.ConfiguredFields, metadataKeys map[string]struct{}) (json.RawMessage, json.RawMessage) {
 	excluded := map[string]struct{}{
-		"id":      {},
-		"level":   {},
-		"_source": {},
+		"id":        {},
+		"level":     {},
+		"_source":   {},
+		"_type":     {},
+		"sort":      {},
+		"highlight": {},
 	}
 	if configuredFields.TimeField != "" {
 		excluded[configuredFields.TimeField] = struct{}{}

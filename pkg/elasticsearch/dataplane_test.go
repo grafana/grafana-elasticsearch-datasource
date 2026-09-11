@@ -63,6 +63,8 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 			"fields": map[string]interface{}{
 				"region": []interface{}{"us-east-1"},
 			},
+			"sort":      []interface{}{float64(1704164645123), "doc-1"},
+			"highlight": map[string]interface{}{"message": []interface{}{"<em>hello</em> world"}},
 		},
 		{
 			"_id":    "doc-2",
@@ -156,6 +158,9 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 		require.NotContains(t, labels, "level")
 		require.NotContains(t, labels, "id")
 		require.NotContains(t, labels, "_source")
+		for _, k := range []string{"_type", "sort", "highlight"} {
+			require.NotContainsf(t, labels, k, "hit envelope key %q is not a document attribute", k)
+		}
 
 		labelTypesField := fieldByName(t, frame, "labelTypes")
 		rawTypes := labelTypesField.At(0).(json.RawMessage)
@@ -282,6 +287,9 @@ func TestBuildLogLabelsAndTypes_EmptyWhenNothingRemains(t *testing.T) {
 		"level":      "info",
 		"id":         "x",
 		"_source":    "{}",
+		"_type":      "_doc",
+		"sort":       []interface{}{float64(1)},
+		"highlight":  map[string]interface{}{},
 	}
 	labels, types := buildLogLabelsAndTypes(doc, configuredFields, nil)
 	require.Equal(t, "{}", string(labels))
