@@ -7,14 +7,19 @@
 // backends evaluate GOFF flags over OFREP directly. Flag definitions are
 // managed centrally in Grafana Cloud's feature-flag configuration and roll
 // out wave by wave. A flag must exist (disabled) in every wave before code
-// evaluating it ships, because undefined flags cause an uncached error on
-// every evaluation.
+// evaluating it ships: an undefined flag turns every evaluation into an
+// error result, cached and logged once per flag, tenant, and TTL window, and
+// no environment can turn the flag on until the definition exists.
 //
 // Evaluation fails closed: any transport or evaluation error yields false, so
 // environments with no reachable GOFF service (OSS, self-managed, local
-// development) keep flagged behaviour off until the flag's in-code default
-// flips. Results are cached per flag and tenant for cacheTTL, keeping
-// evaluation off the query hot path.
+// development) keep flagged behavior off until the flag's in-code default
+// flips. Self-managed installs can opt in by pointing ofrepURLEnvVar at any
+// OFREP server, including the host Grafana's own OFREP endpoint with the flag
+// defined in its [feature_toggles] section. Results are cached per flag and
+// tenant for cacheTTL, so a query pays at most one OFREP round trip per flag,
+// tenant, and TTL window. That round trip runs on the query path, bounded by
+// dialTimeout for name resolution and connect and by requestTimeout overall.
 package featureflags
 
 import (
