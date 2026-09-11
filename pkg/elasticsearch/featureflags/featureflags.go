@@ -19,6 +19,8 @@ package featureflags
 
 import (
 	"context"
+	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -49,6 +51,13 @@ const (
 	// requestTimeout matches the timeout other in-cluster services use against
 	// the same relay proxy.
 	requestTimeout = 5 * time.Second
+
+	// dialTimeout bounds name resolution and connect separately. Where the
+	// default in-cluster host is unreachable by design (OSS, self-managed),
+	// some resolvers take the whole requestTimeout to fail it (for example
+	// ones routing .local to mDNS), and that wait would land on the first
+	// query of every TTL window.
+	dialTimeout = time.Second
 
 	// cacheTTL matches the interval at which the relay proxy reloads flag
 	// definitions, so a flag flip is picked up within about a minute. Errors
@@ -86,10 +95,19 @@ type cacheEntry struct {
 // baseURL.
 func NewClient(baseURL string) *Client {
 	return &Client{
-		provider: ofrep.NewProvider(baseURL, ofrep.WithTimeout(requestTimeout)),
+		provider: ofrep.NewProvider(baseURL, ofrep.WithClient(newHTTPClient())),
 		logger:   log.DefaultLogger,
 		cache:    map[string]cacheEntry{},
 	}
+}
+
+// newHTTPClient is the default transport with a short dial timeout. The
+// provider ignores WithTimeout once a client is supplied, so the overall
+// bound is set here too.
+func newHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = (&net.Dialer{Timeout: dialTimeout}).DialContext
+	return &http.Client{Timeout: requestTimeout, Transport: transport}
 }
 
 var defaultClient = sync.OnceValue(func() *Client {

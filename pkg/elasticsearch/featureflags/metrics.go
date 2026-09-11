@@ -23,11 +23,12 @@ var (
 
 	// requestDurationSeconds is observed on the cache-miss path only; a cache
 	// hit performs no I/O. This is the latency a query pays once per flag and
-	// tenant per cache TTL window.
+	// tenant per cache TTL window. The top bucket matches requestTimeout so a
+	// timed-out request is distinguishable from a slow success.
 	requestDurationSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "grafana",
 		Name:      "elasticsearch_plugin_feature_flag_request_duration_seconds",
 		Help:      "Duration of OFREP feature flag requests in seconds",
-		Buckets:   []float64{.0005, .001, .0025, .005, .01, .025, .05, .1, .25, .5, 1, 2.5},
+		Buckets:   []float64{.0005, .001, .0025, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5},
 	}, []string{"flag"})
 )
