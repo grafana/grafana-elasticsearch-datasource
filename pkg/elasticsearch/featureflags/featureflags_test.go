@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/config"
 	"github.com/prometheus/client_golang/prometheus"
@@ -276,6 +277,8 @@ func TestSlugFromAppURL(t *testing.T) {
 		{appURL: "https://myslug.grafana.net/", expected: "myslug"},
 		{appURL: "https://myslug.grafana-dev.net", expected: "myslug"},
 		{appURL: "https://myslug.grafana-ops.net/", expected: "myslug"},
+		{appURL: "https://myslug.grafana.net:3000/", expected: "myslug"},
+		{appURL: "https://a.b.grafana.net/", expected: ""},
 		{appURL: "https://grafana.example.com/", expected: ""},
 		{appURL: "https://grafana.net/", expected: ""},
 		{appURL: "://not-a-url", expected: ""},
@@ -318,22 +321,59 @@ func TestClientEvaluationMetrics(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// The counters are package globals on the default registry, so each
-			// case uses its own flag key and reads only its own label children.
+			// case uses its own flag key and asserts deltas, which keeps
+			// repeated runs (-count=N) green.
 			var requests atomic.Int64
 			server := httptest.NewServer(ofrepHandler(t, tt.status, tt.body(tt.flag), &requests))
 			t.Cleanup(server.Close)
+
+			outcomeBefore := testutil.ToFloat64(evaluationsTotal.WithLabelValues(tt.flag, tt.wantOutcome))
+			hitBefore := testutil.ToFloat64(evaluationsTotal.WithLabelValues(tt.flag, outcomeHit))
+			samplesBefore := histogramSampleCount(t, tt.flag)
 
 			client := NewClient(server.URL)
 			client.IsEnabled(context.Background(), tt.flag)
 			client.IsEnabled(context.Background(), tt.flag)
 
-			require.Equal(t, float64(1), testutil.ToFloat64(evaluationsTotal.WithLabelValues(tt.flag, tt.wantOutcome)))
-			require.Equal(t, float64(1), testutil.ToFloat64(evaluationsTotal.WithLabelValues(tt.flag, outcomeHit)))
-			hist, err := requestDurationSeconds.GetMetricWithLabelValues(tt.flag)
-			require.NoError(t, err)
-			var m dto.Metric
-			require.NoError(t, hist.(prometheus.Metric).Write(&m))
-			require.Equal(t, uint64(1), m.GetHistogram().GetSampleCount())
+			require.Equal(t, float64(1), testutil.ToFloat64(evaluationsTotal.WithLabelValues(tt.flag, tt.wantOutcome))-outcomeBefore)
+			require.Equal(t, float64(1), testutil.ToFloat64(evaluationsTotal.WithLabelValues(tt.flag, outcomeHit))-hitBefore)
+			require.Equal(t, uint64(1), histogramSampleCount(t, tt.flag)-samplesBefore)
 		})
 	}
+}
+
+func histogramSampleCount(t *testing.T, flag string) uint64 {
+	t.Helper()
+	hist, err := requestDurationSeconds.GetMetricWithLabelValues(flag)
+	require.NoError(t, err)
+	var m dto.Metric
+	require.NoError(t, hist.(prometheus.Metric).Write(&m))
+	return m.GetHistogram().GetSampleCount()
+}
+
+func TestClientCollapsesConcurrentLookups(t *testing.T) {
+	var requests atomic.Int64
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		<-release
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(enabledResponse(LogsDataplane)))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL)
+	const callers = 8
+	results := make(chan bool, callers)
+	for i := 0; i < callers; i++ {
+		go func() { results <- client.IsEnabled(context.Background(), LogsDataplane) }()
+	}
+	// Hold the leader's request open until every caller has started, so the
+	// followers join the in-flight request rather than a warm cache.
+	require.Eventually(t, func() bool { return requests.Load() == 1 }, time.Second, time.Millisecond)
+	close(release)
+	for i := 0; i < callers; i++ {
+		require.True(t, <-results)
+	}
+	require.Equal(t, int64(1), requests.Load())
 }
