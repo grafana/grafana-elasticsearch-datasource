@@ -19,11 +19,12 @@ import (
 // The flag is scoped to logs specifically to leave room for a separate
 // metrics-dataplane flag later (mirroring lokiLogsDataplane / lokiMetricDataplane).
 
-// labelTypeField marks a label as a regular log field (from _source).
+// labelTypeField marks a label as a regular log field (from _source or the
+// hit envelope).
 const labelTypeField = "Field"
 
-// labelTypeMetadata marks a label as metadata, e.g. a doc-value returned via
-// the `fields` parameter rather than the document _source.
+// labelTypeMetadata marks a label as metadata: a value the fields API returned
+// that the document _source does not carry, such as a runtime field.
 const labelTypeMetadata = "Metadata"
 
 // labelTypeArrayField marks a label whose value is a JSON array.
@@ -50,9 +51,9 @@ func setLogLinesFrameMeta(frame *data.Frame) {
 // document carries, so two documents can never share an id and a document's
 // own `id` stays a label.
 //
-// metadataKeys[i] holds the doc keys for hit i that originated from
-// hit["fields"] (doc-value returns) rather than _source. These are tagged
-// as "Metadata" in labelTypes; everything else is "Field" or "ArrayField"
+// metadataKeys[i] holds the doc keys for hit i that hit["fields"] returned
+// and _source does not carry. These are tagged as "Metadata" in labelTypes;
+// everything else is "Field" or "ArrayField"
 // depending on its runtime type. Pass nil when no such distinction exists
 // (e.g. ES|QL responses, where all keys are Field-equivalent columns).
 //
@@ -194,9 +195,9 @@ func scalarString(v interface{}) (string, bool) {
 // document's own "id" attribute stays too; the canonical id comes from the
 // hit envelope, not from it.
 //
-// metadataKeys names the keys that originated from hit["fields"] (doc-value
-// returns) rather than _source. Those become "Metadata"; values whose runtime
-// type is an array become "ArrayField"; everything else is "Field".
+// metadataKeys names the keys that hit["fields"] returned and _source does not
+// carry. Those become "Metadata"; values whose runtime type is an array become
+// "ArrayField"; everything else is "Field".
 func buildLogLabelsAndTypes(doc map[string]interface{}, configuredFields es.ConfiguredFields, metadataKeys map[string]struct{}) (json.RawMessage, json.RawMessage) {
 	excluded := map[string]struct{}{
 		"_source":   {},

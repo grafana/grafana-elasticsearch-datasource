@@ -28,10 +28,10 @@ func newLogsResponseProcessor(logger log.Logger) *logsResponseProcessor {
 func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, target *Query, configuredFields es.ConfiguredFields, dataplaneEnabled bool, queryRes *backend.DataResponse) error {
 	propNames := make(map[string]bool)
 	docs := make([]map[string]interface{}, len(res.Hits.Hits))
-	// metadataKeys[i] records the keys in docs[i] that originated from
-	// hit["fields"] (doc-value returns) rather than _source. Only populated
-	// when the dataplane toggle is on; consumed by buildLogLinesCanonicalFields
-	// to tag those keys as "Metadata" in labelTypes.
+	// metadataKeys[i] records the keys in docs[i] that hit["fields"] returned
+	// and _source does not carry (runtime and doc-value-only fields). Only
+	// populated when the dataplane toggle is on; consumed by
+	// buildLogLinesCanonicalFields to tag those keys as "Metadata" in labelTypes.
 	var metadataKeys []map[string]struct{}
 	// rowIDs[i] is the canonical log-line id for hit i, <_index>#<_id>. It is
 	// kept apart from doc["id"] so that a document's own `id` attribute stays
@@ -82,7 +82,11 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 				}
 				for k, v := range source {
 					doc[k] = unwrapFieldValue(v)
-					if dataplaneEnabled {
+					// A key that _source also carries is a document field the
+					// fields API merely echoed (every field is requested under
+					// "Include runtime fields"); only keys the document itself
+					// lacks are metadata.
+					if _, inSource := flattened[k]; dataplaneEnabled && !inSource {
 						fieldsOrigin[k] = struct{}{}
 					}
 				}

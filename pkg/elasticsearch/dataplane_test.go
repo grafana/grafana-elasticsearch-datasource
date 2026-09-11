@@ -74,6 +74,7 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 			},
 			"fields": map[string]interface{}{
 				"region": []interface{}{"us-east-1"},
+				"host":   []interface{}{"host-a"},
 			},
 			"sort":      []interface{}{float64(1704164645123), "doc-1"},
 			"highlight": map[string]interface{}{"message": []interface{}{"<em>hello</em> world"}},
@@ -181,7 +182,7 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 		rawTypes := labelTypesField.At(0).(json.RawMessage)
 		var types map[string]string
 		require.NoError(t, json.Unmarshal(rawTypes, &types))
-		require.Equal(t, labelTypeField, types["host"], "host comes from _source → Field")
+		require.Equal(t, labelTypeField, types["host"], "host is in _source, so its echo in hit.fields does not make it Metadata")
 		require.Equal(t, labelTypeMetadata, types["region"], "region came from hit.fields → Metadata")
 		require.Equal(t, labelTypeArrayField, types["tags"], "tags is a JSON array → ArrayField")
 	})
