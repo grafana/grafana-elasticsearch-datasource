@@ -341,7 +341,6 @@ func TestBuildLogLabelsAndTypes_EmptyWhenNothingRemains(t *testing.T) {
 		"message":    "m",
 		"lvl":        "info",
 		"level":      "info",
-		"id":         "x",
 		"_source":    "{}",
 		"_type":      "_doc",
 		"sort":       []interface{}{float64(1)},
@@ -365,4 +364,104 @@ func TestClassifyLabelType(t *testing.T) {
 		got := classifyLabelType("host", "host-a", nil)
 		require.Equal(t, labelTypeField, got)
 	})
+}
+
+func TestLogsResponseProcessor_DataplaneIDComesFromHitEnvelope(t *testing.T) {
+	// A document's own `id` attribute must not become the row id: a numeric
+	// value would be dropped and a repeated string would make rows share an
+	// id. It stays a label instead.
+	hits := []map[string]interface{}{
+		{
+			"_id":    "doc-1",
+			"_index": "logs-000001",
+			"_source": map[string]interface{}{
+				"@timestamp": "2024-01-02T03:04:05.123Z",
+				"message":    "numeric id",
+				"id":         float64(42),
+			},
+		},
+		{
+			"_id":    "doc-2",
+			"_index": "logs-000001",
+			"_source": map[string]interface{}{
+				"@timestamp": "2024-01-02T03:04:06.456Z",
+				"message":    "string id",
+				"id":         "user-7",
+			},
+		},
+		{
+			"_id":    "doc-3",
+			"_index": "logs-000001",
+			"_source": map[string]interface{}{
+				"@timestamp": "2024-01-02T03:04:07.789Z",
+				"message":    "same string id",
+				"id":         "user-7",
+			},
+		},
+	}
+	searchResponse := &es.SearchResponse{
+		Hits: &es.SearchResponseHits{
+			Hits:  hits,
+			Total: &es.SearchResponseHitsTotal{Value: len(hits), Relation: "eq"},
+		},
+	}
+
+	processor := newLogsResponseProcessor(log.New())
+	queryRes := backend.DataResponse{}
+	err := processor.processLogsResponse(searchResponse, newLogsDataplaneQuery(t), dataplaneConfiguredFields(), true, &queryRes)
+	require.NoError(t, err)
+	frame := queryRes.Frames[0]
+
+	require.Equal(t, 1, countFieldsNamed(frame, "id"))
+	idField := fieldByName(t, frame, "id")
+	labelsField := fieldByName(t, frame, "labels")
+	labelTypesField := fieldByName(t, frame, "labelTypes")
+	wantIDs := []string{"logs-000001#doc-1", "logs-000001#doc-2", "logs-000001#doc-3"}
+	wantLabelIDs := []interface{}{float64(42), "user-7", "user-7"}
+	for i := range hits {
+		id := idField.At(i).(*string)
+		require.NotNil(t, id)
+		require.Equal(t, wantIDs[i], *id)
+
+		var labels map[string]interface{}
+		require.NoError(t, json.Unmarshal(labelsField.At(i).(json.RawMessage), &labels))
+		require.Equal(t, wantLabelIDs[i], labels["id"], "the document's own id stays a label")
+		var types map[string]string
+		require.NoError(t, json.Unmarshal(labelTypesField.At(i).(json.RawMessage), &types))
+		require.Equal(t, labelTypeField, types["id"])
+	}
+}
+
+func TestEsqlLogsResponseProcessor_DataplaneIDFromMetadataColumns(t *testing.T) {
+	esqlResp := &es.EsqlResponse{
+		Columns: []es.EsqlColumn{
+			{Name: "@timestamp", Type: "date"},
+			{Name: "message", Type: "keyword"},
+			{Name: "_index", Type: "keyword"},
+			{Name: "_id", Type: "keyword"},
+			{Name: "id", Type: "long"},
+		},
+		Values: [][]any{
+			{"2024-05-01T12:00:00.000Z", "with metadata", "logs-2024", "abc", float64(1)},
+			{"2024-05-01T12:00:01.000Z", "without metadata", nil, nil, nil},
+		},
+	}
+
+	resp, err := processEsqlLogsResponse(esqlResp, newLogsDataplaneQuery(t), dataplaneConfiguredFields(), true)
+	require.NoError(t, err)
+	frame := resp.Frames[0]
+
+	require.Equal(t, 1, countFieldsNamed(frame, "id"))
+	idField := fieldByName(t, frame, "id")
+	id0 := idField.At(0).(*string)
+	require.NotNil(t, id0)
+	require.Equal(t, "logs-2024#abc", *id0, "METADATA _index, _id give the same identity as the search path")
+	id1 := idField.At(1).(*string)
+	require.NotNil(t, id1)
+	require.Equal(t, "esql-row-1", *id1, "without METADATA _id the row position is the only handle")
+
+	var labels map[string]interface{}
+	require.NoError(t, json.Unmarshal(fieldByName(t, frame, "labels").At(0).(json.RawMessage), &labels))
+	require.Equal(t, float64(1), labels["id"], "a column named id stays a label")
+	require.Equal(t, "abc", labels["_id"])
 }

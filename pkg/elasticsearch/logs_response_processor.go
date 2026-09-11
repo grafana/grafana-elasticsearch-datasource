@@ -33,8 +33,13 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 	// when the dataplane toggle is on; consumed by buildLogLinesCanonicalFields
 	// to tag those keys as "Metadata" in labelTypes.
 	var metadataKeys []map[string]struct{}
+	// rowIDs[i] is the canonical log-line id for hit i, <_index>#<_id>. It is
+	// kept apart from doc["id"] so that a document's own `id` attribute stays
+	// a label and cannot make two rows share an id.
+	var rowIDs []string
 	if dataplaneEnabled {
 		metadataKeys = make([]map[string]struct{}, len(res.Hits.Hits))
+		rowIDs = make([]string, len(res.Hits.Hits))
 	}
 	searchWords := make(map[string]bool)
 
@@ -87,9 +92,11 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 			}
 		}
 
-		// we are going to add an `id` field with the concatenation of `_id` and `_index`
-		_, ok := doc["id"]
-		if !ok {
+		if dataplaneEnabled {
+			rowIDs[hitIdx] = fmt.Sprintf("%v#%v", doc["_index"], doc["_id"])
+		} else if _, ok := doc["id"]; !ok {
+			// Legacy frames expose the same identity as an `id` column, but only
+			// when the document has no `id` of its own.
 			doc["id"] = fmt.Sprintf("%v#%v", doc["_index"], doc["_id"])
 		}
 
@@ -120,7 +127,7 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 	fields := processDocsToDataFrameFields(docs, sortedPropNames, configuredFields)
 
 	if dataplaneEnabled {
-		canonical := buildLogLinesCanonicalFields(docs, configuredFields, metadataKeys)
+		canonical := buildLogLinesCanonicalFields(docs, rowIDs, configuredFields, metadataKeys)
 		fields = prependLogLinesCanonicalFields(canonical, fields)
 	}
 

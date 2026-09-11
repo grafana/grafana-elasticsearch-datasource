@@ -37,6 +37,10 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 	// Convert ES|QL rows to document maps (similar to how logs processor handles hits)
 	docs := make([]map[string]interface{}, len(response.Values))
 	propNames := make(map[string]bool)
+	var rowIDs []string
+	if dataplaneEnabled {
+		rowIDs = make([]string, len(response.Values))
+	}
 
 	for rowIdx, row := range response.Values {
 		doc := make(map[string]interface{})
@@ -53,8 +57,11 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 			}
 		}
 
-		// Create a unique ID if not present
-		if _, hasID := doc["id"]; !hasID {
+		if dataplaneEnabled {
+			rowIDs[rowIdx] = esqlRowID(doc, rowIdx)
+		} else if _, hasID := doc["id"]; !hasID {
+			// Legacy frames synthesise an id only when the row carries neither
+			// an `id` nor a METADATA `_id` column.
 			if _, hasUnderscoreID := doc["_id"]; !hasUnderscoreID {
 				doc["id"] = fmt.Sprintf("esql-row-%d", rowIdx)
 			}
@@ -73,7 +80,7 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 	if dataplaneEnabled {
 		// ES|QL columns have no _source/fields distinction, so all keys are
 		// regular Field-category labels; pass nil metadata for every row.
-		canonical := buildLogLinesCanonicalFields(docs, configuredFields, nil)
+		canonical := buildLogLinesCanonicalFields(docs, rowIDs, configuredFields, nil)
 		fields = prependLogLinesCanonicalFields(canonical, fields)
 	}
 
@@ -93,6 +100,22 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 	return &backend.DataResponse{
 		Frames: []*data.Frame{frame},
 	}, nil
+}
+
+// esqlRowID derives the canonical log-line id for an ES|QL row. A query that
+// projects METADATA _id (and _index) yields the document's identity in the
+// same <_index>#<_id> form as the search path. Otherwise the row position is
+// the only handle available; it is stable within one response only, so a
+// pinned or linked row may resolve to a different line after a refresh.
+func esqlRowID(doc map[string]interface{}, rowIdx int) string {
+	id, ok := doc["_id"].(string)
+	if !ok {
+		return fmt.Sprintf("esql-row-%d", rowIdx)
+	}
+	if index, ok := doc["_index"].(string); ok {
+		return index + "#" + id
+	}
+	return id
 }
 
 // processEsqlRawDataResponse processes ES|QL response for raw_data queries (table format)

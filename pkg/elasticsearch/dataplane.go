@@ -44,6 +44,11 @@ func setLogLinesFrameMeta(frame *data.Frame) {
 // the Grafana dataplane LogLines contract, in contract order:
 // timestamp, body, severity, id, labels, labelTypes.
 //
+// rowIDs[i] is the log-line id for docs[i], derived by the caller from the
+// hit envelope (or the ES|QL row) rather than from any `id` attribute the
+// document carries, so two documents can never share an id and a document's
+// own `id` stays a label.
+//
 // metadataKeys[i] holds the doc keys for hit i that originated from
 // hit["fields"] (doc-value returns) rather than _source. These are tagged
 // as "Metadata" in labelTypes; everything else is "Field" or "ArrayField"
@@ -52,7 +57,7 @@ func setLogLinesFrameMeta(frame *data.Frame) {
 //
 // timestamp and body are non-nullable per the spec; rows with no parsable
 // time stay at the zero time.Time and rows with no body stay at "".
-func buildLogLinesCanonicalFields(docs []map[string]interface{}, configuredFields es.ConfiguredFields, metadataKeys []map[string]struct{}) []*data.Field {
+func buildLogLinesCanonicalFields(docs []map[string]interface{}, rowIDs []string, configuredFields es.ConfiguredFields, metadataKeys []map[string]struct{}) []*data.Field {
 	size := len(docs)
 	timestamps := make([]time.Time, size)
 	bodies := make([]string, size)
@@ -84,9 +89,9 @@ func buildLogLinesCanonicalFields(docs []map[string]interface{}, configuredField
 			severities[i] = &vv
 		}
 
-		if v, ok := doc["id"].(string); ok {
-			vv := v
-			ids[i] = &vv
+		if i < len(rowIDs) && rowIDs[i] != "" {
+			id := rowIDs[i]
+			ids[i] = &id
 		}
 
 		var meta map[string]struct{}
@@ -153,18 +158,19 @@ func parseDocTimeValue(v interface{}) (time.Time, bool) {
 // `labelTypes` payload (a Record<string,string> of key→category).
 //
 // Excluded keys: the configured time, message, and level source fields (those
-// are promoted to canonical fields); the internally computed "id" and "level"
-// mirrors; "_source" (the whole-document JSON blob, which would duplicate
-// every other field); and the hit envelope keys "_type", "sort" and
-// "highlight", which describe the search response rather than the document.
-// "_type" is absent on Elasticsearch 8 and later, so it would surface as null.
+// are promoted to canonical fields); the internal "level" mirror; "_source"
+// (the whole-document JSON blob, which would duplicate every other field); and
+// the hit envelope keys "_type", "sort" and "highlight", which describe the
+// search response rather than the document. "_type" is absent on
+// Elasticsearch 8 and later, so it would surface as null. A document's own
+// "id" attribute stays: the canonical id comes from the hit envelope, not
+// from it.
 //
 // metadataKeys names the keys that originated from hit["fields"] (doc-value
 // returns) rather than _source. Those become "Metadata"; values whose runtime
 // type is an array become "ArrayField"; everything else is "Field".
 func buildLogLabelsAndTypes(doc map[string]interface{}, configuredFields es.ConfiguredFields, metadataKeys map[string]struct{}) (json.RawMessage, json.RawMessage) {
 	excluded := map[string]struct{}{
-		"id":        {},
 		"level":     {},
 		"_source":   {},
 		"_type":     {},
