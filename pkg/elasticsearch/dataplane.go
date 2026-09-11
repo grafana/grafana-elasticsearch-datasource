@@ -188,6 +188,7 @@ func scalarString(v interface{}) (string, bool) {
 // every other field); and the hit envelope keys "_type", "sort" and
 // "highlight", which describe the search response rather than the document.
 // "_type" is absent on Elasticsearch 8 and later, so it would surface as null.
+// Null values are skipped for the same reason.
 //
 // The configured level field stays a label even though it also feeds
 // severity: Grafana's Log Details for LogLines frames lists labels only, so
@@ -219,6 +220,11 @@ func buildLogLabelsAndTypes(doc map[string]interface{}, configuredFields es.Conf
 	types := make(map[string]string, len(doc))
 	for k, v := range doc {
 		if _, skip := excluded[k]; skip {
+			continue
+		}
+		if v == nil {
+			// A null attribute has no label value; the ES|QL path already
+			// omits null cells.
 			continue
 		}
 		filtered[k] = v

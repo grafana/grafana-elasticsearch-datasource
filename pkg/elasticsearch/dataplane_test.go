@@ -88,6 +88,7 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 				"message":    "second line",
 				"lvl":        "error",
 				"host":       "host-b",
+				"abc":        nil,
 			},
 		},
 	}
@@ -177,6 +178,11 @@ func TestLogsResponseProcessor_Dataplane(t *testing.T) {
 		for _, k := range []string{"_type", "sort", "highlight"} {
 			require.NotContainsf(t, labels, k, "hit envelope key %q is not a document attribute", k)
 		}
+
+		var secondLabels map[string]interface{}
+		require.NoError(t, json.Unmarshal(labelsField.At(1).(json.RawMessage), &secondLabels))
+		require.Equal(t, "host-b", secondLabels["host"])
+		require.NotContains(t, secondLabels, "abc", "a null attribute is not a label")
 
 		labelTypesField := fieldByName(t, frame, "labelTypes")
 		rawTypes := labelTypesField.At(0).(json.RawMessage)
