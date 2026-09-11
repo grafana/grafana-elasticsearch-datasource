@@ -23,9 +23,14 @@ const (
 // Similar to how logs are processed in logs_response_processor.go
 func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configuredFields es.ConfiguredFields, dataplaneEnabled bool) (*backend.DataResponse, error) {
 	if response == nil || len(response.Columns) == 0 {
-		return &backend.DataResponse{
-			Frames: []*data.Frame{data.NewFrame(target.RefID)},
-		}, nil
+		frame := data.NewFrame(target.RefID)
+		if dataplaneEnabled {
+			// Match the search path, whose zero-hit frame is fully tagged.
+			frame.Fields = buildLogLinesCanonicalFields(nil, nil, configuredFields, nil)
+			setPreferredVisType(frame, data.VisTypeLogs)
+			setLogLinesFrameMeta(frame)
+		}
+		return &backend.DataResponse{Frames: []*data.Frame{frame}}, nil
 	}
 
 	// Build column index map for quick lookup

@@ -693,3 +693,25 @@ func TestBuildLogLinesCanonicalFields_UnparsableTimeStaysZero(t *testing.T) {
 	require.True(t, fields[0].At(0).(time.Time).IsZero())
 	require.True(t, fields[0].At(1).(time.Time).IsZero())
 }
+
+func TestEsqlLogsResponseProcessor_DataplaneEmptyResponseIsTagged(t *testing.T) {
+	t.Run("flag on: empty response carries LogLines meta and empty canonical fields", func(t *testing.T) {
+		resp, err := processEsqlLogsResponse(&es.EsqlResponse{}, newLogsDataplaneQuery(t), dataplaneConfiguredFields(), true)
+		require.NoError(t, err)
+		frame := resp.Frames[0]
+		require.Equal(t, data.FrameTypeLogLines, frame.Meta.Type)
+		require.Equal(t, data.VisTypeLogs, string(frame.Meta.PreferredVisualization))
+		require.Len(t, frame.Fields, len(logLinesCanonicalNames))
+		for i, name := range logLinesCanonicalNames {
+			require.Equal(t, name, frame.Fields[i].Name)
+			require.Equal(t, 0, frame.Fields[i].Len())
+		}
+	})
+	t.Run("flag off: empty response is the bare legacy frame", func(t *testing.T) {
+		resp, err := processEsqlLogsResponse(&es.EsqlResponse{}, newLogsDataplaneQuery(t), dataplaneConfiguredFields(), false)
+		require.NoError(t, err)
+		frame := resp.Frames[0]
+		require.Empty(t, frame.Fields)
+		require.Nil(t, frame.Meta)
+	})
+}
