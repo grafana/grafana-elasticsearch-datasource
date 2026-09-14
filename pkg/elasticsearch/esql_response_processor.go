@@ -21,11 +21,16 @@ const (
 
 // processEsqlLogsResponse processes ES|QL response for logs queries
 // Similar to how logs are processed in logs_response_processor.go
-func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configuredFields es.ConfiguredFields) (*backend.DataResponse, error) {
+func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configuredFields es.ConfiguredFields, dataplaneEnabled bool) (*backend.DataResponse, error) {
 	if response == nil || len(response.Columns) == 0 {
-		return &backend.DataResponse{
-			Frames: []*data.Frame{data.NewFrame(target.RefID)},
-		}, nil
+		frame := data.NewFrame(target.RefID)
+		if dataplaneEnabled {
+			// Match the search path, whose zero-hit frame is fully tagged.
+			frame.Fields = buildLogLinesCanonicalFields(nil, nil, configuredFields, nil)
+			setPreferredVisType(frame, data.VisTypeLogs)
+			setLogLinesFrameMeta(frame)
+		}
+		return &backend.DataResponse{Frames: []*data.Frame{frame}}, nil
 	}
 
 	// Build column index map for quick lookup
@@ -37,6 +42,10 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 	// Convert ES|QL rows to document maps (similar to how logs processor handles hits)
 	docs := make([]map[string]interface{}, len(response.Values))
 	propNames := make(map[string]bool)
+	var rowIDs []string
+	if dataplaneEnabled {
+		rowIDs = make([]string, len(response.Values))
+	}
 
 	for rowIdx, row := range response.Values {
 		doc := make(map[string]interface{})
@@ -53,8 +62,11 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 			}
 		}
 
-		// Create a unique ID if not present
-		if _, hasID := doc["id"]; !hasID {
+		if dataplaneEnabled {
+			rowIDs[rowIdx] = esqlRowID(doc, rowIdx)
+		} else if _, hasID := doc["id"]; !hasID {
+			// Legacy frames synthesise an id only when the row carries neither
+			// an `id` nor a METADATA `_id` column.
 			if _, hasUnderscoreID := doc["_id"]; !hasUnderscoreID {
 				doc["id"] = fmt.Sprintf("esql-row-%d", rowIdx)
 			}
@@ -70,8 +82,18 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 	sortedPropNames := sortPropNames(propNames, configuredFields, true)
 	fields := processDocsToDataFrameFields(docs, sortedPropNames, configuredFields)
 
+	if dataplaneEnabled {
+		// ES|QL columns have no _source/fields distinction, so all keys are
+		// regular Field-category labels; pass nil metadata for every row.
+		canonical := buildLogLinesCanonicalFields(docs, rowIDs, configuredFields, nil)
+		fields = prependLogLinesCanonicalFields(canonical, fields)
+	}
+
 	frame := data.NewFrame(target.RefID, fields...)
 	setPreferredVisType(frame, data.VisTypeLogs)
+	if dataplaneEnabled {
+		setLogLinesFrameMeta(frame)
+	}
 
 	// Set logs metadata
 	limit := defaultSize
@@ -83,6 +105,22 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 	return &backend.DataResponse{
 		Frames: []*data.Frame{frame},
 	}, nil
+}
+
+// esqlRowID derives the canonical log-line id for an ES|QL row. A query that
+// projects METADATA _id (and _index) yields the document's identity in the
+// same <_index>#<_id> form as the search path. Otherwise the row position is
+// the only handle available; it is stable within one response only, so a
+// pinned or linked row may resolve to a different line after a refresh.
+func esqlRowID(doc map[string]interface{}, rowIdx int) string {
+	id, ok := doc["_id"].(string)
+	if !ok {
+		return fmt.Sprintf("esql-row-%d", rowIdx)
+	}
+	if index, ok := doc["_index"].(string); ok {
+		return index + "#" + id
+	}
+	return id
 }
 
 // processEsqlRawDataResponse processes ES|QL response for raw_data queries (table format)
