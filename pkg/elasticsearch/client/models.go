@@ -15,7 +15,7 @@ type SearchRequest struct {
 	Index       string
 	Interval    time.Duration
 	Size        int
-	Sort        map[string]interface{}
+	Sort        []map[string]interface{}
 	Query       *Query
 	Aggs        AggArray
 	CustomProps map[string]interface{}
