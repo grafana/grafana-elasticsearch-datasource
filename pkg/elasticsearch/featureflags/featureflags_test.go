@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/config"
+	"github.com/open-feature/go-sdk/openfeature"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	dto "github.com/prometheus/client_model/go"
@@ -260,13 +261,38 @@ func TestEvaluationRequestCarriesContext(t *testing.T) {
 func TestResolveBaseURL(t *testing.T) {
 	t.Run("defaults to the in-cluster GOFF service", func(t *testing.T) {
 		t.Setenv(ofrepURLEnvVar, "")
-		require.Equal(t, defaultOFREPURL, resolveBaseURL())
+		baseURL, explicit := resolveBaseURL()
+		require.Equal(t, defaultOFREPURL, baseURL)
+		require.False(t, explicit)
+		require.False(t, newDefaultClient().explicitURL)
 	})
 
 	t.Run("environment variable overrides the default", func(t *testing.T) {
 		t.Setenv(ofrepURLEnvVar, "http://localhost:1031")
-		require.Equal(t, "http://localhost:1031", resolveBaseURL())
+		baseURL, explicit := resolveBaseURL()
+		require.Equal(t, "http://localhost:1031", baseURL)
+		require.True(t, explicit)
+		require.True(t, newDefaultClient().explicitURL)
 	})
+}
+
+func TestRoutineFailure(t *testing.T) {
+	cloud := openfeature.FlattenedContext{openfeature.TargetingKey: "stacks-1"}
+	tests := []struct {
+		name        string
+		explicitURL bool
+		evalCtx     openfeature.FlattenedContext
+		routine     bool
+	}{
+		{name: "default URL outside cloud is routine", explicitURL: false, evalCtx: openfeature.FlattenedContext{}, routine: true},
+		{name: "configured URL is noteworthy", explicitURL: true, evalCtx: openfeature.FlattenedContext{}, routine: false},
+		{name: "cloud identity is noteworthy", explicitURL: false, evalCtx: cloud, routine: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.routine, routineFailure(tt.explicitURL, tt.evalCtx))
+		})
+	}
 }
 
 func TestSlugFromAppURL(t *testing.T) {

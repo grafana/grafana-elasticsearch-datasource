@@ -16,7 +16,10 @@
 // development) keep flagged behavior off until the flag's in-code default
 // flips. Self-managed installs can opt in by pointing ofrepURLEnvVar at any
 // OFREP server, including the host Grafana's own OFREP endpoint with the flag
-// defined in its [feature_toggles] section. Results are cached per flag and
+// defined in its [feature_toggles] section. Failures are logged as warnings
+// when the URL was configured or the request carries a Grafana Cloud identity,
+// and at debug level where neither holds and no service is expected. Results
+// are cached per flag and
 // tenant for cacheTTL, so a query pays at most one OFREP round trip per flag,
 // tenant, and TTL window. That round trip runs on the query path, bounded by
 // dialTimeout for name resolution and connect and by requestTimeout overall.
@@ -86,9 +89,12 @@ const (
 type Client struct {
 	provider openfeature.FeatureProvider
 	logger   log.Logger
-	group    singleflight.Group
-	mu       sync.RWMutex
-	cache    map[string]cacheEntry
+	// explicitURL records that the OFREP URL was named by a caller or an
+	// operator rather than defaulted, so a failure to reach it is noteworthy.
+	explicitURL bool
+	group       singleflight.Group
+	mu          sync.RWMutex
+	cache       map[string]cacheEntry
 }
 
 type cacheEntry struct {
@@ -97,12 +103,14 @@ type cacheEntry struct {
 }
 
 // NewClient returns a Client evaluating flags against the OFREP service at
-// baseURL.
+// baseURL. A caller that names a URL expects it to answer, so evaluation
+// failures are logged as warnings.
 func NewClient(baseURL string) *Client {
 	return &Client{
-		provider: ofrep.NewProvider(baseURL, ofrep.WithClient(newHTTPClient())),
-		logger:   log.DefaultLogger,
-		cache:    map[string]cacheEntry{},
+		provider:    ofrep.NewProvider(baseURL, ofrep.WithClient(newHTTPClient())),
+		logger:      log.DefaultLogger,
+		explicitURL: true,
+		cache:       map[string]cacheEntry{},
 	}
 }
 
@@ -115,9 +123,14 @@ func newHTTPClient() *http.Client {
 	return &http.Client{Timeout: requestTimeout, Transport: transport}
 }
 
-var defaultClient = sync.OnceValue(func() *Client {
-	return NewClient(resolveBaseURL())
-})
+var defaultClient = sync.OnceValue(newDefaultClient)
+
+func newDefaultClient() *Client {
+	baseURL, explicit := resolveBaseURL()
+	c := NewClient(baseURL)
+	c.explicitURL = explicit
+	return c
+}
 
 // IsEnabled evaluates flag against the process-wide default client, resolving
 // the OFREP base URL from GF_PLUGIN_ELASTICSEARCH_OFREP_URL or falling back
@@ -155,7 +168,11 @@ func (c *Client) IsEnabled(ctx context.Context, flag string) bool {
 		outcome := outcomeMiss
 		if detail.Reason == openfeature.ErrorReason {
 			outcome = outcomeError
-			c.logger.FromContext(ctx).Warn("Feature flag evaluation failed, defaulting to off",
+			logFailure := c.logger.FromContext(ctx).Warn
+			if routineFailure(c.explicitURL, evalCtx) {
+				logFailure = c.logger.FromContext(ctx).Debug
+			}
+			logFailure("Feature flag evaluation failed, defaulting to off",
 				"flag", flag, "error", detail.ResolutionError.Error())
 		}
 		evaluationsTotal.WithLabelValues(flag, outcome).Inc()
@@ -253,14 +270,25 @@ func slugFromAppURL(appURL string) string {
 	return ""
 }
 
+// routineFailure reports whether an evaluation failure is expected rather
+// than noteworthy: nobody configured the OFREP URL and the request carries no
+// Grafana Cloud identity, so no OFREP service is expected to exist (OSS,
+// self-managed, local development). Warning there would repeat once per TTL
+// window for the life of the process.
+func routineFailure(explicitURL bool, evalCtx openfeature.FlattenedContext) bool {
+	_, cloud := evalCtx[openfeature.TargetingKey]
+	return !explicitURL && !cloud
+}
+
 func cacheKey(flag string, evalCtx openfeature.FlattenedContext) string {
 	targetingKey, _ := evalCtx[openfeature.TargetingKey].(string)
 	return flag + "|" + targetingKey
 }
 
-func resolveBaseURL() string {
+// resolveBaseURL returns the OFREP base URL and whether an operator set it.
+func resolveBaseURL() (baseURL string, explicit bool) {
 	if fromEnv := os.Getenv(ofrepURLEnvVar); fromEnv != "" {
-		return fromEnv
+		return fromEnv, true
 	}
-	return defaultOFREPURL
+	return defaultOFREPURL, false
 }
