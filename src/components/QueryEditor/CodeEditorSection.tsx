@@ -9,13 +9,18 @@ import { useDispatch } from '../../hooks/useStatelessReducer';
 
 import { useDatasource } from './ElasticsearchQueryContext';
 import { EsqlQueryEditor } from './EsqlQueryEditor';
+import { IndexPatternRow } from './IndexPatternRow';
 import { QueryLanguageSelector } from './QueryLanguageSelector';
 import { RawQueryEditor } from './RawQueryEditor';
-import { changeQuery, changeQueryType } from './state';
+import { changeQuery, changeQueryType, changeIndex } from './state';
 
 const getStyles = (theme: GrafanaTheme2) => ({
   root: css({
     display: 'flex',
+  }),
+  queryItem: css({
+    flexGrow: 1,
+    margin: theme.spacing(0, 0.5, 0.5, 0),
   }),
 });
 
@@ -63,7 +68,7 @@ export const CodeEditorSection = ({
       {showQueryLanguageSelector && (
         <div className={styles.root}>
           <InlineLabel width={17}>Query language</InlineLabel>
-          <div>
+          <div className={styles.queryItem}>
             <QueryLanguageSelector
               value={queryType}
               onChange={(nextLanguage) => dispatch(changeQueryType(nextLanguage))}
@@ -71,6 +76,8 @@ export const CodeEditorSection = ({
           </div>
         </div>
       )}
+
+      <IndexPatternRow value={value.index} onChange={(index) => dispatch(changeIndex(index))} />
 
       {queryType === 'esql' ? (
         <EsqlQueryEditor {...editorProps} />

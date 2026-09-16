@@ -8,7 +8,7 @@ Queries in the ElasticSearch data source are now exclusively run through the bac
 
 ## Development
 
-When developing for ElasticSearch, use `make devenv sources=elastic`. To specify a version, use `make devenv sources=elastic elastic_version=7.17.0`. In `devenv/docker/blocks/elastic/data/data.js`, you can update data to suit your debugging and testing needs. Additionally, ElasticSearch has a couple of debugging dashboards located in `devenv/dev-dashboards/datasource-ElasticSearch`.
+When developing for ElasticSearch, use `make devenv sources=elastic`. To specify a version, use `make devenv sources=elastic elastic_version=8.0.0`. In `devenv/docker/blocks/elastic/data/data.js`, you can update data to suit your debugging and testing needs. Additionally, ElasticSearch has a couple of debugging dashboards located in `devenv/dev-dashboards/datasource-ElasticSearch`.
 
 ## Instrumentation
 
