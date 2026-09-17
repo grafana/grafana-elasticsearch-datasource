@@ -24,8 +24,10 @@ type SearchRequestBuilder struct {
 	interval time.Duration
 	index    string
 	size     int
-	// Currently sort is map, but based in examples it should be an array https://www.elastic.co/guide/en/elasticsearch/reference/current/sort-search-results.html
-	sort         map[string]any
+	// Ordered sort clauses. Elasticsearch applies these in array order; a map
+	// would be marshaled in key-byte order and can put `_doc` ahead of the
+	// time field.
+	sort         []map[string]any
 	queryBuilder *QueryBuilder
 	aggBuilders  []AggBuilder
 	customProps  map[string]any
@@ -38,7 +40,7 @@ type SearchRequestBuilder struct {
 func NewSearchRequestBuilder(interval time.Duration, timeRange backend.TimeRange) *SearchRequestBuilder {
 	builder := &SearchRequestBuilder{
 		interval:    interval,
-		sort:        make(map[string]any),
+		sort:        make([]map[string]any, 0, 2),
 		customProps: make(map[string]any),
 		aggBuilders: make([]AggBuilder, 0),
 		timeRange:   timeRange,
@@ -119,7 +121,14 @@ func (b *SearchRequestBuilder) Sort(order SortOrder, field string, unmappedType 
 		props["unmapped_type"] = unmappedType
 	}
 
-	b.sort[field] = props
+	entry := map[string]any{field: props}
+	for i, existing := range b.sort {
+		if _, ok := existing[field]; ok {
+			b.sort[i] = entry
+			return b
+		}
+	}
+	b.sort = append(b.sort, entry)
 
 	return b
 }
