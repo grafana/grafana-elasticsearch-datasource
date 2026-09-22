@@ -233,16 +233,25 @@ function exploreUrl(
   return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
 }
 
-// Waits for the first /api/ds/query response where results.A.frames is an array.
-// Skips supplementary log-volume responses which use a different refId (no results.A).
-async function waitForMainQueryResponse(page: Page): Promise<{ response: Response; body: any }> {
+// Resolves on the first query response that is conclusive for refId A. Explore also emits
+// responses that are not: the supplementary log-volume query carries no results.A at all, and a
+// query Explore has superseded comes back with results.A holding neither frames nor an error.
+// Both are skipped, so a spec asserts on the answer to its own query.
+//
+// acceptError widens "conclusive" to include an error, for tests that would rather fail their own
+// assertion on a bad response than time out waiting for a good one.
+async function waitForMainQueryResponse(
+  page: Page,
+  { acceptError = false }: { acceptError?: boolean } = {}
+): Promise<{ response: Response; body: any }> {
   let body: any;
   const response = await page.waitForResponse(async (r: Response) => {
-    if (!isQueryRequestUrl(r.url()) || !r.ok()) {
+    if (!isQueryRequestUrl(r.url()) || (!r.ok() && !acceptError)) {
       return false;
     }
     const b = await r.json().catch(() => null);
-    if (!Array.isArray(b?.results?.A?.frames)) {
+    const result = b?.results?.A;
+    if (!result || !(Array.isArray(result.frames) || (acceptError && !!result.error))) {
       return false;
     }
     body = b;
@@ -291,20 +300,11 @@ test.describe('Query editor with fixture data', () => {
       // interval produces would need well over the Elasticsearch search.max_buckets
       // default (65,535) and fail with "Trying to create too many buckets". The backend
       // widens the auto interval to fit instead (#383).
-      // Resolve on any results.A (error or frames) so a regression fails the assertion
-      // below instead of timing out in waitForMainQueryResponse().
-      let body: any;
-      const responsePromise = page.waitForResponse(async (r: Response) => {
-        if (!isQueryRequestUrl(r.url())) {
-          return false;
-        }
-        const b = await r.json().catch(() => null);
-        if (!b?.results?.A) {
-          return false;
-        }
-        body = b;
-        return true;
-      });
+      // acceptError so a regression here fails the assertions below instead of timing out.
+      // Resolving on *any* results.A is what made this test flaky on every nightly run: it
+      // matched the inconclusive response Explore emits for a superseded query, whose frames and
+      // error are both undefined, and then passed on retry.
+      const responsePromise = waitForMainQueryResponse(page, { acceptError: true });
       await page.goto(
         exploreUrl(env.logsUid, {
           bucketAggs: [
@@ -321,7 +321,7 @@ test.describe('Query editor with fixture data', () => {
           ],
         })
       );
-      await responsePromise;
+      const { body } = await responsePromise;
       expect(body.results?.A?.error).toBeUndefined();
       expect(body.results?.A?.frames?.length).toBeGreaterThan(0);
     });

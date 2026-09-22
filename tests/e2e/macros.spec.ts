@@ -1,7 +1,7 @@
 import { expect, test } from '@grafana/plugin-e2e';
 import { type APIRequestContext } from '@playwright/test';
 
-import { env } from './testEnv';
+import { env, transportErrorFor } from './testEnv';
 
 const INTERVAL_MS = 20000;
 
@@ -29,7 +29,7 @@ interface Frame {
 // happens in the plugin backend after this request, so a literal macro in the payload
 // reaching Elasticsearch unexpanded fails loudly (ES rejects it as an invalid interval
 // or unknown index).
-async function runQuery(request: APIRequestContext, target: Record<string, unknown>) {
+function postQuery(request: APIRequestContext, target: Record<string, unknown>) {
   return request.post('/api/ds/query', {
     data: {
       from: String(new Date(env.from).getTime()),
@@ -45,6 +45,23 @@ async function runQuery(request: APIRequestContext, target: Record<string, unkno
       ],
     },
   });
+}
+
+// cloud.setup.ts dials the Private Data Source Connect tunnel before the suite starts, but a
+// later dial can still fail transiently, and that says nothing about macro expansion — the
+// assertions below all read what Elasticsearch replied. Retry just that class, with backoff
+// (Playwright's own retries re-run the whole spec within the same failure window), and pass
+// every real reply straight through, including the rejection the $__indexes test expects.
+async function runQuery(request: APIRequestContext, target: Record<string, unknown>) {
+  let response = await postQuery(request, target);
+  for (const delay of [1_000, 2_000, 4_000]) {
+    if (!(await transportErrorFor(response))) {
+      return response;
+    }
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    response = await postQuery(request, target);
+  }
+  return response;
 }
 
 async function framesForA(response: { json(): Promise<unknown> }): Promise<Frame[]> {
