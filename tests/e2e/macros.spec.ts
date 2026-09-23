@@ -52,16 +52,19 @@ function postQuery(request: APIRequestContext, target: Record<string, unknown>) 
 // assertions below all read what Elasticsearch replied. Retry just that class, with backoff
 // (Playwright's own retries re-run the whole spec within the same failure window), and pass
 // every real reply straight through, including the rejection the $__indexes test expects.
+// Exhausted retries throw with the transport error, so an unreachable backend never reaches the
+// assertions and reads as a macro failure (or, for $__indexes, passes the ok() === false check).
 async function runQuery(request: APIRequestContext, target: Record<string, unknown>) {
-  let response = await postQuery(request, target);
-  for (const delay of [1_000, 2_000, 4_000]) {
-    if (!(await transportErrorFor(response))) {
+  let transportError: string | null = null;
+  for (const delay of [0, 1_000, 2_000, 4_000]) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    const response = await postQuery(request, target);
+    transportError = await transportErrorFor(response);
+    if (!transportError) {
       return response;
     }
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    response = await postQuery(request, target);
   }
-  return response;
+  throw new Error(`/api/ds/query never reached Elasticsearch after 4 attempts: ${transportError}`);
 }
 
 async function framesForA(response: { json(): Promise<unknown> }): Promise<Frame[]> {

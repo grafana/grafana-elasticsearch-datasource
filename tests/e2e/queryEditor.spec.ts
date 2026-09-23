@@ -238,7 +238,8 @@ function exploreUrl(
 // query Explore has superseded comes back with results.A holding neither frames nor an error.
 // Both are skipped, so a spec asserts on the answer to its own query.
 //
-// acceptError widens "conclusive" to include an error, for tests that would rather fail their own
+// acceptError widens "conclusive" to include an error, and any non-ok response even without
+// results.A (a 5xx page, a `{"message"}` error), for tests that would rather fail their own
 // assertion on a bad response than time out waiting for a good one.
 async function waitForMainQueryResponse(
   page: Page,
@@ -250,6 +251,10 @@ async function waitForMainQueryResponse(
       return false;
     }
     const b = await r.json().catch(() => null);
+    if (!r.ok()) {
+      body = b ?? {};
+      return true;
+    }
     const result = b?.results?.A;
     if (!result || !(Array.isArray(result.frames) || (acceptError && !!result.error))) {
       return false;
@@ -321,8 +326,9 @@ test.describe('Query editor with fixture data', () => {
           ],
         })
       );
-      const { body } = await responsePromise;
+      const { response, body } = await responsePromise;
       expect(body.results?.A?.error).toBeUndefined();
+      expect(response.ok(), `HTTP ${response.status()}: ${JSON.stringify(body)}`).toBe(true);
       expect(body.results?.A?.frames?.length).toBeGreaterThan(0);
     });
 

@@ -106,9 +106,10 @@ async function waitForQueryPath(
     });
 
   // Only a transport error is retried. A query Elasticsearch answers — even to reject — means the
-  // tunnel is up, which is all this gate is for.
+  // tunnel is up, which is all this gate is for. A request that throws (socket reset, the request
+  // context's own timeout) is polled the same way; expect.poll would otherwise abort on it.
   await expect
-    .poll(async () => transportErrorFor(await post()), {
+    .poll(async () => post().then(transportErrorFor, (error: unknown) => String(error)), {
       message: `Query traffic to ${uid} never got through Private Data Source Connect`,
       intervals: [1_000, 2_000, 4_000, 8_000, 15_000],
       timeout: 60_000,
@@ -126,6 +127,10 @@ const LUCENE_COUNT = {
 
 setup('provision cloud datasources', async ({ request }) => {
   setup.skip(!isCloudRun, 'Local and PR CI use provisioning/datasources/datasources.yml.');
+  // The query-path gates below run concurrently and each polls for up to 60 s. The config's 90 s
+  // Cloud timeout leaves too little room for provisioning plus a gate's final in-flight request,
+  // and running out would skip the whole chromium project on a generic timeout.
+  setup.setTimeout(150_000);
 
   const managed = await readManagedDataSource(request);
 
@@ -149,10 +154,13 @@ setup('provision cloud datasources', async ({ request }) => {
   // are separate endpoints on it, so every combination the suite uses gets dialled. The ES|QL
   // probe names the index literally: the macro that resolves it is what macros.spec.ts covers,
   // and a gate that depended on it would report a macro bug as unreachable infrastructure.
-  await waitForQueryPath(request, CLOUD_LOGS_UID, LUCENE_COUNT);
-  await waitForQueryPath(request, CLOUD_METRICS_UID, LUCENE_COUNT);
-  await waitForQueryPath(request, CLOUD_LOGS_UID, {
-    queryType: 'esql',
-    query: `FROM ${CLOUD_LOGS_INDEX} | STATS c = COUNT(*)`,
-  });
+  // Concurrent, so a slow first dial on one path cannot eat the others' budget.
+  await Promise.all([
+    waitForQueryPath(request, CLOUD_LOGS_UID, LUCENE_COUNT),
+    waitForQueryPath(request, CLOUD_METRICS_UID, LUCENE_COUNT),
+    waitForQueryPath(request, CLOUD_LOGS_UID, {
+      queryType: 'esql',
+      query: `FROM ${CLOUD_LOGS_INDEX} | STATS c = COUNT(*)`,
+    }),
+  ]);
 });
