@@ -41,6 +41,7 @@ jobs:
       # Ensure PR builds produce unique plugin versions.
       plugin-version-suffix: ${{ github.event.pull_request.head.sha }}
       run-playwright: true
+      disable-gcs-upload: true
 
   cicd:
     name: CI/CD
