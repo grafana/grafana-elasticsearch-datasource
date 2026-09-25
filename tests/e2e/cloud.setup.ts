@@ -10,6 +10,7 @@ import {
   CLOUD_METRICS_NAME,
   CLOUD_METRICS_UID,
   isCloudRun,
+  transportErrorFor,
 } from './testEnv';
 
 // The shared Cloud instance never applies provisioning/datasources/datasources.yml, and the
@@ -76,8 +77,60 @@ async function upsertDataSource(
   ).toBe('OK');
 }
 
+// The health check above and query traffic do not share a connection, so health reports OK while
+// the run's first query still pays a cold Private Data Source Connect dial — and that dial fails
+// outright ("socks connect tcp ... host unreachable") instead of waiting. It broke whichever spec
+// queried first (the ES|QL macro tests) on roughly 40% of nightly runs, and Playwright's retries
+// re-ran them inside the same two-second window, so all three attempts failed together. Dial the
+// query path here instead, with backoff, so the tunnel is established before any spec queries.
+async function waitForQueryPath(
+  request: APIRequestContext,
+  uid: string,
+  query: Record<string, unknown>
+): Promise<void> {
+  const post = () =>
+    request.post('/api/ds/query', {
+      data: {
+        from: String(Date.now() - 60_000),
+        to: String(Date.now()),
+        queries: [
+          {
+            refId: 'A',
+            datasource: { type: 'elasticsearch', uid },
+            intervalMs: 60_000,
+            maxDataPoints: 10,
+            ...query,
+          },
+        ],
+      },
+    });
+
+  // Only a transport error is retried. A query Elasticsearch answers — even to reject — means the
+  // tunnel is up, which is all this gate is for. A request that throws (socket reset, the request
+  // context's own timeout) is polled the same way; expect.poll would otherwise abort on it.
+  await expect
+    .poll(async () => post().then(transportErrorFor, (error: unknown) => String(error)), {
+      message: `Query traffic to ${uid} never got through Private Data Source Connect`,
+      intervals: [1_000, 2_000, 4_000, 8_000, 15_000],
+      timeout: 60_000,
+    })
+    .toBeNull();
+}
+
+const LUCENE_COUNT = {
+  queryType: 'lucene',
+  query: '*',
+  metrics: [{ type: 'count', id: '1' }],
+  bucketAggs: [{ type: 'date_histogram', id: '2', field: '@timestamp', settings: { interval: 'auto' } }],
+  timeField: '@timestamp',
+};
+
 setup('provision cloud datasources', async ({ request }) => {
   setup.skip(!isCloudRun, 'Local and PR CI use provisioning/datasources/datasources.yml.');
+  // The query-path gates below run concurrently and each polls for up to 60 s. The config's 90 s
+  // Cloud timeout leaves too little room for provisioning plus a gate's final in-flight request,
+  // and running out would skip the whole chromium project on a generic timeout.
+  setup.setTimeout(150_000);
 
   const managed = await readManagedDataSource(request);
 
@@ -96,4 +149,18 @@ setup('provision cloud datasources', async ({ request }) => {
     name: CLOUD_METRICS_NAME,
     index: CLOUD_METRICS_INDEX,
   });
+
+  // Each datasource instance holds its own HTTP client, and Lucene (_msearch) and ES|QL (_query)
+  // are separate endpoints on it, so every combination the suite uses gets dialled. The ES|QL
+  // probe names the index literally: the macro that resolves it is what macros.spec.ts covers,
+  // and a gate that depended on it would report a macro bug as unreachable infrastructure.
+  // Concurrent, so a slow first dial on one path cannot eat the others' budget.
+  await Promise.all([
+    waitForQueryPath(request, CLOUD_LOGS_UID, LUCENE_COUNT),
+    waitForQueryPath(request, CLOUD_METRICS_UID, LUCENE_COUNT),
+    waitForQueryPath(request, CLOUD_LOGS_UID, {
+      queryType: 'esql',
+      query: `FROM ${CLOUD_LOGS_INDEX} | STATS c = COUNT(*)`,
+    }),
+  ]);
 });

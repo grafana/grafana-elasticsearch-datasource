@@ -1,4 +1,4 @@
-import { type Page } from '@playwright/test';
+import { type APIResponse, type Page } from '@playwright/test';
 
 // GRAFANA_URL is set only by the Cloud cron workflow (playwright-cloud); its presence signals
 // a run against the shared Cloud instance rather than local/PR CI.
@@ -198,3 +198,43 @@ export function healthPathFor(uid: string): string {
   return `${uid}/health`;
 }
 
+// Query traffic on the Cloud lane crosses a Private Data Source Connect tunnel, and dialling it
+// fails outright rather than waiting when the tunnel is not up yet:
+//
+//   Post "***/_query": socks connect tcp private-datasource-connect...:443->...:9200: unknown
+//   error host unreachable
+//
+// That is a failure to reach Elasticsearch, not a reply from it. Specs here assert on what
+// Elasticsearch returned — including queries it is expected to reject — so the two have to be
+// told apart: this class is retried, anything else is reported as the result it is.
+//
+// A bare EOF is only matched after the Go client's `Post "<url>": ` prefix. ES|QL parse errors
+// ("mismatched input '<EOF>' expecting ...") are copied verbatim into results.A.error, and those
+// are rejections, not transport.
+const TRANSPORT_ERROR =
+  /socks connect|host unreachable|connection refused|no such host|i\/o timeout|context deadline exceeded|dial tcp|Post "[^"]*": (unexpected )?EOF/i;
+
+export function isTransportError(message: string | undefined | null): boolean {
+  return !!message && TRANSPORT_ERROR.test(message);
+}
+
+// The transport error /api/ds/query reported for refId A, or null when Elasticsearch answered.
+// Reads the body rather than the HTTP status because a rejected query and an unreachable backend
+// both come back as 400 with the detail in results.A.error.
+//
+// A body with no results.A (an edge 502/503 page, or a `{"message"}` error from Grafana itself)
+// never reached Elasticsearch either, so it counts as transport too. Returning null for it would
+// let the setup gate pass without proving the tunnel.
+export async function transportErrorFor(response: Pick<APIResponse, 'json' | 'status'>): Promise<string | null> {
+  const body = (await response.json().catch(() => null)) as {
+    results?: Record<string, { error?: string }>;
+    message?: string;
+  } | null;
+  const result = body?.results?.['A'];
+  if (!result) {
+    return body?.message
+      ? `HTTP ${response.status()}: ${body.message}`
+      : `HTTP ${response.status()} with no results for refId A`;
+  }
+  return isTransportError(result.error) ? (result.error ?? '') : null;
+}
