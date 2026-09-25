@@ -49,6 +49,32 @@ func TestSearchRequest(t *testing.T) {
 		})
 	})
 
+	t.Run("When sorting by a time field that sorts after _doc", func(t *testing.T) {
+		b := setup()
+		b.Sort(SortOrderDesc, "timestamp", "boolean")
+		b.Sort(SortOrderDesc, "_doc", "")
+		sr, err := b.Build()
+		require.Nil(t, err)
+		require.Equal(t, []map[string]any{
+			{"timestamp": map[string]string{"order": "desc", "unmapped_type": "boolean"}},
+			{"_doc": map[string]string{"order": "desc"}},
+		}, sr.Sort)
+
+		body, err := json.Marshal(sr)
+		require.Nil(t, err)
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(body, &payload))
+		sort, ok := payload["sort"].([]any)
+		require.True(t, ok)
+		require.Equal(t, 2, len(sort))
+		first, ok := sort[0].(map[string]any)
+		require.True(t, ok)
+		_, hasTime := first["timestamp"]
+		_, hasDoc := first["_doc"]
+		require.True(t, hasTime, "time field must be the first sort clause, got %s", body)
+		require.False(t, hasDoc, "_doc must not be the primary sort, got %s", body)
+	})
+
 	t.Run("When adding size, sort, filters", func(t *testing.T) {
 		b := setup()
 		b.Size(200)
@@ -66,10 +92,9 @@ func TestSearchRequest(t *testing.T) {
 			})
 
 			t.Run("Should have correct sorting", func(t *testing.T) {
-				sort, ok := sr.Sort[timeField].(map[string]string)
-				require.True(t, ok)
-				require.Equal(t, "desc", sort["order"])
-				require.Equal(t, "boolean", sort["unmapped_type"])
+				require.Equal(t, []map[string]any{
+					{timeField: map[string]string{"order": "desc", "unmapped_type": "boolean"}},
+				}, sr.Sort)
 			})
 
 			t.Run("Should have range filter", func(t *testing.T) {
@@ -94,7 +119,7 @@ func TestSearchRequest(t *testing.T) {
 				require.Nil(t, err)
 				require.Equal(t, 200, json.Get("size").MustInt(0))
 
-				sort := json.GetPath("sort", timeField)
+				sort := json.Get("sort").GetIndex(0).Get(timeField)
 				require.Equal(t, "desc", sort.Get("order").MustString())
 				require.Equal(t, "boolean", sort.Get("unmapped_type").MustString())
 
