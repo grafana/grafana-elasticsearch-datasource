@@ -57,6 +57,8 @@ services:
         set -e
         for file in /data/*.ndjson; do
           index=$$(basename "$$file" .ndjson)
+          curl -sf --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors \
+            -X DELETE "http://elasticsearch:9200/$${index}?ignore_unavailable=true" >/dev/null
           response=$$(curl -sf --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors \
             -X POST "http://elasticsearch:9200/$${index}/_bulk" \
             -H "Content-Type: application/x-ndjson" \
