@@ -159,23 +159,19 @@ func (p *responseParser) processHits(dec *json.Decoder, sr *SearchResponse) erro
 				return err
 			}
 		case "total":
+			// hits.total is always the object form ({value, relation}) on the
+			// versions of Elasticsearch this client supports, since it has
+			// been the default shape since 7.0 and the client never sets
+			// rest_total_hits_as_int. A malformed or legacy (bare integer)
+			// total is logged and skipped rather than reinterpreted. The
+			// json.Decoder call below fully consumes the value even when it
+			// fails to unmarshal, so the stream remains consumable.
 			var total *SearchResponseHitsTotal
-			err := dec.Decode(&total)
-			if err != nil {
-				// It's possible that the user is using an older version of Elasticsearch (or one that doesn't return what is expected)
-				// Attempt to parse the total value as an integer in this case
-				totalInt := 0
-				err = dec.Decode(&totalInt)
-				if err == nil {
-					total = &SearchResponseHitsTotal{
-						Value: totalInt,
-					}
-				} else {
-					// Log the error but do not fail the query
-					backend.Logger.Debug("failed to decode total hits", "error", err)
-				}
+			if err := dec.Decode(&total); err != nil {
+				backend.Logger.Debug("failed to decode total hits", "error", err)
+			} else {
+				sr.Hits.Total = total
 			}
-			sr.Hits.Total = total
 		default:
 			// ignore these fields as they are not used in the current implementation
 			err := skipUnknownField(dec)
