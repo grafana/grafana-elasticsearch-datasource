@@ -1,5 +1,18 @@
 # Changelog
 
+## [12.9.1](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.0...v12.9.1) (2026-09-28)
+
+
+### 🐛 Bug Fixes
+
+* disable gcs upload ([#437](https://github.com/grafana/grafana-elasticsearch-datasource/issues/437)) ([38603a4](https://github.com/grafana/grafana-elasticsearch-datasource/commit/38603a47144a1cdc2098c7ac5f42aa5a38a1822c))
+* emit Elasticsearch sort as an ordered array ([#434](https://github.com/grafana/grafana-elasticsearch-datasource/issues/434)) ([c207a89](https://github.com/grafana/grafana-elasticsearch-datasource/commit/c207a89676e0ca00e838e407906f8133200b8237))
+
+
+### ✅ Tests
+
+* **e2e:** warm the Cloud PDC query path and stop matching superseded Explore responses ([#436](https://github.com/grafana/grafana-elasticsearch-datasource/issues/436)) ([364b257](https://github.com/grafana/grafana-elasticsearch-datasource/commit/364b2576a110a5e79be0fe7a248ae8abd603b639))
+
 ## [12.9.0](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.8.2...v12.9.0) (2026-09-16)
 
 
