@@ -217,6 +217,11 @@ func isFieldCaps(url string) bool {
 
 func (ds *DataSource) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
 	logger := ds.logger.FromContext(ctx)
+	logger.Debug("Resource request received", "path", req.Path, "method", req.Method)
+
+	// Clean the path to prevent path traversal attacks (e.g., _resolve/index/../../_cluster/settings)
+	cleanedPath := path.Clean(req.Path)
+
 	// allowed paths for resource calls:
 	// - empty string for fetching db version
 	// - /_mapping for fetching index mapping, e.g. requests going to `index/_mapping`
@@ -224,8 +229,10 @@ func (ds *DataSource) CallResource(ctx context.Context, req *backend.CallResourc
 	// - _msearch for executing getTerms queries
 	// - _mapping for fetching "root" index mappings
 	// - _field_caps for fetching "root" field capabilities
-	if req.Path != "" && !isFieldCaps(req.Path) && req.Path != "_msearch" &&
-		!strings.HasSuffix(req.Path, "/_mapping") && req.Path != "_mapping" {
+	// - _resolve/index/* for listing indices, aliases, and data streams
+	if cleanedPath != "" && !isFieldCaps(cleanedPath) && cleanedPath != "_msearch" &&
+		!strings.HasSuffix(cleanedPath, "/_mapping") && cleanedPath != "_mapping" &&
+		!strings.HasPrefix(cleanedPath, "_resolve/index/") {
 		logger.Error("Invalid resource path", "path", req.Path)
 		return fmt.Errorf("invalid resource URL: %s", req.Path)
 	}
