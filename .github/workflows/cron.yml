@@ -27,6 +27,7 @@ jobs:
     with:
       # Nightly Cloud E2E run, labelled with the DER run_stage vocabulary.
       run-stage: nightly
+      bench-execute-cmd: npm run e2e:cloud
       # The provisioned Elasticsearch test instance (9.1, self-hosted) is reached over PDC.
       pdc-network-name: datasources-pdc-network-aws-datasourcese2e
       # Connection URL, published to the data-sources Vault mount and read via
