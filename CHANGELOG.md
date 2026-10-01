@@ -1,5 +1,12 @@
 # Changelog
 
+## [12.9.2](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.1...v12.9.2) (2026-10-01)
+
+
+### 🤖 Continuous Integration
+
+* **e2e:** add quarantine split to nightly cloud E2E ([#441](https://github.com/grafana/grafana-elasticsearch-datasource/issues/441)) ([486d99f](https://github.com/grafana/grafana-elasticsearch-datasource/commit/486d99fd66bbd0cf811bb2342adbff60b48249ba))
+
 ## [12.9.1](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.0...v12.9.1) (2026-09-28)
 
 
