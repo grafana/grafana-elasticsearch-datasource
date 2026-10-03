@@ -31,7 +31,9 @@ func TestGetClusterInfo_LiveCluster(t *testing.T) {
 	expectedDistribution := os.Getenv("CLUSTER_INFO_TEST_DISTRIBUTION")
 	require.NotEmpty(t, expectedDistribution, "CLUSTER_INFO_TEST_DISTRIBUTION must be set when CLUSTER_INFO_TEST_URL is set")
 
-	clusterInfo, err := GetClusterInfo(context.Background(), &http.Client{Timeout: 30 * time.Second}, url)
+	esClient, err := NewESClient(&http.Client{Timeout: 30 * time.Second}, url)
+	require.NoError(t, err)
+	clusterInfo, err := GetClusterInfo(context.Background(), esClient)
 	require.NoError(t, err)
 
 	assert.Equal(t, expectedDistribution, clusterInfo.Distribution())
