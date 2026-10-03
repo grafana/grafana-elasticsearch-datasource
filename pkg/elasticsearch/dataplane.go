@@ -15,9 +15,7 @@ import (
 // are tagged with data.FrameTypeLogLines and carry the canonical
 // timestamp/body/severity/id/labels/labelTypes fields described in
 // https://github.com/grafana/dataplane/blob/main/docs/contract/logs.md.
-//
-// The flag is scoped to logs specifically to leave room for a separate
-// metrics-dataplane flag later (mirroring lokiLogsDataplane / lokiMetricDataplane).
+// Metrics frames are gated separately; see dataplane_metrics.go.
 
 // labelTypeField marks a label as a regular log field (from _source or the
 // hit envelope).
