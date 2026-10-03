@@ -20,7 +20,7 @@ import { ElasticsearchDataQuery, QueryType } from '../../dataquery.gen';
 import { useNextId } from '../../hooks/useNextId';
 import { useDispatch } from '../../hooks/useStatelessReducer';
 import { EditorType, ElasticDatasourceLike, ElasticsearchOptions } from '../../types';
-import { isSupportedVersion, isTimeSeriesQuery, unsupportedVersionMessage } from '../../utils';
+import { impliedQueryType, isSupportedVersion, isTimeSeriesQuery, unsupportedVersionMessage } from '../../utils';
 
 import { BucketAggregationsEditor } from './BucketAggregationsEditor';
 import { CodeEditorSection } from './CodeEditorSection';
@@ -28,7 +28,6 @@ import { EditorTypeSelector } from './EditorTypeSelector';
 import { ElasticsearchProvider } from './ElasticsearchQueryContext';
 import { ElasticsearchQueryOptions } from './ElasticsearchQueryOptions';
 import { MetricAggregationsEditor } from './MetricAggregationsEditor';
-import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
 import { setPreserveQueryDefault } from './preserveQueryPreference';
 import { QueryTypeSelector } from './QueryTypeSelector';
 import { changeAliasPattern, changeEditorTypeAndResetQuery, changeQuery } from './state';
@@ -203,13 +202,9 @@ const QueryEditorForm = ({
   // Default to 'builder' if editorType is empty
   const currentEditorType: EditorType = value.editorType === 'code' ? 'code' : 'builder';
 
-  const showBucketAggregationsEditor = value.metrics?.every(
-    (metric) => metricAggregationConfig[metric.type].impliedQueryType === 'metrics'
-  );
+  const showBucketAggregationsEditor = value.metrics?.every((metric) => impliedQueryType(metric.type) === 'metrics');
 
-  const isRawDocumentEditor = value.metrics?.every(
-    (metric) => metricAggregationConfig[metric.type].impliedQueryType === 'raw_document'
-  );
+  const isRawDocumentEditor = value.metrics?.every((metric) => impliedQueryType(metric.type) === 'raw_document');
 
   const onEditorTypeChange = useCallback((newEditorType: EditorType) => {
     // Show warning modal when switching modes

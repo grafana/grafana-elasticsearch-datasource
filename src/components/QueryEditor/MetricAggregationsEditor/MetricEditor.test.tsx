@@ -2,11 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React, { PropsWithChildren, act } from 'react';
 import { from } from 'rxjs';
-import { SemVer } from 'semver';
 
 import { getDefaultTimeRange } from '@grafana/data';
 
-import { Average, Count, Derivative, ElasticsearchDataQuery, SumBucket, UniqueCount } from '../../../dataquery.gen';
+import { Average, Count, Derivative, ElasticsearchDataQuery, MetricAggregation, SumBucket, UniqueCount } from '../../../dataquery.gen';
 import { ElasticDatasource } from '../../../datasource';
 import { defaultBucketAgg } from '../../../queryDef';
 import { describeMetric } from '../../../utils';
@@ -101,11 +100,9 @@ describe('Metric Editor', () => {
       bucketAggs: [],
     };
 
-    const getDatabaseVersion: ElasticDatasource['getDatabaseVersion'] = jest.fn(() => Promise.resolve(null));
-
     const wrapper = ({ children }: PropsWithChildren<{}>) => (
       <ElasticsearchProvider
-        datasource={{ getDatabaseVersion } as ElasticDatasource}
+        datasource={{} as ElasticDatasource}
         query={query}
         range={getDefaultTimeRange()}
         onChange={() => {}}
@@ -127,49 +124,6 @@ describe('Metric Editor', () => {
     expect(screen.queryByText('Logs')).toBeNull();
     expect(screen.queryByText('Raw Data')).toBeNull();
     expect(screen.queryByText('Raw Document (deprecated)')).toBeNull();
-  });
-
-  // Regression test for https://github.com/grafana/grafana/issues/115127:
-  // SemVer ranges exclude prereleases by default, so versions like
-  // `8.14.0-SNAPSHOT` reported by snapshot builds of Elasticsearch were
-  // filtering every metric type out of the picker.
-  it('Should list metric types for prerelease Elasticsearch versions (e.g. -SNAPSHOT)', async () => {
-    const count: Count = { id: '1', type: 'count' };
-
-    const query: ElasticsearchDataQuery = {
-      refId: 'A',
-      query: '',
-      metrics: [count],
-      bucketAggs: [],
-    };
-
-    const getDatabaseVersion: ElasticDatasource['getDatabaseVersion'] = jest.fn(() =>
-      Promise.resolve(new SemVer('8.14.0-SNAPSHOT'))
-    );
-
-    const wrapper = ({ children }: PropsWithChildren<{}>) => (
-      <ElasticsearchProvider
-        datasource={{ getDatabaseVersion } as ElasticDatasource}
-        query={query}
-        range={getDefaultTimeRange()}
-        onChange={() => {}}
-        onRunQuery={() => {}}
-      >
-        {children}
-      </ElasticsearchProvider>
-    );
-
-    render(<MetricEditor value={count} />, { wrapper });
-
-    await userEvent.click(screen.getByText('Count'));
-
-    // Base metric types must remain visible for prerelease versions.
-    expect(await screen.findByText('Average')).toBeInTheDocument();
-    expect(screen.getByText('Extended Stats')).toBeInTheDocument();
-
-    // Version-gated `moving_avg` (`<8.0.0`) must still be excluded — the fix
-    // should not regress upper-bound filtering when the version is a prerelease.
-    expect(screen.queryByText('Moving Average')).toBeNull();
   });
 
   it('Should not offer sibling composite metrics as "apply to" targets for a parent pipeline aggregation', async () => {
@@ -212,5 +166,32 @@ describe('Metric Editor', () => {
     expect(screen.queryByText(describeMetric(sumBucket))).not.toBeInTheDocument();
     // Other, non-sibling metrics remain valid "apply to" targets.
     expect(await screen.findByText(describeMetric(avg))).toBeInTheDocument();
+  });
+
+  it('Should render a removed-type row for saved moving_avg queries without crashing', async () => {
+    const movingAvg = { id: '2', type: 'moving_avg', field: '1' } as unknown as MetricAggregation;
+
+    const query: ElasticsearchDataQuery = {
+      refId: 'A',
+      query: '',
+      metrics: [{ id: '1', type: 'count' }, movingAvg],
+      bucketAggs: [defaultBucketAgg('3')],
+    };
+
+    const wrapper = ({ children }: PropsWithChildren<{}>) => (
+      <ElasticsearchProvider
+        datasource={{} as ElasticDatasource}
+        query={query}
+        range={getDefaultTimeRange()}
+        onChange={() => {}}
+        onRunQuery={() => {}}
+      >
+        {children}
+      </ElasticsearchProvider>
+    );
+
+    render(<MetricEditor value={movingAvg} />, { wrapper });
+
+    expect(await screen.findByText('moving_avg (removed)')).toBeInTheDocument();
   });
 });

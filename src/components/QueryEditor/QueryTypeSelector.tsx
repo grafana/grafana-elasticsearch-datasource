@@ -4,10 +4,10 @@ import { QUERY_TYPE_SELECTOR_OPTIONS } from '../../configuration/utils';
 import { useDispatch } from '../../hooks/useStatelessReducer';
 import { queryTypeToMetricType } from '../../queryDef';
 import { QueryType } from '../../types';
+import { impliedQueryType } from '../../utils';
 
 import { useQuery } from './ElasticsearchQueryContext';
 import { changeMetricType } from './MetricAggregationsEditor/state/actions';
-import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
 import React from 'react';
 
 export const QueryTypeSelector = () => {
@@ -21,7 +21,7 @@ export const QueryTypeSelector = () => {
     return null;
   }
 
-  const queryType = metricAggregationConfig[firstMetric.type].impliedQueryType;
+  const queryType = impliedQueryType(firstMetric.type);
 
   const onChange = (newQueryType: QueryType) => {
     dispatch(
