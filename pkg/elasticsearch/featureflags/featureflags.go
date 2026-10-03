@@ -47,6 +47,10 @@ import (
 // The key must match the GOFF flag definition byte-for-byte.
 const LogsDataplane = "elasticsearch.logs-dataplane"
 
+// MetricsDataplane gates emission of Grafana dataplane-compliant metrics
+// frames. The key must match the GOFF flag definition byte-for-byte.
+const MetricsDataplane = "elasticsearch.metrics-dataplane"
+
 const (
 	// defaultOFREPURL is the unauthenticated GOFF relay proxy. Anywhere else the
 	// host does not resolve and evaluations fail closed.

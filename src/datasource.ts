@@ -23,6 +23,7 @@ import {
   DataSourceWithSupplementaryQueriesSupport,
   DataSourceWithToggleableQueryFiltersSupport,
   DateTime,
+  FieldType,
   LogLevel,
   LogRowContextOptions,
   LogRowContextQueryDirection,
@@ -1285,17 +1286,13 @@ export class ElasticDatasource
   };
 }
 
-// The supplementary logs-volume query groups counts by `logLevelField`, but the
-// backend writes that bucket value into `frame.name` and strips field labels
-// (see field_namer.go::nameFields). Grafana's logs-volume panel expects a
-// `level` label on the value field to colour each series — without it every
-// frame collapses to "unknown". Re-attach the label from `frame.name`.
-// See https://github.com/grafana/grafana/issues/90436.
+// The logs-volume panel reads the level from a `level` label on the value field; the
+// backend only writes it to frame.name. See https://github.com/grafana/grafana/issues/90436.
 export function attachLevelLabelToVolumeFrame(dataFrame: DataFrame): DataFrame {
   if (!dataFrame.name) {
     return dataFrame;
   }
-  const valueField = dataFrame.fields.find((field) => field.name === 'Value');
+  const valueField = dataFrame.fields.find((field) => field.type === FieldType.number);
   if (!valueField) {
     return dataFrame;
   }
