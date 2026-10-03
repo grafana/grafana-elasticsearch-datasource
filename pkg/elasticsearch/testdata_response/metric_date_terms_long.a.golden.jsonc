@@ -1,0 +1,78 @@
+//  🌟 This was machine generated.  Do not edit. 🌟
+//  
+//  Frame[0] 
+//  Name: 
+//  Dimensions: 3 Fields by 4 Rows
+//  +-----------------+-----------------+------------------+
+//  | Name: testtime  | Name: host      | Name: Count      |
+//  | Labels:         | Labels:         | Labels:          |
+//  | Type: []*string | Type: []*string | Type: []*float64 |
+//  +-----------------+-----------------+------------------+
+//  | 1668422460000   | web-1           | 3                |
+//  | 1668422460000   | web-2           | 1                |
+//  | 1668422520000   | web-1           | 2                |
+//  | 1668422520000   | web-2           | 3                |
+//  +-----------------+-----------------+------------------+
+//  
+//  
+//  🌟 This was machine generated.  Do not edit. 🌟
+{
+  "status": 200,
+  "frames": [
+    {
+      "schema": {
+        "fields": [
+          {
+            "name": "testtime",
+            "type": "string",
+            "typeInfo": {
+              "frame": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "host",
+            "type": "string",
+            "typeInfo": {
+              "frame": "string",
+              "nullable": true
+            },
+            "config": {
+              "filterable": true
+            }
+          },
+          {
+            "name": "Count",
+            "type": "number",
+            "typeInfo": {
+              "frame": "float64",
+              "nullable": true
+            }
+          }
+        ]
+      },
+      "data": {
+        "values": [
+          [
+            "1668422460000",
+            "1668422460000",
+            "1668422520000",
+            "1668422520000"
+          ],
+          [
+            "web-1",
+            "web-2",
+            "web-1",
+            "web-2"
+          ],
+          [
+            3,
+            1,
+            2,
+            3
+          ]
+        ]
+      }
+    }
+  ]
+}

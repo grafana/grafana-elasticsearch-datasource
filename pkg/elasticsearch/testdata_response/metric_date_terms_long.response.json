@@ -1,0 +1,44 @@
+{
+  "took": 4,
+  "responses": [
+    {
+      "took": 3,
+      "timed_out": false,
+      "_shards": { "total": 1, "successful": 1, "skipped": 0, "failed": 0 },
+      "hits": { "total": { "value": 9, "relation": "eq" }, "max_score": null, "hits": [] },
+      "aggregations": {
+        "2": {
+          "buckets": [
+            {
+              "key_as_string": "1668422460000",
+              "key": 1668422460000,
+              "doc_count": 4,
+              "3": {
+                "doc_count_error_upper_bound": 0,
+                "sum_other_doc_count": 0,
+                "buckets": [
+                  { "key": "web-1", "doc_count": 3 },
+                  { "key": "web-2", "doc_count": 1 }
+                ]
+              }
+            },
+            {
+              "key_as_string": "1668422520000",
+              "key": 1668422520000,
+              "doc_count": 5,
+              "3": {
+                "doc_count_error_upper_bound": 0,
+                "sum_other_doc_count": 0,
+                "buckets": [
+                  { "key": "web-1", "doc_count": 2 },
+                  { "key": "web-2", "doc_count": 3 }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "status": 200
+    }
+  ]
+}

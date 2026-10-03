@@ -2,6 +2,7 @@ package elasticsearch
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"time"
@@ -13,11 +14,13 @@ import (
 )
 
 // metricsResponseProcessor handles processing of metrics query responses
-type metricsResponseProcessor struct{}
+type metricsResponseProcessor struct {
+	dataplane bool
+}
 
 // newMetricsResponseProcessor creates a new metrics response processor
-func newMetricsResponseProcessor() *metricsResponseProcessor {
-	return &metricsResponseProcessor{}
+func newMetricsResponseProcessor(dataplane bool) *metricsResponseProcessor {
+	return &metricsResponseProcessor{dataplane: dataplane}
 }
 
 // processBuckets processes aggregation buckets recursively
@@ -64,14 +67,19 @@ func (p *metricsResponseProcessor) processBuckets(aggs map[string]interface{}, t
 					newProps[k] = v
 				}
 
-				if key, err := bucket.Get("key").String(); err == nil {
+				if key, ok := formatBucketKey(bucket); ok {
 					newProps[aggDef.Field] = key
-				} else if key, err := bucket.Get("key").Int64(); err == nil {
-					newProps[aggDef.Field] = strconv.FormatInt(key, 10)
 				}
 
 				if key, err := bucket.Get("key_as_string").String(); err == nil {
 					newProps[aggDef.Field] = key
+				}
+				// Dataplane long frames read the first outer date_histogram back as
+				// a time column, so its key stays epoch millis regardless of format.
+				if p.dataplane && aggDef.Type == dateHistType && !leafIsDateHistogram(target) && aggDef == firstDateHistogramAgg(target) {
+					if key, ok := formatBucketKey(bucket); ok {
+						newProps[aggDef.Field] = key
+					}
 				}
 				err = p.processBuckets(bucket.MustMap(), target, queryResult, newProps, depth+1)
 				if err != nil {
@@ -94,7 +102,7 @@ func (p *metricsResponseProcessor) processBuckets(aggs map[string]interface{}, t
 					newProps[k] = v
 				}
 
-				newProps["filter"] = bucketKey
+				newProps[p.filterPropName(props, aggDef)] = bucketKey
 
 				err = p.processBuckets(bucket.MustMap(), target, queryResult, newProps, depth+1)
 				if err != nil {
@@ -125,7 +133,7 @@ func (p *metricsResponseProcessor) processMetrics(esAgg *simplejson.Json, target
 
 		switch metric.Type {
 		case countType:
-			countFrames, err := p.processCountMetric(jsonBuckets, props)
+			countFrames, err := p.processCountMetric(metric, jsonBuckets, props)
 			if err != nil {
 				return fmt.Errorf("error processing count metric: %w", err)
 			}
@@ -166,7 +174,7 @@ func (p *metricsResponseProcessor) processMetrics(esAgg *simplejson.Json, target
 }
 
 // processCountMetric processes count metric aggregations
-func (p *metricsResponseProcessor) processCountMetric(buckets []*simplejson.Json, props map[string]string) (data.Frames, error) {
+func (p *metricsResponseProcessor) processCountMetric(metric *MetricAgg, buckets []*simplejson.Json, props map[string]string) (data.Frames, error) {
 	tags := make(map[string]string, len(props))
 	timeVector := make([]time.Time, 0, len(buckets))
 	values := make([]*float64, 0, len(buckets))
@@ -185,6 +193,7 @@ func (p *metricsResponseProcessor) processCountMetric(buckets []*simplejson.Json
 		tags[k] = v
 	}
 	tags["metric"] = countType
+	p.tagMetricID(tags, metric)
 	return data.Frames{newTimeSeriesFrame(timeVector, tags, values)}, nil
 }
 
@@ -215,6 +224,7 @@ func (p *metricsResponseProcessor) processPercentilesMetric(metric *MetricAgg, b
 		}
 		tags["metric"] = "p" + percentileName
 		tags["field"] = metric.Field
+		p.tagMetricID(tags, metric)
 		for _, bucket := range buckets {
 			value := castToFloat(bucket.GetPath(metric.ID, "values", percentileName))
 			key := bucket.Get("key")
@@ -247,6 +257,7 @@ func (p *metricsResponseProcessor) processTopMetricsMetric(metric *MetricAgg, bu
 
 		tags["field"] = metricField.(string)
 		tags["metric"] = "top_metrics"
+		p.tagMetricID(tags, metric)
 
 		for _, bucket := range buckets {
 			stats := bucket.GetPath(metric.ID, "top")
@@ -255,21 +266,7 @@ func (p *metricsResponseProcessor) processTopMetricsMetric(metric *MetricAgg, bu
 				return nil, err
 			}
 			timeVector = append(timeVector, timeValue)
-
-			for _, stat := range stats.MustArray() {
-				stat := stat.(map[string]interface{})
-
-				metrics, hasMetrics := stat["metrics"]
-				if hasMetrics {
-					metrics := metrics.(map[string]interface{})
-					metricValue, hasMetricValue := metrics[metricField.(string)]
-
-					if hasMetricValue && metricValue != nil {
-						v := metricValue.(float64)
-						values = append(values, &v)
-					}
-				}
-			}
+			values = append(values, topMetricValue(stats.MustArray(), metricField.(string)))
 		}
 
 		frames = append(frames, newTimeSeriesFrame(timeVector, tags, values))
@@ -304,6 +301,7 @@ func (p *metricsResponseProcessor) processExtendedStatsMetric(metric *MetricAgg,
 		}
 		tags["metric"] = statName
 		tags["field"] = metric.Field
+		p.tagMetricID(tags, metric)
 
 		for _, bucket := range buckets {
 			timeValue, err := getAsTime(bucket.Get("key"))
@@ -393,21 +391,21 @@ func appendPropsRow(fields *[]*data.Field, props map[string]string, propKeys []s
 	}
 }
 
-// appendMetrics appends all metric values for a single bucket/row
+// appendMetrics appends all metric values for a single bucket/row; a repeated column name gets the metric id as suffix.
 func appendMetrics(fields *[]*data.Field, bucket *simplejson.Json, target *Query) {
-	var values []interface{}
+	used := map[string]struct{}{}
 	for _, metric := range target.Metrics {
 		switch metric.Type {
 		case countType:
-			addMetricValueToFields(fields, values, getMetricName(metric.Type), castToFloat(bucket.Get("doc_count")))
+			addMetricValueToFields(fields, used, getMetricName(metric.Type), metric.ID, castToFloat(bucket.Get("doc_count")))
 		case extendedStatsType:
-			addExtendedStatsToFields(fields, bucket, metric, values)
+			addExtendedStatsToFields(fields, used, bucket, metric)
 		case percentilesType:
-			addPercentilesToFields(fields, bucket, metric, values)
+			addPercentilesToFields(fields, used, bucket, metric)
 		case topMetricsType:
-			addTopMetricsToFields(fields, bucket, metric, values)
+			addTopMetricsToFields(fields, used, bucket, metric)
 		default:
-			addOtherMetricsToFields(fields, bucket, metric, values, target)
+			addOtherMetricsToFields(fields, used, bucket, metric, target)
 		}
 	}
 }
@@ -427,8 +425,20 @@ func appendKeyColumnString(fields *[]*data.Field, fieldName, key string) {
 	*fields = append(*fields, f)
 }
 
-// appendBucketKeyValue appends the bucket's "key" (string or number) to fieldName
-func appendBucketKeyValue(fields *[]*data.Field, fieldName string, bucket *simplejson.Json) error {
+// appendBucketKeyValue appends the bucket's "key" to fieldName; stringKeys forces a
+// string column so dataplane long frames read it as a dimension.
+func appendBucketKeyValue(fields *[]*data.Field, fieldName string, bucket *simplejson.Json, stringKeys bool) error {
+	if stringKeys {
+		key, err := bucket.Get("key_as_string").String()
+		if err != nil {
+			var ok bool
+			if key, ok = formatBucketKey(bucket); !ok {
+				return fmt.Errorf("bucket key for field %q is neither string nor number", fieldName)
+			}
+		}
+		appendKeyColumnString(fields, fieldName, key)
+		return nil
+	}
 	for _, f := range *fields {
 		if f.Name == fieldName {
 			if s, err := bucket.Get("key").String(); err == nil {
@@ -482,8 +492,12 @@ func (p *metricsResponseProcessor) processAggregationDocs(
 			bucket := simplejson.NewFromAny(v)
 
 			appendPropsRow(&fields, props, propKeys, "")
-			if aggDef.Field != "" {
-				if err := appendBucketKeyValue(&fields, aggDef.Field, bucket); err != nil {
+			keyFieldName := aggDef.Field
+			if keyFieldName == "" && p.dataplane {
+				keyFieldName = "key"
+			}
+			if keyFieldName != "" {
+				if err := appendBucketKeyValue(&fields, keyFieldName, bucket, p.dataplane); err != nil {
 					return err
 				}
 			}
@@ -495,22 +509,21 @@ func (p *metricsResponseProcessor) processAggregationDocs(
 	}
 
 	if m := buckets.MustMap(); len(m) > 0 {
-		// default key column to "filter" for leaf filters
+		filterKey := p.filterPropName(props, aggDef)
 		keyFieldName := aggDef.Field
 		if keyFieldName == "" {
-			keyFieldName = "filter"
+			keyFieldName = filterKey
 		}
 
-		// ensure "filter" exists among props
 		hasFilter := false
 		for _, pk := range propKeys {
-			if pk == "filter" {
+			if pk == filterKey {
 				hasFilter = true
 				break
 			}
 		}
 		if !hasFilter {
-			propKeys = append(propKeys, "filter")
+			propKeys = append(propKeys, filterKey)
 		}
 
 		fields := createFields(queryResult.Frames, propKeys)
@@ -529,12 +542,12 @@ func (p *metricsResponseProcessor) processAggregationDocs(
 			for kk, vv := range props {
 				locProps[kk] = vv
 			}
-			locProps["filter"] = k
+			locProps[filterKey] = k
 
-			// avoid double-append when the key column is "filter"
+			// avoid double-append when the key column is the filter dimension
 			skip := ""
-			if keyFieldName == "filter" {
-				skip = "filter"
+			if keyFieldName == filterKey {
+				skip = filterKey
 			}
 
 			appendPropsRow(&fields, locProps, propKeys, skip)
@@ -546,8 +559,10 @@ func (p *metricsResponseProcessor) processAggregationDocs(
 		return nil
 	}
 
-	// no buckets present
-	queryResult.Frames = data.Frames{}
+	// no buckets present: keep rows accumulated from earlier outer buckets
+	if queryResult.Frames == nil {
+		queryResult.Frames = data.Frames{}
+	}
 	return nil
 }
 
@@ -602,7 +617,11 @@ func trimDatapoints(queryResult backend.DataResponse, target *Query) {
 
 // Helper functions for adding metrics to fields
 
-func addMetricValueToFields(fields *[]*data.Field, values []interface{}, metricName string, value *float64) {
+func addMetricValueToFields(fields *[]*data.Field, used map[string]struct{}, metricName, metricID string, value *float64) {
+	if _, taken := used[metricName]; taken {
+		metricName += " " + metricID
+	}
+	used[metricName] = struct{}{}
 	index := -1
 	for i, f := range *fields {
 		if f.Name == metricName {
@@ -621,15 +640,15 @@ func addMetricValueToFields(fields *[]*data.Field, values []interface{}, metricN
 	field.Append(value)
 }
 
-func addPercentilesToFields(fields *[]*data.Field, bucket *simplejson.Json, metric *MetricAgg, values []interface{}) {
+func addPercentilesToFields(fields *[]*data.Field, used map[string]struct{}, bucket *simplejson.Json, metric *MetricAgg) {
 	percentiles := bucket.GetPath(metric.ID, "values")
 	for _, percentileName := range getSortedKeys(percentiles.MustMap()) {
 		percentileValue := percentiles.Get(percentileName).MustFloat64()
-		addMetricValueToFields(fields, values, fmt.Sprintf("p%v %v", percentileName, metric.Field), &percentileValue)
+		addMetricValueToFields(fields, used, fmt.Sprintf("p%v %v", percentileName, metric.Field), metric.ID, &percentileValue)
 	}
 }
 
-func addExtendedStatsToFields(fields *[]*data.Field, bucket *simplejson.Json, metric *MetricAgg, values []interface{}) {
+func addExtendedStatsToFields(fields *[]*data.Field, used map[string]struct{}, bucket *simplejson.Json, metric *MetricAgg) {
 	metaKeys := make([]string, 0)
 	meta := metric.Meta.MustMap()
 	for k := range meta {
@@ -651,12 +670,12 @@ func addExtendedStatsToFields(fields *[]*data.Field, bucket *simplejson.Json, me
 			value = castToFloat(bucket.GetPath(metric.ID, statName))
 		}
 
-		addMetricValueToFields(fields, values, getMetricName(metric.Type), value)
+		addMetricValueToFields(fields, used, getMetricName(metric.Type), metric.ID, value)
 		break
 	}
 }
 
-func addTopMetricsToFields(fields *[]*data.Field, bucket *simplejson.Json, metric *MetricAgg, values []interface{}) {
+func addTopMetricsToFields(fields *[]*data.Field, used map[string]struct{}, bucket *simplejson.Json, metric *MetricAgg) {
 	baseName := getMetricName(metric.Type)
 	metrics := metric.Settings.Get("metrics").MustStringArray()
 	for _, metricField := range metrics {
@@ -666,19 +685,11 @@ func addTopMetricsToFields(fields *[]*data.Field, bucket *simplejson.Json, metri
 			metricName += " " + metricField
 		}
 		top := bucket.GetPath(metric.ID, "top").MustArray()
-		metrics, hasMetrics := top[0].(map[string]interface{})["metrics"]
-		if hasMetrics {
-			metrics := metrics.(map[string]interface{})
-			metricValue, hasMetricValue := metrics[metricField]
-			if hasMetricValue && metricValue != nil {
-				v := metricValue.(float64)
-				addMetricValueToFields(fields, values, metricName, &v)
-			}
-		}
+		addMetricValueToFields(fields, used, metricName, metric.ID, topMetricValue(top, metricField))
 	}
 }
 
-func addOtherMetricsToFields(fields *[]*data.Field, bucket *simplejson.Json, metric *MetricAgg, values []interface{}, target *Query) {
+func addOtherMetricsToFields(fields *[]*data.Field, used map[string]struct{}, bucket *simplejson.Json, metric *MetricAgg, target *Query) {
 	metricName := getMetricName(metric.Type)
 	otherMetrics := make([]*MetricAgg, 0)
 
@@ -706,7 +717,7 @@ func addOtherMetricsToFields(fields *[]*data.Field, bucket *simplejson.Json, met
 			metricName = metric.Settings.Get("script").MustString("")
 		}
 	}
-	addMetricValueToFields(fields, values, metricName, castToFloat(bucket.GetPath(metric.ID, "value")))
+	addMetricValueToFields(fields, used, metricName, metric.ID, castToFloat(bucket.GetPath(metric.ID, "value")))
 }
 
 func extractDataField(name string, v interface{}) *data.Field {
@@ -722,4 +733,61 @@ func extractDataField(name string, v interface{}) *data.Field {
 	isFilterable := true
 	field.Config = &data.FieldConfig{Filterable: &isFilterable}
 	return field
+}
+
+// formatBucketKey returns the bucket's "key" as a string; integral numbers keep
+// their int64 rendering and fractions are not truncated.
+func formatBucketKey(bucket *simplejson.Json) (string, bool) {
+	key := bucket.Get("key")
+	if s, err := key.String(); err == nil {
+		return s, true
+	}
+	f, err := key.Float64()
+	if err != nil {
+		return "", false
+	}
+	switch {
+	case f != math.Trunc(f):
+		return strconv.FormatFloat(f, 'f', -1, 64), true
+	case math.Abs(f) < 1<<63:
+		return strconv.FormatInt(int64(f), 10), true
+	default:
+		return strconv.FormatFloat(f, 'f', 0, 64), true
+	}
+}
+
+// filterPropName names a filters level's dimension; under the dataplane flag a
+// filters level nested in another one gets its agg id so the two stay distinct.
+func (p *metricsResponseProcessor) filterPropName(props map[string]string, aggDef *BucketAgg) string {
+	if _, taken := props["filter"]; taken && p.dataplane {
+		return "filter " + aggDef.ID
+	}
+	return "filter"
+}
+
+// topMetricValue returns the first top hit's value for field, or nil when no
+// hit carries one, so every bucket contributes exactly one point.
+func topMetricValue(hits []interface{}, field string) *float64 {
+	for _, hit := range hits {
+		stat, ok := hit.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		metrics, ok := stat["metrics"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if v, ok := metrics[field].(float64); ok {
+			return &v
+		}
+	}
+	return nil
+}
+
+// tagMetricID records the metric id as an internal label so dataplane naming
+// can tell apart items whose generated names collide; nameFields strips it.
+func (p *metricsResponseProcessor) tagMetricID(tags map[string]string, metric *MetricAgg) {
+	if p.dataplane {
+		tags["metricId"] = metric.ID
+	}
 }
