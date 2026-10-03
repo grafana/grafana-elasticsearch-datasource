@@ -280,14 +280,15 @@ func buildEsqlMultiSeriesFrames(response *es.EsqlResponse, layout esqlColumnLayo
 	return frames
 }
 
-// processEsqlMetricsResponse processes ES|QL response for metrics queries.
-// It maps a time column + numeric value column to a timeseries-multi frame
-// to match the shape returned by regular/raw DSL metrics queries.
-// When breakdown columns are present (columns that are neither time nor numeric),
-// rows are grouped by unique breakdown values and separate frames are created.
-func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query) (*backend.DataResponse, error) {
+// processEsqlMetricsResponse turns an ES|QL STATS/PROMQL result into metrics frames:
+// dataplane kinds when dataplane is set, else the legacy time + first-numeric series.
+func processEsqlMetricsResponse(response *es.EsqlResponse, target *Query, dataplane bool) (*backend.DataResponse, error) {
 	if !hasEsqlMetricsCommand(target.RawQuery) {
 		return &backend.DataResponse{}, nil
+	}
+
+	if dataplane {
+		return processEsqlDataplaneMetricsResponse(response, target)
 	}
 
 	if response == nil || len(response.Columns) == 0 {

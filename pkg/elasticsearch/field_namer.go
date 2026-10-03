@@ -9,7 +9,7 @@ import (
 )
 
 // nameFields applies naming logic to data frame fields based on query configuration
-func nameFields(queryResult backend.DataResponse, target *Query, keepLabelsInResponse bool) {
+func nameFields(queryResult backend.DataResponse, target *Query, keepLabelsInResponse bool, dataplane bool) {
 	set := make(map[string]struct{})
 	frames := queryResult.Frames
 	for _, v := range frames {
@@ -20,11 +20,16 @@ func nameFields(queryResult backend.DataResponse, target *Query, keepLabelsInRes
 		}
 	}
 	metricTypeCount := len(set)
+	seen := make(map[string]string)
 	for _, frame := range frames {
 		if frame.Meta != nil && frame.Meta.Type == data.FrameTypeTimeSeriesMulti {
 			// if it is a time-series-multi, it means it has two columns, one is "time",
 			// another is "number"
 			valueField := frame.Fields[1]
+			if dataplane {
+				nameDataplaneSeries(frame, valueField, target, metricTypeCount, seen)
+				continue
+			}
 			fieldName := getFieldName(*valueField, target, metricTypeCount)
 			// If we  need to keep the labels in the response, to prevent duplication in names and to keep
 			// backward compatibility with alerting and expressions we use DisplayNameFromDS
@@ -46,6 +51,7 @@ func nameFields(queryResult backend.DataResponse, target *Query, keepLabelsInRes
 func getFieldName(dataField data.Field, target *Query, metricTypeCount int) string {
 	metricType := dataField.Labels["metric"]
 	metricName := getMetricName(metricType)
+	itemName := metricItemName(dataField.Labels, target)
 	delete(dataField.Labels, "metric")
 
 	field := ""
@@ -81,42 +87,61 @@ func getFieldName(dataField data.Field, target *Query, metricTypeCount int) stri
 
 		return frameName
 	}
-	// todo, if field and pipelineAgg
-	if isPipelineAgg(metricType) {
-		if metricType != "" && isPipelineAggWithMultipleBucketPaths(metricType) {
-			metricID := ""
-			if v, ok := dataField.Labels["metricId"]; ok {
-				metricID = v
-			}
+	delete(dataField.Labels, "metricId")
 
+	if len(dataField.Labels) == 0 {
+		return itemName
+	}
+
+	name := ""
+	for _, v := range getSortedLabelValues(dataField.Labels) {
+		name += v + " "
+	}
+
+	if metricTypeCount == 1 {
+		return strings.TrimSpace(name)
+	}
+
+	return strings.TrimSpace(name) + " " + itemName
+}
+
+// metricItemName returns the alias-independent item name built from the
+// internal metric, field and metricId labels.
+func metricItemName(labels data.Labels, target *Query) string {
+	metricType := labels["metric"]
+	field := labels["field"]
+	metricID := labels["metricId"]
+	metricName := getMetricName(metricType)
+
+	switch {
+	case isPipelineAgg(metricType):
+		if isPipelineAggWithMultipleBucketPaths(metricType) {
 			for _, metric := range target.Metrics {
-				if metric.ID == metricID {
-					metricName = metric.Settings.Get("script").MustString()
-					for name, pipelineAgg := range metric.PipelineVariables {
-						for _, m := range target.Metrics {
-							if m.ID == pipelineAgg {
-								metricName = strings.ReplaceAll(metricName, "params."+name, describeMetric(m.Type, m.Field))
-							}
+				if metric.ID != metricID {
+					continue
+				}
+				metricName = metric.Settings.Get("script").MustString()
+				for name, pipelineAgg := range metric.PipelineVariables {
+					for _, m := range target.Metrics {
+						if m.ID == pipelineAgg {
+							metricName = strings.ReplaceAll(metricName, "params."+name, describeMetric(m.Type, m.Field))
 						}
 					}
 				}
 			}
-		} else {
-			if field != "" {
-				found := false
-				for _, metric := range target.Metrics {
-					if metric.ID == field {
-						metricName += " " + describeMetric(metric.Type, metric.Field)
-						found = true
-					}
-				}
-				if !found {
-					metricName = "Unset"
+		} else if field != "" {
+			found := false
+			for _, metric := range target.Metrics {
+				if metric.ID == field {
+					metricName += " " + describeMetric(metric.Type, metric.Field)
+					found = true
 				}
 			}
+			if !found {
+				metricName = "Unset"
+			}
 		}
-	} else if isSiblingPipelineAgg(metricType) {
-		metricID := dataField.Labels["metricId"]
+	case isSiblingPipelineAgg(metricType):
 		for _, metric := range target.Metrics {
 			if metric.ID != metricID {
 				continue
@@ -131,26 +156,11 @@ func getFieldName(dataField data.Field, target *Query, metricTypeCount int) stri
 			}
 			break
 		}
-	} else if field != "" {
+	case field != "":
 		metricName += " " + field
 	}
 
-	delete(dataField.Labels, "metricId")
-
-	if len(dataField.Labels) == 0 {
-		return metricName
-	}
-
-	name := ""
-	for _, v := range getSortedLabelValues(dataField.Labels) {
-		name += v + " "
-	}
-
-	if metricTypeCount == 1 {
-		return strings.TrimSpace(name)
-	}
-
-	return strings.TrimSpace(name) + " " + metricName
+	return metricName
 }
 
 // getSortedLabelValues sorts label keys and returns the label values in sorted order
