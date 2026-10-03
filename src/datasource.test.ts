@@ -618,14 +618,19 @@ describe('ElasticDatasource', () => {
   });
 
   describe('attachLevelLabelToVolumeFrame', () => {
-    const frame = (name: string | undefined, fields: Array<{ name: string; labels?: Record<string, string> }>) => ({
+    const frame = (
+      name: string | undefined,
+      fields: Array<{ name: string; type?: FieldType; labels?: Record<string, string> }>
+    ) => ({
       name,
-      fields: fields.map((f) => ({ ...f, type: FieldType.number, config: {}, values: [] })),
+      fields: fields.map((f) => ({ type: FieldType.number, config: {}, values: [], ...f })),
       length: 0,
     });
 
     it('sets level label on the Value field using the frame name', () => {
-      const result = attachLevelLabelToVolumeFrame(frame('error', [{ name: 'Time' }, { name: 'Value' }]));
+      const result = attachLevelLabelToVolumeFrame(
+        frame('error', [{ name: 'Time', type: FieldType.time }, { name: 'Value' }])
+      );
       const value = result.fields.find((f) => f.name === 'Value');
       expect(value?.labels).toEqual({ level: 'error' });
     });
@@ -633,7 +638,7 @@ describe('ElasticDatasource', () => {
     it('preserves existing labels on the Value field', () => {
       const result = attachLevelLabelToVolumeFrame(
         frame('warn', [
-          { name: 'Time' },
+          { name: 'Time', type: FieldType.time },
           { name: 'Value', labels: { service: 'api' } },
         ])
       );
@@ -641,10 +646,24 @@ describe('ElasticDatasource', () => {
       expect(value?.labels).toEqual({ service: 'api', level: 'warn' });
     });
 
-    it('returns the frame unchanged when there is no Value field', () => {
-      const f = frame('info', [{ name: 'Time' }, { name: 'Count' }]);
+    it('labels the first number field whatever its name (dataplane frames name it after the metric)', () => {
+      const result = attachLevelLabelToVolumeFrame(
+        frame('error', [
+          { name: 'Time', type: FieldType.time },
+          { name: 'Count', labels: { 'log.level': 'error' } },
+        ])
+      );
+      const value = result.fields.find((f) => f.name === 'Count');
+      expect(value?.labels).toEqual({ 'log.level': 'error', level: 'error' });
+    });
+
+    it('returns the frame unchanged when there is no number field', () => {
+      const f = frame('info', [
+        { name: 'Time', type: FieldType.time },
+        { name: 'message', type: FieldType.string },
+      ]);
       const result = attachLevelLabelToVolumeFrame(f);
-      expect(result.fields.find((x) => x.name === 'Count')?.labels).toBeUndefined();
+      expect(result.fields.find((x) => x.name === 'message')?.labels).toBeUndefined();
     });
 
     it('returns the frame unchanged when the name is missing', () => {
