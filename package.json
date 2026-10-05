@@ -89,6 +89,7 @@
   },
   "packageManager": "npm@11.18.0",
   "overrides": {
-    "@tanstack/react-virtual": "3.10.9"
+    "@tanstack/react-virtual": "3.10.9",
+    "basic-ftp": "^6.2.1"
   }
 }
