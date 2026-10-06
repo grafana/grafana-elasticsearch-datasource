@@ -7,8 +7,10 @@ import {
   aliasPatternReducer,
   changeAliasPattern,
   changeEditorTypeAndResetQuery,
+  changeIndex,
   changeQuery,
   changeQueryType,
+  indexReducer,
   initQuery,
   preserveQueryReducer,
   queryReducer,
@@ -269,5 +271,43 @@ describe('Preserve Query Reducer', () => {
       .givenReducer(preserveQueryReducer, false)
       .whenActionIsDispatched(initQuery())
       .thenStateShouldEqual(false);
+  });
+});
+
+describe('Index Reducer', () => {
+  it('Should correctly set index', () => {
+    const expectedIndex = 'logs-*';
+
+    reducerTester<string | undefined>()
+      .givenReducer(indexReducer, undefined)
+      .whenActionIsDispatched(changeIndex(expectedIndex))
+      .thenStateShouldEqual(expectedIndex);
+  });
+
+  it('Should correctly clear index when set to undefined', () => {
+    const initialIndex = 'logs-*';
+
+    reducerTester<string | undefined>()
+      .givenReducer(indexReducer, initialIndex)
+      .whenActionIsDispatched(changeIndex(undefined))
+      .thenStateShouldEqual(undefined);
+  });
+
+  it('Should reset index to undefined when switching editor types', () => {
+    const initialIndex = 'logs-*';
+
+    reducerTester<string | undefined>()
+      .givenReducer(indexReducer, initialIndex)
+      .whenActionIsDispatched(changeEditorTypeAndResetQuery({ editorType: 'code', queryType: 'dsl' }))
+      .thenStateShouldEqual(undefined);
+  });
+
+  it('Should not change state with other action types', () => {
+    const initialIndex = 'logs-*';
+
+    reducerTester<string | undefined>()
+      .givenReducer(indexReducer, initialIndex)
+      .whenActionIsDispatched({ type: 'THIS ACTION SHOULD NOT HAVE ANY EFFECT IN THIS REDUCER' })
+      .thenStateShouldEqual(initialIndex);
   });
 });
