@@ -4017,6 +4017,10 @@ func TestParseResponseRawDSLWithoutMetrics(t *testing.T) {
 }
 
 func parseTestResponse(tsdbQueries map[string]string, responseBody string, keepLabelsInResponse bool) (*backend.QueryDataResponse, error) {
+	return parseTestResponseWithFlags(tsdbQueries, responseBody, keepLabelsInResponse, false, false)
+}
+
+func parseTestResponseWithFlags(tsdbQueries map[string]string, responseBody string, keepLabelsInResponse bool, logsDataplane bool, metricsDataplane bool) (*backend.QueryDataResponse, error) {
 	from := time.Date(2018, 5, 15, 17, 50, 0, 0, time.UTC)
 	to := time.Date(2018, 5, 15, 17, 55, 0, 0, time.UTC)
 	configuredFields := es.ConfiguredFields{
@@ -4051,7 +4055,7 @@ func parseTestResponse(tsdbQueries map[string]string, responseBody string, keepL
 		return nil, err
 	}
 
-	return parseResponse(context.Background(), response.Responses, queries, configuredFields, keepLabelsInResponse, false, log.New())
+	return parseResponse(context.Background(), response.Responses, queries, configuredFields, keepLabelsInResponse, logsDataplane, metricsDataplane, log.New())
 }
 
 func requireTimeValue(t *testing.T, expected int64, frame *data.Frame, index int) {
