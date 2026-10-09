@@ -1,5 +1,12 @@
 # Changelog
 
+## [12.9.3](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.2...v12.9.3) (2026-10-09)
+
+
+### 🐛 Bug Fixes
+
+* **deps:** update backend dependencies ([#447](https://github.com/grafana/grafana-elasticsearch-datasource/issues/447)) ([bd49cf5](https://github.com/grafana/grafana-elasticsearch-datasource/commit/bd49cf5a13f565b24a296e3f01ad6fe648217c37))
+
 ## [12.9.2](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.1...v12.9.2) (2026-10-06)
 
 
