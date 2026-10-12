@@ -26,12 +26,13 @@ import { BucketAggregationsEditor } from './BucketAggregationsEditor';
 import { CodeEditorSection } from './CodeEditorSection';
 import { EditorTypeSelector } from './EditorTypeSelector';
 import { ElasticsearchProvider } from './ElasticsearchQueryContext';
+import { IndexPatternRow } from './IndexPatternRow';
 import { ElasticsearchQueryOptions } from './ElasticsearchQueryOptions';
 import { MetricAggregationsEditor } from './MetricAggregationsEditor';
 import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
 import { setPreserveQueryDefault } from './preserveQueryPreference';
 import { QueryTypeSelector } from './QueryTypeSelector';
-import { changeAliasPattern, changeEditorTypeAndResetQuery, changeQuery } from './state';
+import { changeAliasPattern, changeEditorTypeAndResetQuery, changeQuery, changeIndex } from './state';
 
 export type ElasticQueryEditorProps = QueryEditorProps<
   ElasticDatasourceLike,
@@ -283,6 +284,8 @@ const QueryEditorForm = ({
           <EditorTypeSelector value={currentEditorType} onChange={onEditorTypeChange} />
         </div>
       </div>
+
+      {!isCodeEditor && <IndexPatternRow value={value.index} onChange={(index) => dispatch(changeIndex(index))} />}
 
       {isCodeEditor && (
         <CodeEditorSection
