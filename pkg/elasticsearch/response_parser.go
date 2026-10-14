@@ -43,7 +43,7 @@ const (
 var searchWordsRegex = regexp.MustCompile(regexp.QuoteMeta(es.HighlightPreTagsString) + `(.*?)` + regexp.QuoteMeta(es.HighlightPostTagsString))
 var aliasPatternRegex = regexp.MustCompile(`\{\{([\s\S]+?)\}\}`)
 
-func parseResponse(ctx context.Context, responses []*es.SearchResponse, targets []*Query, configuredFields es.ConfiguredFields, keepLabelsInResponse bool, dataplaneEnabled bool, logger log.Logger) (*backend.QueryDataResponse, error) {
+func parseResponse(ctx context.Context, responses []*es.SearchResponse, targets []*Query, configuredFields es.ConfiguredFields, keepLabelsInResponse bool, dataplaneEnabled bool, metricsDataplaneEnabled bool, logger log.Logger) (*backend.QueryDataResponse, error) {
 	result := backend.QueryDataResponse{
 		Responses: backend.Responses{},
 	}
@@ -58,7 +58,7 @@ func parseResponse(ctx context.Context, responses []*es.SearchResponse, targets 
 	// Create processors
 	logsProcessor := newLogsResponseProcessor(logger)
 	rawProcessor := newRawResponseProcessor(logger)
-	metricsProcessor := newMetricsResponseProcessor()
+	metricsProcessor := newMetricsResponseProcessor(metricsDataplaneEnabled)
 
 	for i, res := range responses {
 		// Raw DSL queries (e.g. migrated from {"find":"terms"}) carry no structured metrics,
@@ -124,8 +124,12 @@ func parseResponse(ctx context.Context, responses []*es.SearchResponse, targets 
 				resSpan.End()
 				return &backend.QueryDataResponse{}, err
 			}
-			nameFields(queryRes, target, keepLabelsInResponse)
-			trimDatapoints(queryRes, target)
+			nameFields(queryRes, target, keepLabelsInResponse, metricsDataplaneEnabled)
+			if metricsDataplaneEnabled {
+				finalizeDataplaneMetricsFrames(&queryRes, target)
+			} else {
+				trimDatapoints(queryRes, target)
+			}
 
 			result.Responses[target.RefID] = queryRes
 		}

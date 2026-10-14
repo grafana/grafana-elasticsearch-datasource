@@ -12,5 +12,6 @@ import (
 // timeout once per process and log a warning.
 func TestMain(m *testing.M) {
 	isDataplaneEnabled = func(context.Context) bool { return false }
+	isMetricsDataplaneEnabled = func(context.Context) bool { return false }
 	os.Exit(m.Run())
 }

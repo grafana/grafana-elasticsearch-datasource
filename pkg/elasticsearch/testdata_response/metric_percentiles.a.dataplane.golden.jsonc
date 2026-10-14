@@ -1,0 +1,141 @@
+//  🌟 This was machine generated.  Do not edit. 🌟
+//  
+//  Frame[0] {
+//      "type": "timeseries-multi",
+//      "typeVersion": [
+//          0,
+//          1
+//      ]
+//  }
+//  Name: p25.0 counter
+//  Dimensions: 2 Fields by 3 Rows
+//  +-----------------------------------+---------------------+
+//  | Name: Time                        | Name: p25.0 counter |
+//  | Labels:                           | Labels:             |
+//  | Type: []time.Time                 | Type: []*float64    |
+//  +-----------------------------------+---------------------+
+//  | 2023-03-17 13:53:00.123 +0000 UTC | 36.5                |
+//  | 2023-03-17 13:54:00.123 +0000 UTC | 62                  |
+//  | 2023-03-17 13:55:00.123 +0000 UTC | 127.5               |
+//  +-----------------------------------+---------------------+
+//  
+//  
+//  
+//  Frame[1] {
+//      "type": "timeseries-multi",
+//      "typeVersion": [
+//          0,
+//          1
+//      ]
+//  }
+//  Name: p75.0 counter
+//  Dimensions: 2 Fields by 3 Rows
+//  +-----------------------------------+---------------------+
+//  | Name: Time                        | Name: p75.0 counter |
+//  | Labels:                           | Labels:             |
+//  | Type: []time.Time                 | Type: []*float64    |
+//  +-----------------------------------+---------------------+
+//  | 2023-03-17 13:53:00.123 +0000 UTC | 42.5                |
+//  | 2023-03-17 13:54:00.123 +0000 UTC | 95                  |
+//  | 2023-03-17 13:55:00.123 +0000 UTC | 159.5               |
+//  +-----------------------------------+---------------------+
+//  
+//  
+//  🌟 This was machine generated.  Do not edit. 🌟
+{
+  "status": 200,
+  "frames": [
+    {
+      "schema": {
+        "name": "p25.0 counter",
+        "meta": {
+          "type": "timeseries-multi",
+          "typeVersion": [
+            0,
+            1
+          ]
+        },
+        "fields": [
+          {
+            "name": "Time",
+            "type": "time",
+            "typeInfo": {
+              "frame": "time.Time"
+            }
+          },
+          {
+            "name": "p25.0 counter",
+            "type": "number",
+            "typeInfo": {
+              "frame": "float64",
+              "nullable": true
+            },
+            "config": {
+              "displayNameFromDS": "p25.0 counter"
+            }
+          }
+        ]
+      },
+      "data": {
+        "values": [
+          [
+            1679061180123,
+            1679061240123,
+            1679061300123
+          ],
+          [
+            36.5,
+            62,
+            127.5
+          ]
+        ]
+      }
+    },
+    {
+      "schema": {
+        "name": "p75.0 counter",
+        "meta": {
+          "type": "timeseries-multi",
+          "typeVersion": [
+            0,
+            1
+          ]
+        },
+        "fields": [
+          {
+            "name": "Time",
+            "type": "time",
+            "typeInfo": {
+              "frame": "time.Time"
+            }
+          },
+          {
+            "name": "p75.0 counter",
+            "type": "number",
+            "typeInfo": {
+              "frame": "float64",
+              "nullable": true
+            },
+            "config": {
+              "displayNameFromDS": "p75.0 counter"
+            }
+          }
+        ]
+      },
+      "data": {
+        "values": [
+          [
+            1679061180123,
+            1679061240123,
+            1679061300123
+          ],
+          [
+            42.5,
+            95,
+            159.5
+          ]
+        ]
+      }
+    }
+  ]
+}
