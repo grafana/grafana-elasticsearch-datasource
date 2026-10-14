@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -529,4 +530,45 @@ func createMultisearchWithMultipleQueriesForTest(t *testing.T, c Client, firstTi
 	})
 
 	return msb.Build()
+}
+
+func TestClient_ExecuteEsql_DecodesIntegersExactly(t *testing.T) {
+	var requestPath string
+	var requestBody []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		requestPath = r.URL.Path
+		var err error
+		requestBody, err = io.ReadAll(r.Body)
+		require.NoError(t, err)
+		rw.Header().Set("Content-Type", "application/json")
+		// Captured from Elasticsearch 9.3.1: unsigned_long and long values above 2^53.
+		_, err = rw.Write([]byte(`{"took":281,"is_partial":false,"columns":[{"name":"@timestamp","type":"date"},{"name":"job_id","type":"unsigned_long"},{"name":"big_long","type":"long"},{"name":"ratio","type":"double"},{"name":"name","type":"keyword"}],"values":[["2026-10-01T00:00:00.000Z",18446744073709551615,9007199254740993,1.5,"a"],["2026-10-01T00:02:00.000Z",9223372036854775808,-9007199254740993,1.0E21,"c"]]}`))
+		require.NoError(t, err)
+	}))
+	t.Cleanup(ts.Close)
+
+	ds := DatasourceInfo{
+		URL:        ts.URL,
+		HTTPClient: ts.Client(),
+		Database:   "issue430",
+	}
+	c, err := NewClient(context.Background(), &ds, log.New())
+	require.NoError(t, err)
+
+	res, err := c.ExecuteEsql("FROM issue430")
+	require.NoError(t, err)
+
+	require.Equal(t, "/_query", requestPath)
+	require.JSONEq(t, `{"query":"FROM issue430"}`, string(requestBody))
+	require.Equal(t, []EsqlColumn{
+		{Name: "@timestamp", Type: "date"},
+		{Name: "job_id", Type: "unsigned_long"},
+		{Name: "big_long", Type: "long"},
+		{Name: "ratio", Type: "double"},
+		{Name: "name", Type: "keyword"},
+	}, res.Columns)
+	require.Equal(t, [][]any{
+		{"2026-10-01T00:00:00.000Z", json.Number("18446744073709551615"), json.Number("9007199254740993"), json.Number("1.5"), "a"},
+		{"2026-10-01T00:02:00.000Z", json.Number("9223372036854775808"), json.Number("-9007199254740993"), json.Number("1.0E21"), "c"},
+	}, res.Values)
 }
