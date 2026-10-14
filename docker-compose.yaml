@@ -44,7 +44,7 @@ services:
         hard: -1
 
   es-loader:
-    image: curlimages/curl:latest
+    image: curlimages/curl:latest@sha256:a134550be58ab783810e613ae96fd253c38f7bdd16d9bf9be350700c7a29ac06
     depends_on:
       elasticsearch:
         condition: service_healthy
