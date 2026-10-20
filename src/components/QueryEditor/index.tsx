@@ -117,7 +117,15 @@ interface Props {
   value: ElasticsearchDataQuery;
 }
 
-export const ElasticSearchQueryField = ({ value, onChange }: { value?: string; onChange: (v: string) => void }) => {
+export const ElasticSearchQueryField = ({
+  value,
+  onChange,
+  onRunQuery,
+}: {
+  value?: string;
+  onChange: (v: string) => void;
+  onRunQuery?: () => void;
+}) => {
   const styles = useStyles2(getStyles);
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -166,6 +174,13 @@ export const ElasticSearchQueryField = ({ value, onChange }: { value?: string; o
         rows={1}
         value={value ?? ''}
         onChange={(e) => onChange(e.currentTarget.value.replace(/\n/g, ' '))}
+        onKeyDown={(e) => {
+          // Shift+Enter runs the query (as it did with the previous QueryField) instead of inserting a space.
+          if (e.key === 'Enter' && e.shiftKey && onRunQuery) {
+            e.preventDefault();
+            onRunQuery();
+          }
+        }}
         placeholder="Enter a lucene query"
       />
     </div>
@@ -298,7 +313,11 @@ const QueryEditorForm = ({
         <>
           <div className={styles.root}>
             <InlineLabel width={17}>Lucene Query</InlineLabel>
-            <ElasticSearchQueryField onChange={(query) => dispatch(changeQuery(query))} value={value?.query} />
+            <ElasticSearchQueryField
+              onChange={(query) => dispatch(changeQuery(query))}
+              onRunQuery={onRunQuery}
+              value={value?.query}
+            />
 
             {isTimeSeries && (
               <InlineField

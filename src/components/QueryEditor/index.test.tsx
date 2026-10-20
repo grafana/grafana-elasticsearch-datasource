@@ -68,6 +68,28 @@ describe('QueryEditor', () => {
       );
     });
 
+    it('runs the query on Shift+Enter without inserting a character', () => {
+      const onChange = jest.fn<void, [ElasticsearchDataQuery]>();
+      const onRunQuery = jest.fn();
+      render(
+        <QueryEditor
+          query={buildQuery('status:200')}
+          datasource={datasourceMock}
+          onChange={onChange}
+          onRunQuery={onRunQuery}
+        />
+      );
+      onRunQuery.mockClear();
+      onChange.mockClear();
+
+      const queryField = screen.getByPlaceholderText('Enter a lucene query');
+      const notPrevented = fireEvent.keyDown(queryField, { key: 'Enter', shiftKey: true });
+
+      expect(notPrevented).toBe(false);
+      expect(onRunQuery).toHaveBeenCalledTimes(1);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
     it('accounts for the textarea border when growing to fit content, so the last line is not clipped', () => {
       const { rerender } = render(
         <QueryEditor query={buildQuery('status:200')} datasource={datasourceMock} onChange={noop} onRunQuery={noop} />
