@@ -60,6 +60,8 @@ jobs:
       attestations: write
       pull-requests: read
     secrets: inherit
+    with:
+      golangci-lint-version: '2.14.0'
 
   publish-dev:
     name: Publish to Dev Catalog and Deploy
@@ -76,8 +78,8 @@ jobs:
       id-token: write
       pull-requests: read
     with:
-      # Both inputs are required by cd-dev.yml. These values reproduce what ci.yml
-      # resolves today: go-version from go.mod, and the shared golangci-lint default.
+      # Both inputs are required by cd-dev.yml. Keep Go aligned with go.mod
+      # and golangci-lint aligned with the explicit version in the ci job above.
       go-version: '1.27.3'
       golangci-lint-version: '2.14.0'
       # The backend ships to dev0 per merge through the bundled pipeline

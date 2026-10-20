@@ -3,10 +3,9 @@
 # builds the plugin, bakes it onto the Grafana base image the first rollout wave runs, boot-smokes
 # the result, and pushes it to this repository's own registry.
 #
-# This file carries no value specific to this repository. The shared workflow derives the plugin id
-# and version from the build, and the registry from the repository name, so the same file works
-# unchanged in every plugin repo that adopts bundled images. Keep it that way: anything that has to
-# differ per repo belongs in the shared workflow's defaults, not copied into three callers.
+# The shared workflow derives the plugin id and version from the build, and the registry from the
+# repository name. Keep deployment defaults there; the linter pin below matches this repo's Go
+# toolchain and its other CI/CD callers.
 #
 # Push events ship every merge to main to the dev0 wave through the shared pipeline: the
 # build is pushed and the dev-only rollout is triggered, gated and benched. The paths
@@ -81,6 +80,7 @@ jobs:
       contents: read
       id-token: write
     with:
+      golangci-lint-version: '2.14.0'
       ref: ${{ inputs.ref }}
       grafana-image: ${{ inputs.grafana-image }}
       push-image: ${{ inputs.push-image }}
