@@ -66,6 +66,7 @@ import { BucketAggregation, ElasticsearchDataQuery } from './dataquery.gen';
 import { isMetricAggregationWithMeta } from './guards';
 import {
   addAddHocFilter,
+  addAdHocFiltersToEsqlQuery,
   addFilterToQuery,
   addStringFilterToQuery,
   queryHasFilter,
@@ -1128,14 +1129,15 @@ export class ElasticDatasource
       datasource: this.getRef(),
       query:
         query.queryType === 'esql'
-          ? this.addAdHocFilters(
+          ? addAdHocFiltersToEsqlQuery(
               // Interpolate template variables *before* parsing for time-range injection. A bare
               // variable (e.g. `${foo}s`) is invalid ES|QL, so parsing the raw query would fail and
               // silently skip the WHERE filter — see issue #339. The injected
               // `${__from:date:iso}`/`${__to:date:iso}` placeholders are resolved by the final
               // templateSrv.replace pass below.
               this.addTimeRangeToEsqlQuery(this.interpolateEsqlQuery(query.query || '', scopedVars)),
-              filters
+              filters,
+              this.logLevelField
             )
           : this.addAdHocFilters(this.interpolateLuceneQuery(query.query || '', scopedVars), filters),
       bucketAggs: query.bucketAggs?.map(interpolateBucketAgg),
