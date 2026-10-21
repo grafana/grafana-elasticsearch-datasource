@@ -1,4 +1,10 @@
-import { addFilterToQuery, addStringFilterToQuery, queryHasFilter, removeFilterFromQuery } from './modifyQuery';
+import {
+  addAdHocFiltersToEsqlQuery,
+  addFilterToQuery,
+  addStringFilterToQuery,
+  queryHasFilter,
+  removeFilterFromQuery,
+} from './modifyQuery';
 
 describe('queryHasFilter', () => {
   it('should return true if the query contains the positive filter', () => {
@@ -134,5 +140,70 @@ describe('addStringFilterToQuery', () => {
     expect(addStringFilterToQuery('label:"value"', '"filter with \\"', false)).toBe(
       'label:"value" NOT "\\"filter with \\\\\\""'
     );
+  });
+});
+
+describe('addAdHocFiltersToEsqlQuery', () => {
+  const rowQuery = 'ROW id=[1,2,3,4,5], __line__="test", @timestamp=NOW() | MV_EXPAND id';
+
+  it('inserts an equality filter after ROW and before MV_EXPAND', () => {
+    const query = addAdHocFiltersToEsqlQuery(rowQuery, [{ key: 'id', operator: '=', value: '2', condition: '' }]);
+    expect(query).not.toContain('AND id:"2"');
+    expect(query).toMatch(/ROW[\s\S]*WHERE id == 2[\s\S]*MV_EXPAND id/);
+  });
+
+  it.each([
+    ['=', 'id == 2'],
+    ['!=', 'id != 2'],
+    ['<', 'id < 2'],
+    ['>', 'id > 2'],
+    ['<=', 'id <= 2'],
+    ['>=', 'id >= 2'],
+    ['=~', '__line__ RLIKE "test[24]"'],
+    ['!~', '__line__ NOT RLIKE "test[24]"'],
+  ])('translates %s into ES|QL', (operator, expected) => {
+    const key = operator === '=~' || operator === '!~' ? '__line__' : 'id';
+    const value = operator === '=~' || operator === '!~' ? 'test[24]' : '2';
+    const query = addAdHocFiltersToEsqlQuery('FROM access | STATS COUNT()', [
+      { key, operator, value, condition: '' },
+    ]);
+    expect(query).toContain(expected);
+    expect(query.indexOf('WHERE')).toBeLessThan(query.indexOf('STATS'));
+  });
+
+  it('inserts the filter immediately after FROM, before STATS', () => {
+    const query = addAdHocFiltersToEsqlQuery('FROM access | STATS COUNT() BY app | LIMIT 10000', [
+      { key: 'response_status', operator: '=', value: '504', condition: '' },
+    ]);
+    expect(query).toMatch(/FROM access[\s\S]*WHERE response_status == 504[\s\S]*STATS COUNT\(\)/);
+  });
+
+  it('quotes string values and escapes quotes', () => {
+    const query = addAdHocFiltersToEsqlQuery('FROM access', [
+      { key: 'status', operator: '=', value: 'say "hi"', condition: '' },
+    ]);
+    expect(query).toContain('status == "say \\"hi\\""');
+  });
+
+  it('quotes field names that are not plain identifiers', () => {
+    const query = addAdHocFiltersToEsqlQuery('FROM access', [
+      { key: 'field:name', operator: '=', value: 'x', condition: '' },
+    ]);
+    expect(query).toContain('`field:name` == "x"');
+  });
+
+  it('renames the level key to the configured log level field', () => {
+    const query = addAdHocFiltersToEsqlQuery(
+      'FROM access',
+      [{ key: 'level', operator: '=', value: 'error', condition: '' }],
+      'level_field'
+    );
+    expect(query).toContain('level_field == "error"');
+  });
+
+  it('leaves the query unchanged when filters are empty or invalid', () => {
+    expect(addAdHocFiltersToEsqlQuery(rowQuery, [])).toBe(rowQuery);
+    expect(addAdHocFiltersToEsqlQuery(rowQuery, [{ key: '', operator: '=', value: '2', condition: '' }])).toBe(rowQuery);
+    expect(addAdHocFiltersToEsqlQuery('}{}{[', [{ key: 'id', operator: '=', value: '2', condition: '' }])).toBe('}{}{[');
   });
 });
