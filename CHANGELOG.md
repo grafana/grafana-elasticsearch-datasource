@@ -1,5 +1,14 @@
 # Changelog
 
+## [12.9.3](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.2...v12.9.3) (2026-10-21)
+
+
+### 🐛 Bug Fixes
+
+* **deps:** update backend dependencies ([#447](https://github.com/grafana/grafana-elasticsearch-datasource/issues/447)) ([bd49cf5](https://github.com/grafana/grafana-elasticsearch-datasource/commit/bd49cf5a13f565b24a296e3f01ad6fe648217c37))
+* **esql:** return unsigned_long and counter columns as exact numbers ([#444](https://github.com/grafana/grafana-elasticsearch-datasource/issues/444)) ([003af11](https://github.com/grafana/grafana-elasticsearch-datasource/commit/003af1143bb578abb382db0f23948144ce84a9fe))
+* shift+enter not running the query in the Lucene field ([#449](https://github.com/grafana/grafana-elasticsearch-datasource/issues/449)) ([1c76e4f](https://github.com/grafana/grafana-elasticsearch-datasource/commit/1c76e4f44b651e9cea62101d3cf8b5b1710a62c7))
+
 ## [12.9.2](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.1...v12.9.2) (2026-10-06)
 
 
