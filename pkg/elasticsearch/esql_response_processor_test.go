@@ -32,7 +32,7 @@ func TestProcessEsqlMetricsResponse_ReturnsTimeSeriesForCountMetric(t *testing.T
 		},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 1)
 
@@ -75,7 +75,7 @@ func TestProcessEsqlMetricsResponse_FallsBackToTableWhenNoTimeColumn(t *testing.
 		},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 1)
 
@@ -107,7 +107,7 @@ func TestProcessEsqlMetricsResponse_GroupsByBreakdownFields(t *testing.T) {
 		},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 2, "should create one frame per unique host.name")
 
@@ -161,7 +161,7 @@ func TestProcessEsqlMetricsResponse_MultipleBreakdownFields(t *testing.T) {
 		},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 2, "should create one frame per unique (host.name, region) combination")
 
@@ -185,7 +185,7 @@ func TestProcessEsqlMetricsResponse_NilResponse(t *testing.T) {
 		Metrics:  []*MetricAgg{{Type: countType}},
 	}
 
-	res, err := processEsqlMetricsResponse(nil, target)
+	res, err := processEsqlMetricsResponse(nil, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 1)
 	require.Equal(t, "A", res.Frames[0].Name)
@@ -204,7 +204,7 @@ func TestProcessEsqlMetricsResponse_EmptyColumns(t *testing.T) {
 		Metrics:  []*MetricAgg{{Type: countType}},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 1)
 	require.Equal(t, "A", res.Frames[0].Name)
@@ -227,7 +227,7 @@ func TestProcessEsqlMetricsResponse_NoValueColumnFallsBackToTable(t *testing.T) 
 		Metrics:  []*MetricAgg{{Type: countType}},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 1)
 	require.Equal(t, data.VisType(data.VisTypeTable), res.Frames[0].Meta.PreferredVisualization)
@@ -252,7 +252,7 @@ func TestProcessEsqlMetricsResponse_NilBreakdownValues(t *testing.T) {
 		Metrics:  []*MetricAgg{{Type: countType}},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 2)
 
@@ -280,7 +280,7 @@ func TestProcessEsqlMetricsResponse_NilMetricValue(t *testing.T) {
 		Metrics:  []*MetricAgg{{Type: countType}},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 1)
 
@@ -310,7 +310,7 @@ func TestProcessEsqlMetricsResponse_UnparseableTimestampsFallBackToTable(t *test
 		Metrics:  []*MetricAgg{{Type: countType}},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 1)
 	require.Equal(t, data.VisType(data.VisTypeTable), res.Frames[0].Meta.PreferredVisualization)
@@ -335,7 +335,7 @@ func TestProcessEsqlMetricsResponse_BreakdownWithUnparseableTimestampsFallBackTo
 		Metrics:  []*MetricAgg{{Type: countType}},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 1)
 	require.Equal(t, data.VisType(data.VisTypeTable), res.Frames[0].Meta.PreferredVisualization)
@@ -363,7 +363,7 @@ func TestProcessEsqlMetricsResponse_PicksFirstNumericColumn(t *testing.T) {
 		Metrics:  []*MetricAgg{{Type: countType}},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	// Two frames because each row has a unique MIN(cpu) value treated as breakdown
 	require.Len(t, res.Frames, 2)
@@ -578,7 +578,7 @@ func TestProcessEsqlMetricsResponse_ReturnsEmptySuccessWhenNoStatsCommand(t *tes
 		},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Empty(t, res.Frames)
 }
@@ -606,7 +606,7 @@ func TestProcessEsqlMetricsResponse_ReturnsTimeSeriesForPromqlQuery(t *testing.T
 		},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 1)
 
@@ -652,7 +652,7 @@ func TestProcessEsqlMetricsResponse_DetectsPromqlBehindLeadingComment(t *testing
 		},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 1)
 
@@ -760,7 +760,7 @@ func TestProcessEsqlMetricsResponse_GroupsByBreakdownFieldsForPromqlQuery(t *tes
 		},
 	}
 
-	res, err := processEsqlMetricsResponse(response, target)
+	res, err := processEsqlMetricsResponse(response, target, false)
 	require.NoError(t, err)
 	require.Len(t, res.Frames, 2, "should create one frame per unique host.name")
 
