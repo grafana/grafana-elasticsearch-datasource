@@ -4,10 +4,10 @@ go 1.27.3
 
 require (
 	github.com/grafana/grafana-aws-sdk v1.5.6
-	github.com/grafana/grafana-plugin-sdk-go v0.297.0
+	github.com/grafana/grafana-plugin-sdk-go v0.298.0
 	github.com/grafana/macropro v1.1.0
 	github.com/magefile/mage v1.17.2
-	github.com/open-feature/go-sdk v1.19.0
+	github.com/open-feature/go-sdk v1.20.0
 	github.com/open-feature/go-sdk-contrib/providers/ofrep v0.1.7
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
@@ -90,7 +90,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pierrec/lz4/v4 v4.1.33 // indirect
 	github.com/prometheus/common v0.72.1 // indirect
-	github.com/prometheus/procfs v0.22.0 // indirect
+	github.com/prometheus/procfs v0.23.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/stretchr/objx v0.8.0 // indirect
 	github.com/unknwon/bra v0.0.0-20200517080246-1e3013ecaff8 // indirect
@@ -113,7 +113,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
-	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
