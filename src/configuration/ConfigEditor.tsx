@@ -12,7 +12,7 @@ import {
   DataSourceDescription,
 } from '@grafana/plugin-ui';
 import { config } from '@grafana/runtime';
-import { Alert, Divider, SecureSocksProxySettings, Stack } from '@grafana/ui';
+import { Alert, Divider, SecureSocksProxySettings, Stack, TextLink } from '@grafana/ui';
 
 import { ElasticsearchOptions, ElasticsearchSecureJsonData } from '../types';
 
@@ -78,7 +78,14 @@ export const ConfigEditor = (props: Props) => {
           severity="warning"
         >
           If you connect to Amazon OpenSearch Service, use the OpenSearch data source instead. For other endpoints,
-          update your authentication method.
+          update your authentication method. To learn more, refer to our{' '}
+          <TextLink
+            href="https://grafana.com/docs/grafana/latest/datasources/elasticsearch/configure/#amazon-opensearch-service-and-sigv4"
+            external
+          >
+            documentation
+          </TextLink>
+          .
         </Alert>
       )}
       <Divider spacing={4} />

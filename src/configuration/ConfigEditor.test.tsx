@@ -45,6 +45,10 @@ describe('ConfigEditor', () => {
       screen.getByText('AWS Signature Version 4 (SigV4) authentication will be deprecated in Grafana version 14.')
     ).toBeInTheDocument();
     expect(screen.getByText(/use the OpenSearch data source instead/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'documentation' })).toHaveAttribute(
+      'href',
+      'https://grafana.com/docs/grafana/latest/datasources/elasticsearch/configure/#amazon-opensearch-service-and-sigv4'
+    );
   });
 
   it('should not show the SigV4 deprecation notice when SigV4 is not enabled', () => {
