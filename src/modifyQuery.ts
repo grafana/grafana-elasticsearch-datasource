@@ -1,3 +1,4 @@
+import { mutate, Parser, WrappingPrettyPrinter } from '@elastic/esql';
 import { isEqual } from 'lodash';
 import lucene, { AST, BinaryAST, LeftOnlyAST, NodeTerm } from 'lucene';
 
@@ -126,6 +127,102 @@ export function addAddHocFilter(query: string, filter: AdHocVariableFilter, logL
       break;
   }
   return concatenate(query, addHocFilter);
+}
+
+const ES_SOURCE_COMMANDS = new Set(['from', 'row', 'ts']);
+
+/**
+ * Inserts ad hoc filters as an ES|QL WHERE command immediately after the source
+ * command (FROM, ROW, or TS), before later pipes such as STATS or MV_EXPAND.
+ * Returns the original query when it cannot be parsed safely.
+ */
+export function addAdHocFiltersToEsqlQuery(
+  query: string,
+  filters?: AdHocVariableFilter[],
+  logLevelField?: string
+): string {
+  const predicates = esqlAdHocPredicates(filters, logLevelField);
+  if (!query || predicates.length === 0) {
+    return query;
+  }
+
+  try {
+    const { root, errors } = Parser.parse(query, { withFormatting: true });
+    if (errors.length) {
+      return query;
+    }
+
+    const headerCmdIndex = root.commands.findIndex((cmd) => ES_SOURCE_COMMANDS.has(cmd.name));
+    if (headerCmdIndex === -1) {
+      return query;
+    }
+
+    const { root: whereCmd } = Parser.parseCommand(`WHERE ${predicates.join(' AND ')}`);
+    mutate.generic.commands.insert(root, whereCmd, headerCmdIndex + 1);
+    return WrappingPrettyPrinter.print(root);
+  } catch (e) {
+    return query;
+  }
+}
+
+function esqlAdHocPredicates(filters: AdHocVariableFilter[] | undefined, logLevelField?: string): string[] {
+  if (!filters) {
+    return [];
+  }
+
+  return filters.flatMap((filter) => {
+    const predicate = toEsqlAdHocPredicate(filter, logLevelField);
+    return predicate ? [predicate] : [];
+  });
+}
+
+function toEsqlAdHocPredicate(filter: AdHocVariableFilter, logLevelField?: string): string | null {
+  if (!filter.key || filter.value === undefined || filter.value === null || `${filter.value}` === '') {
+    return null;
+  }
+
+  const rawValue = `${filter.value}`;
+  let key = filter.key;
+  if (logLevelField && key === 'level') {
+    key = logLevelField;
+  }
+  const field = esqlField(key);
+
+  switch (filter.operator) {
+    case '=':
+      return `${field} == ${esqlLiteral(rawValue)}`;
+    case '!=':
+      return `${field} != ${esqlLiteral(rawValue)}`;
+    case '<':
+    case '>':
+    case '<=':
+    case '>=':
+      return `${field} ${filter.operator} ${esqlLiteral(rawValue)}`;
+    case '=~':
+      return `${field} RLIKE ${esqlString(rawValue)}`;
+    case '!~':
+      return `${field} NOT RLIKE ${esqlString(rawValue)}`;
+    default:
+      return null;
+  }
+}
+
+function esqlField(name: string): string {
+  if (/^[@A-Za-z_][@A-Za-z0-9_]*$/.test(name)) {
+    return name;
+  }
+  return `\`${name.replace(/`/g, '``')}\``;
+}
+
+function esqlLiteral(value: string): string {
+  if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) {
+    return value;
+  }
+  return esqlString(value);
+}
+
+function esqlString(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 /**

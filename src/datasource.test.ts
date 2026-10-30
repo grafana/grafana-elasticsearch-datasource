@@ -1898,6 +1898,22 @@ describe('ElasticDatasource', () => {
       expect(result.query).toBe('');
     });
 
+    it('inserts ad hoc filters as WHERE after the source command', () => {
+      const testDs = createDsWithTimeRange();
+      const result = testDs.applyTemplateVariables(
+        {
+          refId: 'A',
+          query: 'FROM access | STATS COUNT() BY app | LIMIT 10000',
+          queryType: 'esql',
+        },
+        {},
+        [{ key: 'response_status', operator: '=', value: '504', condition: '' }]
+      );
+      expect(result.query).not.toContain('AND response_status:"504"');
+      expect(result.query).toMatch(/FROM access[\s\S]*WHERE response_status == 504[\s\S]*STATS/);
+      expect(result.query).toContain('WHERE @timestamp >=');
+    });
+
     it('should return malformed query unchanged when parsing fails', () => {
       const testDs = createDsWithTimeRange();
       const input = '}{}{[';
