@@ -36,6 +36,23 @@ describe('ConfigEditor', () => {
     expect(screen.getByText('Logs')).toBeInTheDocument();
   });
 
+  it('should show the SigV4 deprecation notice when SigV4 is enabled', () => {
+    const options = createDefaultConfigOptions();
+    options.jsonData.sigV4Auth = true;
+    render(<ConfigEditor onOptionsChange={() => {}} options={options} />);
+
+    expect(
+      screen.getByText('AWS Signature Version 4 (SigV4) authentication will be deprecated in Grafana version 14.')
+    ).toBeInTheDocument();
+    expect(screen.getByText(/use the OpenSearch data source instead/)).toBeInTheDocument();
+  });
+
+  it('should not show the SigV4 deprecation notice when SigV4 is not enabled', () => {
+    render(<ConfigEditor onOptionsChange={() => {}} options={createDefaultConfigOptions()} />);
+
+    expect(screen.queryByText(/SigV4\) authentication will be deprecated/)).not.toBeInTheDocument();
+  });
+
   it('should set defaults', () => {
     const mockOnOptionsChange = jest.fn();
     const options = createDefaultConfigOptions();
