@@ -42,7 +42,7 @@ describe('ConfigEditor', () => {
     render(<ConfigEditor onOptionsChange={() => {}} options={options} />);
 
     expect(
-      screen.getByText('AWS Signature Version 4 (SigV4) authentication will be deprecated in Grafana version 14.')
+      screen.getByText('AWS Signature Version 4 (SigV4) authentication will no longer be supported starting Grafana version 14.')
     ).toBeInTheDocument();
     expect(screen.getByText(/use the OpenSearch data source instead/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'documentation' })).toHaveAttribute(
