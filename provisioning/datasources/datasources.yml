@@ -55,3 +55,15 @@ datasources:
       timeField: '@timestamp'
       logMessageField: message
       logLevelField: level.keyword
+
+  - name: auth_events
+    uid: auth-events-e2e
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    orgId: 1
+    version: 1
+    editable: true
+    jsonData:
+      index: auth_events
+      timeField: '@timestamp'

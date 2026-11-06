@@ -1,0 +1,58 @@
+{
+  "took": 5,
+  "responses": [
+    {
+      "took": 4,
+      "timed_out": false,
+      "_shards": {
+        "total": 1,
+        "successful": 1,
+        "skipped": 0,
+        "failed": 0
+      },
+      "hits": {
+        "total": {
+          "value": 48,
+          "relation": "eq"
+        },
+        "max_score": null,
+        "hits": []
+      },
+      "aggregations": {
+        "2": {
+          "buckets": [
+            {
+              "key": 1679061180000,
+              "key_as_string": "1679061180000",
+              "doc_count": 24,
+              "1_groupby": {
+                "doc_count_error_upper_bound": 0,
+                "sum_other_doc_count": 0,
+                "buckets": [
+                  { "key": "web-01", "doc_count": 12, "1_inner": { "value": 30 } },
+                  { "key": "web-02", "doc_count": 12, "1_inner": { "value": 18 } }
+                ]
+              },
+              "1": { "value": 48 }
+            },
+            {
+              "key": 1679061240000,
+              "key_as_string": "1679061240000",
+              "doc_count": 24,
+              "1_groupby": {
+                "doc_count_error_upper_bound": 0,
+                "sum_other_doc_count": 0,
+                "buckets": [
+                  { "key": "web-01", "doc_count": 12, "1_inner": { "value": 26 } },
+                  { "key": "web-02", "doc_count": 12, "1_inner": { "value": 18 } }
+                ]
+              },
+              "1": { "value": 44 }
+            }
+          ]
+        }
+      },
+      "status": 200
+    }
+  ]
+}

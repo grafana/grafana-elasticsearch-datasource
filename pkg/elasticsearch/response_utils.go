@@ -26,8 +26,7 @@ func step(currentDepth, maxDepth int, target map[string]interface{}, prev string
 	for key, value := range target {
 		newKey := strings.Trim(prev+"."+key, ".")
 
-		v, ok := value.(map[string]interface{})
-		if ok && len(v) > 0 && currentDepth < maxDepth {
+		if v, ok := value.(map[string]interface{}); ok && len(v) > 0 && currentDepth < maxDepth {
 			step(nextDepth, maxDepth, v, newKey, output)
 		} else {
 			output[newKey] = value
@@ -51,7 +50,7 @@ func sortPropNames(propNames map[string]bool, configuredFields es.ConfiguredFiel
 	hasTimeField := false
 	hasLogMessageField := false
 
-	var sortedPropNames []string
+	sortedPropNames := make([]string, 0, len(propNames))
 	for k := range propNames {
 		if configuredFields.TimeField != "" && k == configuredFields.TimeField {
 			hasTimeField = true
@@ -77,33 +76,25 @@ func sortPropNames(propNames map[string]bool, configuredFields es.ConfiguredFiel
 
 // castToInt casts a simplejson.Json value to int
 func castToInt(j *simplejson.Json) (int, error) {
-	i, err := j.Int()
-	if err == nil {
+	if i, err := j.Int(); err == nil {
 		return i, nil
 	}
-
-	s, err := j.String()
-	if err != nil {
-		return 0, err
+	if s, err := j.String(); err == nil {
+		if v, err := strconv.Atoi(s); err == nil {
+			return v, nil
+		}
 	}
-
-	v, err := strconv.Atoi(s)
-	if err != nil {
-		return 0, err
-	}
-
-	return v, nil
+	return 0, errors.New("value is neither int nor numeric string")
 }
 
 // castToFloat casts a simplejson.Json value to float64
 func castToFloat(j *simplejson.Json) *float64 {
-	f, err := j.Float64()
-	if err == nil {
+	if f, err := j.Float64(); err == nil {
 		return &f
 	}
 
 	if s, err := j.String(); err == nil {
-		if strings.ToLower(s) == "nan" {
+		if strings.EqualFold(s, "nan") {
 			return nil
 		}
 

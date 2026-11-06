@@ -8,7 +8,6 @@ import (
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
 	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/simplejson"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/config"
 )
 
 // processQuery processes a single query and adds it to the multi-search request builder
@@ -19,7 +18,7 @@ func (e *elasticsearchDataQuery) processQuery(q *Query, ms *es.MultiSearchReques
 	}
 
 	defaultTimeField := e.client.GetConfiguredFields().TimeField
-	b := ms.Search(q.Interval, q.TimeRange)
+	b := ms.Search(clampAutoInterval(q, from, to), q.TimeRange)
 	if q.Index != "" {
 		b.SetIndex(q.Index)
 	}
@@ -28,11 +27,6 @@ func (e *elasticsearchDataQuery) processQuery(q *Query, ms *es.MultiSearchReques
 	filters.AddDateRangeFilter(defaultTimeField, to, from, es.DateFormatEpochMS)
 
 	if q.IsDSLQuery() {
-		cfg := config.GrafanaConfigFromContext(e.ctx)
-		if !cfg.FeatureToggles().IsEnabled("elasticsearchRawDSLQuery") {
-			return backend.DownstreamError(fmt.Errorf("raw DSL query feature is disabled. Enable the elasticsearchRawDSLQuery feature toggle to use this query type"))
-		}
-
 		if err := e.processRawDSLQuery(q, b); err != nil {
 			return err
 		}
@@ -91,15 +85,15 @@ func processLogsQuery(q *Query, b *es.SearchRequestBuilder, from, to int64, defa
 
 	// For log query, we add a date histogram aggregation
 	aggBuilder := b.Agg()
-	q.BucketAggs = append(q.BucketAggs, &BucketAgg{
+	bucketAgg := &BucketAgg{
 		Type:  dateHistType,
 		Field: defaultTimeField,
 		ID:    "1",
 		Settings: simplejson.NewFromAny(map[string]any{
 			"interval": "auto",
 		}),
-	})
-	bucketAgg := q.BucketAggs[0]
+	}
+	q.BucketAggs = append(q.BucketAggs, bucketAgg)
 	bucketAgg.Settings = simplejson.NewFromAny(
 		bucketAgg.generateSettingsForDSL(),
 	)
@@ -157,27 +151,46 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 			continue
 		}
 
+		if isSiblingPipelineAgg(m.Type) {
+			addSiblingPipelineAgg(aggBuilder, m)
+			continue
+		}
+
 		if isPipelineAgg(m.Type) {
 			if isPipelineAggWithMultipleBucketPaths(m.Type) {
 				if len(m.PipelineVariables) > 0 {
-					bucketPaths := map[string]any{}
+					bucketPaths := make(map[string]any, len(m.PipelineVariables))
 					for name, pipelineAgg := range m.PipelineVariables {
-						if _, err := strconv.Atoi(pipelineAgg); err == nil {
-							var appliedAgg *MetricAgg
-							for _, pipelineMetric := range q.Metrics {
-								if pipelineMetric.ID == pipelineAgg {
-									appliedAgg = pipelineMetric
-									break
-								}
-							}
-							if appliedAgg != nil {
-								if appliedAgg.Type == countType {
-									bucketPaths[name] = "_count"
-								} else {
-									bucketPaths[name] = pipelineAgg
-								}
+						var appliedAgg *MetricAgg
+						for _, pipelineMetric := range q.Metrics {
+							if pipelineMetric.ID == pipelineAgg {
+								appliedAgg = pipelineMetric
+								break
 							}
 						}
+						if appliedAgg != nil {
+							// The reference resolves to a sibling metric. This covers
+							// numeric builder-UI IDs and named raw-DSL aggregation IDs.
+							if appliedAgg.Type == countType {
+								bucketPaths[name] = "_count"
+							} else {
+								bucketPaths[name] = pipelineAgg
+							}
+						} else if _, err := strconv.Atoi(pipelineAgg); err != nil {
+							// A non-numeric reference that matches no sibling comes from a
+							// raw-DSL query (e.g. a nested path like "agg>metric" or
+							// "_count"): pass it through verbatim so Elasticsearch
+							// validates it. Numeric references that match no sibling are
+							// builder-UI pointers to deleted metrics and are dropped.
+							bucketPaths[name] = pipelineAgg
+						}
+					}
+
+					// Skip emitting the pipeline aggregation when no variable resolved
+					// to a real metric or a raw-DSL reference: an empty buckets_path
+					// would produce an invalid Elasticsearch query.
+					if len(bucketPaths) == 0 {
+						continue
 					}
 
 					aggBuilder.Pipeline(m.ID, m.Type, bucketPaths, func(a *es.PipelineAggregation) {
@@ -216,6 +229,42 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 			})
 		}
 	}
+}
+
+// addSiblingPipelineAgg emits the pair of aggregations behind a composite
+// metric such as Sum Bucket: a hidden terms aggregation grouping documents by
+// the groupBy field (with the inner stat nested inside), and the sibling
+// pipeline aggregation combining the per-group results. The hidden terms
+// aggregation is not part of the query model's bucket aggregations, so the
+// response parser never recurses into it.
+func addSiblingPipelineAgg(aggBuilder es.AggBuilder, m *MetricAgg) {
+	groupBy := m.Settings.Get("groupBy").MustString()
+	if groupBy == "" || m.Field == "" {
+		// An empty groupBy or field would produce an invalid Elasticsearch query.
+		return
+	}
+
+	innerStat := m.Settings.Get("metric").MustString()
+	if _, ok := validSiblingInnerStats[innerStat]; !ok {
+		innerStat = defaultSiblingInnerStat
+	}
+
+	limit := stringToIntWithDefaultValue(m.Settings.Get("limit").MustString(), defaultSiblingBucketLimit)
+	if limit < 1 {
+		limit = defaultSiblingBucketLimit
+	}
+	if limit > maxSiblingBucketLimit {
+		limit = maxSiblingBucketLimit
+	}
+
+	groupByID := m.ID + "_groupby"
+	innerID := m.ID + "_inner"
+
+	aggBuilder.Terms(groupByID, groupBy, func(a *es.TermsAggregation, b es.AggBuilder) {
+		a.Size = limit
+		b.Metric(innerID, innerStat, m.Field, nil)
+	})
+	aggBuilder.Pipeline(m.ID, m.Type, groupByID+">"+innerID, nil)
 }
 
 func applyBoolFilters(bf *BoolFilterSet, b *es.SearchRequestBuilder) {
@@ -265,17 +314,28 @@ func (e *elasticsearchDataQuery) processRawDSLQuery(q *Query, b *es.SearchReques
 				return backend.DownstreamError(fmt.Errorf("failed to parse aggregations: %w", err))
 			}
 
-			// If there is no metric agg in the query, it is a count agg
-			if len(metricAggs) == 0 {
-				metricAggs = append(metricAggs, &MetricAgg{Type: "count"})
+			// Only adopt the aggregations parsed from the raw body when it actually defines its
+			// own. When it doesn't, keep the aggregations the frontend already supplied: this is
+			// the case for the Explore logs-volume supplementary query, which carries a
+			// Grafana-synthesized date_histogram (and optional per-level terms agg) in BucketAggs
+			// even though the raw DSL body only contains a `query` clause. Overwriting them here
+			// is what made the logs view fail to load log volume in the raw query editor.
+			// See https://github.com/grafana/grafana-elasticsearch-datasource/issues/112
+			if len(bucketAggs) > 0 || len(metricAggs) > 0 {
+				// If there is no metric agg in the query, it is a count agg
+				if len(metricAggs) == 0 {
+					metricAggs = append(metricAggs, &MetricAgg{Type: "count"})
+				}
+
+				q.BucketAggs = bucketAggs
+				q.Metrics = metricAggs
 			}
 
-			q.BucketAggs = bucketAggs
-			q.Metrics = metricAggs
-
+			// Apply the user's `query` clause as a bool filter so the aggregation respects it.
+			// The date-range filter has already been added by the caller, and Bool()/Filter()
+			// reuse that same filter builder.
 			if queryPart, ok := queryBody["query"].(map[string]any); ok {
-				queryJSON, _ := json.Marshal(queryPart)
-				q.RawQuery = string(queryJSON)
+				b.Query().Bool().Filter().AddRawFilter(queryPart)
 			}
 			return nil
 		}

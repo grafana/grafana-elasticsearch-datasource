@@ -15,7 +15,7 @@ type SearchRequest struct {
 	Index       string
 	Interval    time.Duration
 	Size        int
-	Sort        map[string]interface{}
+	Sort        []map[string]interface{}
 	Query       *Query
 	Aggs        AggArray
 	CustomProps map[string]interface{}
@@ -133,6 +133,20 @@ func (f *QueryStringFilter) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(root)
+}
+
+// RawFilter represents a raw Elasticsearch Query DSL clause supplied verbatim.
+// It is used to apply the `query` part of a raw DSL query as a bool filter so
+// that Grafana-supplied aggregations (e.g. the Explore logs-volume date_histogram)
+// still respect the user's query.
+type RawFilter struct {
+	Filter
+	Raw map[string]any
+}
+
+// MarshalJSON returns the JSON encoding of the raw filter.
+func (f *RawFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(f.Raw)
 }
 
 // RangeFilter represents a range search filter
@@ -322,9 +336,11 @@ type FiltersAggregation struct {
 
 // TermsAggregation represents a terms aggregation
 type TermsAggregation struct {
-	Field       string                 `json:"field"`
-	Size        int                    `json:"size"`
-	Order       map[string]interface{} `json:"order"`
+	Field string `json:"field"`
+	Size  int    `json:"size"`
+	// Order is omitted when empty: Elasticsearch rejects an empty order object
+	// with "Must specify at least one field for [order]".
+	Order       map[string]interface{} `json:"order,omitempty"`
 	MinDocCount *int                   `json:"min_doc_count,omitempty"`
 	Missing     *string                `json:"missing,omitempty"`
 }

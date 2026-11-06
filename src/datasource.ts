@@ -1,5 +1,5 @@
 import { mutate, Parser, Walker, WrappingPrettyPrinter } from '@elastic/esql';
-import { map as _map, cloneDeep, isNumber, isObject, isString } from 'lodash';
+import { map as _map, cloneDeep, isNumber, isString } from 'lodash';
 import { Observable, from, generate, lastValueFrom, of } from 'rxjs';
 import { catchError, first, map, mergeMap, skipWhile, tap, throwIfEmpty } from 'rxjs/operators';
 import { SemVer } from 'semver';
@@ -45,7 +45,6 @@ import {
   BackendSrvRequest,
   DataSourceWithBackend,
   TemplateSrv,
-  config,
   getDataSourceSrv,
   getTemplateSrv,
 } from '@grafana/runtime';
@@ -92,20 +91,6 @@ import { QueryValidatorRegistry, esqlValidator, toDataQueryError } from './valid
 export const REF_ID_STARTER_LOG_VOLUME = 'log-volume-';
 export const REF_ID_STARTER_LOG_SAMPLE = 'log-sample-';
 
-// Those are metadata fields as defined in https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-fields.html#_identity_metadata_fields.
-// custom fields can start with underscores, therefore is not safe to exclude anything that starts with one.
-const ELASTIC_META_FIELDS = [
-  '_index',
-  '_type',
-  '_id',
-  '_source',
-  '_size',
-  '_field_names',
-  '_ignored',
-  '_routing',
-  '_meta',
-];
-
 export class ElasticDatasource
   extends DataSourceWithBackend<ElasticsearchDataQuery, ElasticsearchOptions>
   implements
@@ -146,7 +131,9 @@ export class ElasticDatasource
     this.name = instanceSettings.name;
     this.isProxyAccess = instanceSettings.access === 'proxy';
     const settingsData = instanceSettings.jsonData || {};
-    // instanceSettings.database is deprecated and should be removed in the future
+    // Deprecated `database` must stay as a read fallback for datasources saved
+    // before the index moved to jsonData, mirroring the backend's settings parsing.
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     this.index = settingsData.index ?? instanceSettings.database ?? '';
     this.timeField = settingsData.timeField;
     this.indexPattern = new IndexPattern(this.index, settingsData.interval);
@@ -208,7 +195,7 @@ export class ElasticDatasource
       indexList = [this.indexPattern.getIndexForToday()];
     }
 
-    const url = config.featureToggles.elasticsearchCrossClusterSearch ? '_field_caps' : '_mapping';
+    const url = '_field_caps';
 
     const indexUrlList = indexList.map((index) => {
       // make sure `index` does not end with a slash
@@ -745,12 +732,18 @@ export class ElasticDatasource
     const frontendErrors: DataQueryError[] = [];
     const ctx = { timeField: this.timeField };
     for (const target of request.targets) {
-      // Validate the query string that will actually be sent to the backend - i.e. after
-      // time-range injection and template/scoped-var replacement performed by
-      // applyTemplateVariables() - so a query that is only valid once its variables are
-      // resolved isn't rejected, and errors introduced by replacement are still caught.
-      const interpolated = this.applyTemplateVariables(target, request.scopedVars, request.filters);
-      const errors = this.validators.validate(interpolated, ctx);
+      // Validate the query text after variable interpolation but *before* the transformations
+      // applyTemplateVariables() performs (time-range injection, ad hoc filters, pretty-printing).
+      // Interpolating first means a query that is only valid once its variables resolve isn't
+      // rejected. Validating pre-transformation matters because the ES|QL parser recovers from
+      // errors: rewriting the partial AST of an invalid query silently deletes the offending
+      // clause and yields valid text that would pass validation. It also keeps error positions
+      // aligned with what the user wrote in the editor.
+      const interpolatedQuery =
+        target.queryType === 'esql'
+          ? this.interpolateEsqlQuery(target.query || '', request.scopedVars)
+          : this.interpolateLuceneQuery(target.query || '', request.scopedVars);
+      const errors = this.validators.validate({ ...target, query: interpolatedQuery }, ctx);
       if (errors.length === 0) {
         validTargets.push(target);
       } else {
@@ -772,11 +765,6 @@ export class ElasticDatasource
     return true;
   }
 
-  // Private method used in the `getFields` to check if a field is a metadata field.
-  private isMetadataField(fieldName: string) {
-    return ELASTIC_META_FIELDS.includes(fieldName);
-  }
-
   /**
    * Get the list of the fields to display in query editor or used for example in getTagKeys.
    * @todo instead of being a string, this could be a custom type representing all the elastic types
@@ -784,88 +772,7 @@ export class ElasticDatasource
    * or fix the implementation.
    */
   getFields(type?: string[], range?: TimeRange): Observable<MetricFindValue[]> {
-    if (config.featureToggles.elasticsearchCrossClusterSearch) {
-      return this.getFieldsCrossCluster(type, range);
-    }
-
-    const typeMap: Record<string, string> = {
-      float: 'number',
-      double: 'number',
-      integer: 'number',
-      long: 'number',
-      date: 'date',
-      date_nanos: 'date',
-      string: 'string',
-      text: 'string',
-      scaled_float: 'number',
-      nested: 'nested',
-      histogram: 'number',
-    };
-    return this.requestAllIndices(range).pipe(
-      map((result) => {
-        const shouldAddField = (obj: any, key: string) => {
-          if (this.isMetadataField(key)) {
-            return false;
-          }
-
-          if (!type || type.length === 0) {
-            return true;
-          }
-
-          // equal query type filter, or via type map translation
-          return type.includes(obj.type) || type.includes(typeMap[obj.type]);
-        };
-
-        // Store subfield names: [system, process, cpu, total] -> system.process.cpu.total
-        const fieldNameParts: string[] = [];
-        const fields: Record<string, { text: string; type: string }> = {};
-
-        function getFieldsRecursively(obj: any) {
-          for (const key in obj) {
-            const subObj = obj[key];
-
-            // Check mapping field for nested fields
-            if (isObject(subObj.properties)) {
-              fieldNameParts.push(key);
-              getFieldsRecursively(subObj.properties);
-            }
-
-            if (isObject(subObj.fields)) {
-              fieldNameParts.push(key);
-              getFieldsRecursively(subObj.fields);
-            }
-
-            if (isString(subObj.type)) {
-              const fieldName = fieldNameParts.concat(key).join('.');
-
-              // Hide meta-fields and check field type
-              if (shouldAddField(subObj, key)) {
-                fields[fieldName] = {
-                  text: fieldName,
-                  type: subObj.type,
-                };
-              }
-            }
-          }
-          fieldNameParts.pop();
-        }
-
-        for (const indexName in result) {
-          const index = result[indexName];
-          if (index && index.mappings) {
-            const mappings = index.mappings;
-
-            const properties = mappings.properties;
-            getFieldsRecursively(properties);
-          }
-        }
-
-        // transform to array
-        return _map(fields, (value) => {
-          return value;
-        });
-      })
-    );
+    return this.getFieldsCrossCluster(type, range);
   }
 
   getFieldsCrossCluster(type?: string[], range?: TimeRange): Observable<MetricFindValue[]> {
@@ -960,10 +867,16 @@ export class ElasticDatasource
         const buckets = res.responses[0].aggregations['1'].buckets;
         return _map(buckets, (bucket) => {
           const keyString = String(bucket.key);
-          return {
-            text: bucket.key_as_string || keyString,
-            value: isTagValueQuery ? keyString : bucket.key,
-          };
+          // Elasticsearch returns `key_as_string` alongside the raw `key` for typed
+          // fields. For booleans (`key` 0/1, `key_as_string` "false"/"true") value must
+          // be the human-readable form: substituting the raw 0/1 breaks queries against
+          // the field (issue #106053). For dates the opposite holds: `key` is epoch
+          // milliseconds, the only machine-usable form, so it must stay the value with
+          // `key_as_string` used only for display (issue #406).
+          const text = bucket.key_as_string || keyString;
+          const isBooleanBucket = bucket.key_as_string === 'true' || bucket.key_as_string === 'false';
+          const value = isBooleanBucket ? bucket.key_as_string : isTagValueQuery ? keyString : bucket.key;
+          return { text, value };
         });
       })
     );
@@ -1242,9 +1155,15 @@ export class ElasticDatasource
     }
 
     try {
-      // Parse errors are caught upfront by esqlValidator; this call should always
-      // succeed here. The try/catch remains as a defense-in-depth fallback.
-      const { root } = Parser.parse(esqlQuery, { withFormatting: true });
+      const { root, errors } = Parser.parse(esqlQuery, { withFormatting: true });
+
+      // The ANTLR parser recovers from errors and returns a partial AST. Mutating and
+      // re-printing that AST would silently delete the invalid parts of the query, so bail
+      // out and leave anything that slipped past the frontend validator for the backend
+      // to reject with a proper error.
+      if (errors.length) {
+        return esqlQuery;
+      }
 
       const whereCommands = Walker.matchAll(root, {
         type: 'command',
@@ -1403,9 +1322,14 @@ export function enhanceDataFrameWithDataLinks(dataFrame: DataFrame, dataLinks: D
 }
 
 function generateDataLink(linkConfig: DataLinkConfig): DataLink {
+  // The non-deprecated replacement (getDataSourceInstanceSettings from
+  // @grafana/runtime/unstable) is async and only exists from Grafana 13.1,
+  // but this synchronous call site must work on Grafana >=12.2.
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   const dataSourceSrv = getDataSourceSrv();
 
   if (linkConfig.datasourceUid) {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     const dsSettings = dataSourceSrv.getInstanceSettings(linkConfig.datasourceUid);
 
     return {

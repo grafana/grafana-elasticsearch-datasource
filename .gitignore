@@ -46,3 +46,5 @@ ci/
 .eslintcache
 
 .DS_Store
+.directory
+

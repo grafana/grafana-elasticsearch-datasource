@@ -7,6 +7,16 @@ import (
 	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/simplejson"
 )
 
+// metricIdRegex matches a leading metric id (e.g. "1" in "1[95.0]") in an orderBy value.
+// Compiled once at package load to avoid recompiling on every aggregation.
+var metricIdRegex = regexp.MustCompile(`^(\d+)`)
+
+// calendarIntervals is the set of interval strings Elasticsearch treats as calendar
+// intervals (as opposed to fixed intervals).
+var calendarIntervals = map[string]struct{}{
+	"1w": {}, "1M": {}, "1q": {}, "1y": {},
+}
+
 // addDateHistogramAgg adds a date histogram aggregation to the aggregation builder
 func addDateHistogramAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, timeFrom, timeTo int64, timeField string) es.AggBuilder {
 	// If no field is specified, use the time field
@@ -20,13 +30,13 @@ func addDateHistogramAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, timeFro
 			a.CalendarInterval = interval
 		} else {
 			if interval == "auto" {
-				// note this is not really a valid grafana-variable-handling,
-				// because normally this would not match `$__interval_ms`,
-				// but because how we apply these in the go-code, this will work
-				// correctly, and becomes something like `500ms`.
-				// a nicer way would be to use `${__interval_ms}ms`, but
-				// that format is not recognized where we apply these variables
-				// in the elasticsearch datasource
+				// $__interval_msms is a dedicated macro (see searchBodyMacros
+				// in client/macros.go) that expands to the interval in
+				// milliseconds with an explicit "ms" unit, e.g. "500ms".
+				// fixed_interval needs a single-unit value, and the
+				// milliseconds form is valid for any interval, unlike
+				// $__interval whose time.Duration formatting can produce
+				// multi-unit values such as "1m30s".
 				a.FixedInterval = "$__interval_msms"
 			} else {
 				a.FixedInterval = interval
@@ -72,14 +82,20 @@ func addHistogramAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg) es.AggBuild
 	return aggBuilder
 }
 
+// termsAggSize resolves the size setting of a terms aggregation the same way the
+// request builder does: a numeric value is used as is, anything else falls back to
+// the default size.
+func termsAggSize(bucketAgg *BucketAgg) int {
+	if size, err := bucketAgg.Settings.Get("size").Int(); err == nil {
+		return size
+	}
+	return stringToIntWithDefaultValue(bucketAgg.Settings.Get("size").MustString(), defaultSize)
+}
+
 // addTermsAgg adds a terms aggregation to the aggregation builder
 func addTermsAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, metrics []*MetricAgg) es.AggBuilder {
 	aggBuilder.Terms(bucketAgg.ID, bucketAgg.Field, func(a *es.TermsAggregation, b es.AggBuilder) {
-		if size, err := bucketAgg.Settings.Get("size").Int(); err == nil {
-			a.Size = size
-		} else {
-			a.Size = stringToIntWithDefaultValue(bucketAgg.Settings.Get("size").MustString(), defaultSize)
-		}
+		a.Size = termsAggSize(bucketAgg)
 
 		if minDocCount, err := bucketAgg.Settings.Get("min_doc_count").Int(); err == nil {
 			a.MinDocCount = &minDocCount
@@ -88,12 +104,11 @@ func addTermsAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, metrics []*Metr
 			a.Missing = &missing
 		}
 
-		if orderBy, err := bucketAgg.Settings.Get("orderBy").String(); err == nil {
+		if orderBy, err := bucketAgg.Settings.Get("orderBy").String(); err == nil && orderBy != "" {
 			/*
 			   The format for extended stats and percentiles is {metricId}[bucket_path]
 			   for everything else it's just {metricId}, _count, _term, or _key
 			*/
-			metricIdRegex := regexp.MustCompile(`^(\d+)`)
 			metricId := metricIdRegex.FindString(orderBy)
 
 			if len(metricId) > 0 {
@@ -101,6 +116,11 @@ func addTermsAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, metrics []*Metr
 					if m.ID == metricId {
 						if m.Type == "count" {
 							a.Order["_count"] = bucketAgg.Settings.Get("order").MustString("desc")
+						} else if isSiblingPipelineAgg(m.Type) {
+							// Sibling composites (sum_bucket, max_bucket, ...) are hidden
+							// terms+pipeline pairs, not a metric that exists inside this
+							// terms bucket. Ordering by one would emit an invalid nested
+							// aggregation, so fall back to not emitting the order for this key.
 						} else {
 							a.Order[orderBy] = bucketAgg.Settings.Get("order").MustString("desc")
 							b.Metric(m.ID, m.Type, m.Field, nil)
@@ -111,6 +131,13 @@ func addTermsAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg, metrics []*Metr
 			} else {
 				a.Order[orderBy] = bucketAgg.Settings.Get("order").MustString("desc")
 			}
+		} else {
+			// Queries saved before the editor stored its defaults can omit the
+			// ordering options. Apply the same default the editor displays
+			// (Order by: Term value, descending) so the query keeps the meaning
+			// shown in the UI instead of falling back to Elasticsearch's
+			// _count ordering.
+			a.Order["_term"] = bucketAgg.Settings.Get("order").MustString("desc")
 		}
 
 		aggBuilder = b
@@ -130,8 +157,9 @@ func addNestedAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg) es.AggBuilder 
 
 // addFiltersAgg adds a filters aggregation to the aggregation builder
 func addFiltersAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg) es.AggBuilder {
-	filters := make(map[string]any)
-	for _, filter := range bucketAgg.Settings.Get("filters").MustArray() {
+	rawFilters := bucketAgg.Settings.Get("filters").MustArray()
+	filters := make(map[string]any, len(rawFilters))
+	for _, filter := range rawFilters {
 		json := simplejson.NewFromAny(filter)
 		query := json.Get("query").MustString()
 		label := json.Get("label").MustString()
@@ -163,11 +191,6 @@ func addGeoHashGridAgg(aggBuilder es.AggBuilder, bucketAgg *BucketAgg) es.AggBui
 
 // isCalendarInterval checks if the interval is a calendar interval
 func isCalendarInterval(interval string) bool {
-	calendarIntervals := []string{"1w", "1M", "1q", "1y"}
-	for _, ci := range calendarIntervals {
-		if interval == ci {
-			return true
-		}
-	}
-	return false
+	_, ok := calendarIntervals[interval]
+	return ok
 }

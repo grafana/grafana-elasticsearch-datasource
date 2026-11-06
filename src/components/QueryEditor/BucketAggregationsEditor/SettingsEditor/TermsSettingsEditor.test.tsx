@@ -1,9 +1,10 @@
 import { fireEvent, screen } from '@testing-library/react';
-import selectEvent from 'react-select-event';
+import userEvent from '@testing-library/user-event';
 
-import { Average, Derivative, ElasticsearchDataQuery, Terms, TopMetrics } from '../../../../dataquery.gen';
+import { Average, Derivative, ElasticsearchDataQuery, SumBucket, Terms, TopMetrics } from '../../../../dataquery.gen';
 
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
+import { mockComboboxRect } from '../../../../test/helpers/mockCombobox';
 import { renderWithESProvider } from '../../../../test-helpers/render';
 import { describeMetric } from '../../../../utils';
 
@@ -13,7 +14,11 @@ import React from 'react';
 jest.mock('../../../../hooks/useStatelessReducer');
 
 describe('Terms Settings Editor', () => {
-  it('Pipeline aggregations should not be in "order by" options', () => {
+  beforeAll(() => {
+    mockComboboxRect();
+  });
+
+  it('Pipeline aggregations should not be in "order by" options', async () => {
     const termsAgg: Terms = {
       id: '1',
       type: 'terms',
@@ -33,12 +38,42 @@ describe('Terms Settings Editor', () => {
     const selectEl = screen.getByLabelText('Order By');
     expect(selectEl).toBeInTheDocument();
 
-    selectEvent.openMenu(selectEl);
+    await userEvent.click(selectEl);
 
     // Derivative is a pipeline aggregation, it shouldn't be present in the order by options
     expect(screen.queryByText(describeMetric(derivative))).not.toBeInTheDocument();
     // TopMetrics cannot be used as order by option
     expect(screen.queryByText(describeMetric(topMetrics))).not.toBeInTheDocument();
+    // All other metric aggregations can be used in order by
+    expect(screen.getByText(describeMetric(avg))).toBeInTheDocument();
+  });
+
+  it('Sibling bucket aggregations should not be in "order by" options', async () => {
+    const termsAgg: Terms = {
+      id: '1',
+      type: 'terms',
+    };
+    const avg: Average = { id: '2', type: 'avg', field: '@value' };
+    const sumBucket: SumBucket = {
+      id: '3',
+      type: 'sum_bucket',
+      field: 'storage_used',
+      settings: { metric: 'max', groupBy: 'host', limit: '500' },
+    };
+    const query: ElasticsearchDataQuery = {
+      refId: 'A',
+      query: '',
+      bucketAggs: [termsAgg],
+      metrics: [avg, sumBucket],
+    };
+
+    renderWithESProvider(<TermsSettingsEditor bucketAgg={termsAgg} />, { providerProps: { query } });
+
+    const selectEl = screen.getByLabelText('Order By');
+    await userEvent.click(selectEl);
+
+    // Sum Bucket is a sibling composite, it shouldn't be present in the order by options
+    expect(screen.queryByText(describeMetric(sumBucket))).not.toBeInTheDocument();
     // All other metric aggregations can be used in order by
     expect(screen.getByText(describeMetric(avg))).toBeInTheDocument();
   });

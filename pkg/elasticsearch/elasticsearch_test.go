@@ -11,16 +11,19 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
+	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/instrumentation"
 )
 
 func unwrapTestDatasource(t *testing.T, instance instancemgmt.Instance) *DataSource {
 	t.Helper()
-	iw, ok := instance.(*instanceWithSchema)
-	require.True(t, ok, "expected *instanceWithSchema")
-	return iw.DataSource
+	ds, ok := instance.(*DataSource)
+	require.True(t, ok, "expected *DataSource")
+	return ds
 }
 
 // contextWithForwardedHeader simulates what the SDK's headerMiddleware does:
@@ -114,7 +117,7 @@ func TestNewDatasource_ForwardHTTPHeaders(t *testing.T) {
 
 		instance, err := NewDatasource(context.Background(), dsSettings)
 		require.NoError(t, err)
-		ds := instance.(*instanceWithSchema)
+		ds := instance.(*DataSource)
 
 		// Simulate the SDK's headerMiddleware: it reads OAuth headers from
 		// req.GetHTTPHeaders() and injects them into the context via
@@ -188,8 +191,8 @@ func TestNewDatasource(t *testing.T) {
 
 		// Verify that the datasource was created with empty (non-serverless) cluster info
 		dsInstance := unwrapTestDatasource(t, instance)
-		require.False(t, dsInstance.info.ClusterInfo.IsServerless())
-		require.Equal(t, "", dsInstance.info.ClusterInfo.Version.BuildFlavor)
+		require.False(t, dsInstance.info.ClusterInfo().IsServerless())
+		require.Equal(t, "", dsInstance.info.ClusterInfo().Version.BuildFlavor)
 	})
 
 	t.Run("timeField", func(t *testing.T) {
@@ -425,33 +428,146 @@ func TestDispose(t *testing.T) {
 	})
 }
 
+func gaugeValue(t *testing.T, gauge prometheus.Gauge) float64 {
+	t.Helper()
+	var m dto.Metric
+	require.NoError(t, gauge.Write(&m))
+	return m.GetGauge().GetValue()
+}
+
+func TestDatasourceInstanceGauge(t *testing.T) {
+	t.Run("NewDatasource increments the instance gauge and Dispose decrements it", func(t *testing.T) {
+		// mockElasticsearchServer reports build_flavor serverless and version 8.0.0
+		server := mockElasticsearchServer()
+		defer server.Close()
+
+		gauge := instrumentation.DatasourceInstances.WithLabelValues(es.DistributionElasticsearchServerless, "8")
+		before := gaugeValue(t, gauge)
+
+		instance, err := NewDatasource(context.Background(), backend.DataSourceInstanceSettings{
+			URL:      server.URL,
+			JSONData: json.RawMessage(`{"timeField": "@timestamp"}`),
+		})
+		require.NoError(t, err)
+		require.Equal(t, before+1, gaugeValue(t, gauge))
+
+		ds := unwrapTestDatasource(t, instance)
+		ds.Dispose()
+		require.Equal(t, before, gaugeValue(t, gauge))
+	})
+
+	t.Run("gauge reports unknown labels when the root endpoint is not accessible", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+		}))
+		defer server.Close()
+
+		gauge := instrumentation.DatasourceInstances.WithLabelValues(es.DistributionUnknown, es.DistributionUnknown)
+		before := gaugeValue(t, gauge)
+
+		instance, err := NewDatasource(context.Background(), backend.DataSourceInstanceSettings{
+			URL:      server.URL,
+			JSONData: json.RawMessage(`{"timeField": "@timestamp"}`),
+		})
+		require.NoError(t, err)
+		require.Equal(t, before+1, gaugeValue(t, gauge))
+
+		ds := unwrapTestDatasource(t, instance)
+		ds.Dispose()
+		require.Equal(t, before, gaugeValue(t, gauge))
+	})
+
+	t.Run("gauge bounds labels when the cluster reports garbage version info", func(t *testing.T) {
+		// A remote endpoint controls the distribution and version strings in
+		// the root response. Unbounded values would mint a permanent gauge
+		// series per distinct pair, so they must collapse to bounded labels.
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"version": map[string]interface{}{
+					"distribution": "Elasticsearch<script>",
+					"number":       "banana",
+				},
+			})
+		}))
+		defer server.Close()
+
+		gauge := instrumentation.DatasourceInstances.WithLabelValues("other", "unknown")
+		before := gaugeValue(t, gauge)
+
+		instance, err := NewDatasource(context.Background(), backend.DataSourceInstanceSettings{
+			URL:      server.URL,
+			JSONData: json.RawMessage(`{"timeField": "@timestamp"}`),
+		})
+		require.NoError(t, err)
+		require.Equal(t, before+1, gaugeValue(t, gauge))
+
+		ds := unwrapTestDatasource(t, instance)
+		ds.Dispose()
+		require.Equal(t, before, gaugeValue(t, gauge))
+	})
+
+	t.Run("Dispose does not decrement for instances that never registered", func(t *testing.T) {
+		gauge := instrumentation.DatasourceInstances.WithLabelValues(es.DistributionUnknown, es.DistributionUnknown)
+		before := gaugeValue(t, gauge)
+
+		ds := &DataSource{info: &es.DatasourceInfo{}}
+		ds.Dispose()
+
+		require.Equal(t, before, gaugeValue(t, gauge))
+	})
+
+	t.Run("repeated Dispose decrements the gauge only once", func(t *testing.T) {
+		// The SDK schedules Dispose on a cached instance before attempting its
+		// replacement. When constructing the replacement fails, the old
+		// instance stays cached and a later settings change schedules Dispose
+		// on it again.
+		server := mockElasticsearchServer()
+		defer server.Close()
+
+		gauge := instrumentation.DatasourceInstances.WithLabelValues(es.DistributionElasticsearchServerless, "8")
+		before := gaugeValue(t, gauge)
+
+		instance, err := NewDatasource(context.Background(), backend.DataSourceInstanceSettings{
+			URL:      server.URL,
+			JSONData: json.RawMessage(`{"timeField": "@timestamp"}`),
+		})
+		require.NoError(t, err)
+
+		ds := unwrapTestDatasource(t, instance)
+		ds.Dispose()
+		ds.Dispose()
+		require.Equal(t, before, gaugeValue(t, gauge))
+	})
+}
+
 func TestCreateElasticsearchURL(t *testing.T) {
 	tt := []struct {
 		name     string
-		settings es.DatasourceInfo
+		settings *es.DatasourceInfo
 		req      backend.CallResourceRequest
 		expected string
 	}{
-		{name: "with /_msearch path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "_msearch"}, expected: "http://localhost:9200/_msearch"},
-		{name: "with _msearch path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "_msearch"}, expected: "http://localhost:9200/_msearch"},
-		{name: "with _msearch path and valid url with /", settings: es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "_msearch"}, expected: "http://localhost:9200/_msearch"},
-		{name: "with _mapping path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "/_mapping"}, expected: "http://localhost:9200/_mapping"},
-		{name: "with /_mapping path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "/_mapping"}, expected: "http://localhost:9200/_mapping"},
-		{name: "with /_mapping path and valid url with /", settings: es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "/_mapping"}, expected: "http://localhost:9200/_mapping"},
-		{name: "with abc/_mapping path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "abc/_mapping"}, expected: "http://localhost:9200/abc/_mapping"},
-		{name: "with /abc/_mapping path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "abc/_mapping"}, expected: "http://localhost:9200/abc/_mapping"},
-		{name: "with /abc/_mapping path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "abc/_mapping"}, expected: "http://localhost:9200/abc/_mapping"},
+		{name: "with /_msearch path and valid url", settings: &es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "_msearch"}, expected: "http://localhost:9200/_msearch"},
+		{name: "with _msearch path and valid url", settings: &es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "_msearch"}, expected: "http://localhost:9200/_msearch"},
+		{name: "with _msearch path and valid url with /", settings: &es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "_msearch"}, expected: "http://localhost:9200/_msearch"},
+		{name: "with _mapping path and valid url", settings: &es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "/_mapping"}, expected: "http://localhost:9200/_mapping"},
+		{name: "with /_mapping path and valid url", settings: &es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "/_mapping"}, expected: "http://localhost:9200/_mapping"},
+		{name: "with /_mapping path and valid url with /", settings: &es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "/_mapping"}, expected: "http://localhost:9200/_mapping"},
+		{name: "with abc/_mapping path and valid url", settings: &es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "abc/_mapping"}, expected: "http://localhost:9200/abc/_mapping"},
+		{name: "with /abc/_mapping path and valid url", settings: &es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: "abc/_mapping"}, expected: "http://localhost:9200/abc/_mapping"},
+		{name: "with /abc/_mapping path and valid url", settings: &es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "abc/_mapping"}, expected: "http://localhost:9200/abc/_mapping"},
 		// This is to support mapping for cluster searches that include ":"
-		{name: "with path including :", settings: es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "ab:c/_mapping"}, expected: "http://localhost:9200/ab:c/_mapping"},
-		{name: "with \"\" path and valid url and /", settings: es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://localhost:9200/"},
-		{name: "with \"\" path and valid url", settings: es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://localhost:9200/"},
-		{name: "with \"\" path and valid url with path", settings: es.DatasourceInfo{URL: "http://elastic:9200/lb"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://elastic:9200/lb/"},
-		{name: "with \"\" path and valid url with path and /", settings: es.DatasourceInfo{URL: "http://elastic:9200/lb/"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://elastic:9200/lb/"},
+		{name: "with path including :", settings: &es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: "ab:c/_mapping"}, expected: "http://localhost:9200/ab:c/_mapping"},
+		{name: "with \"\" path and valid url and /", settings: &es.DatasourceInfo{URL: "http://localhost:9200/"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://localhost:9200/"},
+		{name: "with \"\" path and valid url", settings: &es.DatasourceInfo{URL: "http://localhost:9200"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://localhost:9200/"},
+		{name: "with \"\" path and valid url with path", settings: &es.DatasourceInfo{URL: "http://elastic:9200/lb"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://elastic:9200/lb/"},
+		{name: "with \"\" path and valid url with path and /", settings: &es.DatasourceInfo{URL: "http://elastic:9200/lb/"}, req: backend.CallResourceRequest{Path: ""}, expected: "http://elastic:9200/lb/"},
 	}
 
 	for _, test := range tt {
 		t.Run(test.name, func(t *testing.T) {
-			url, err := createElasticsearchURL(&test.req, &test.settings)
+			url, err := createElasticsearchURL(&test.req, test.settings)
 			require.NoError(t, err)
 			require.Equal(t, test.expected, url)
 		})

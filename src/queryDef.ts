@@ -28,6 +28,30 @@ export const movingAvgModelOptions: MovingAverageModelOption[] = [
   { label: 'Holt Winters', value: 'holt_winters' },
 ];
 
+export const siblingInnerStatOptions: Array<{ label: string; value: string }> = [
+  { label: 'Max', value: 'max' },
+  { label: 'Min', value: 'min' },
+  { label: 'Sum', value: 'sum' },
+  { label: 'Average', value: 'avg' },
+];
+
+export const SIBLING_INNER_STATS = siblingInnerStatOptions.map((o) => o.value);
+
+export const SIBLING_BUCKET_DEFAULT_LIMIT = 500;
+// Conservative cap just below Elasticsearch's default search.max_buckets ceiling (65536),
+// which bounds the total buckets a request may create across all aggregations.
+export const SIBLING_BUCKET_MAX_LIMIT = 65535;
+
+export function clampSiblingBucketLimit(value?: string): number {
+  // Strict integer parse for parity with the backend's strconv.Atoi: partial
+  // numeric strings like "500abc", "1e3" or "50.5" fall back to the default.
+  const parsed = /^[+-]?\d+$/.test(value ?? '') ? Number(value) : NaN;
+  if (isNaN(parsed) || parsed < 1) {
+    return SIBLING_BUCKET_DEFAULT_LIMIT;
+  }
+  return Math.min(parsed, SIBLING_BUCKET_MAX_LIMIT);
+}
+
 export const highlightTags = {
   pre: '@HIGHLIGHT@',
   post: '@/HIGHLIGHT@',

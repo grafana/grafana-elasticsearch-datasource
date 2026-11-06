@@ -1,4 +1,4 @@
-import { CoreApp, DataQueryRequest, DataQueryResponse, DashboardLoadedEvent } from '@grafana/data';
+import { CoreApp, DataQueryRequest, DataQueryResponse, DashboardLoadedEvent, LoadingState } from '@grafana/data';
 import { reportInteraction } from '@grafana/runtime';
 
 import { ElasticsearchDataQuery } from './dataquery.gen';
@@ -137,6 +137,36 @@ describe('trackQuery', () => {
     const response: DataQueryResponse = {
       data: [],
       errors: [{ refId: 'A', message: 'invalid query' }],
+    };
+
+    trackQuery(response, request, new Date());
+
+    expect(reportInteraction).toHaveBeenCalledWith(
+      'grafana_elasticsearch_query_executed',
+      expect.objectContaining({
+        has_error: true,
+      })
+    );
+  });
+
+  test('reports has_error for transport failures where only state signals the error', () => {
+    const query: ElasticsearchDataQuery = {
+      refId: 'A',
+      query: 'test query',
+      metrics: [{ id: '1', type: 'count' }],
+      bucketAggs: [],
+    };
+
+    const request: DataQueryRequest<ElasticsearchDataQuery> & { targets: ElasticsearchDataQuery[] } = {
+      app: CoreApp.Explore,
+      targets: [query],
+    } as DataQueryRequest<ElasticsearchDataQuery>;
+
+    // toDataQueryResponse puts transport-level failures (e.g. a 502 with no
+    // per-refId results) in the deprecated `error` field only, never `errors`.
+    const response: DataQueryResponse = {
+      data: [],
+      state: LoadingState.Error,
     };
 
     trackQuery(response, request, new Date());

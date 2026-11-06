@@ -1,10 +1,20 @@
 import { css } from '@emotion/css';
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { SemVer } from 'semver';
 
 import { getDefaultTimeRange, GrafanaTheme2, QueryEditorProps } from '@grafana/data';
-import { config } from '@grafana/runtime';
-import { Alert, ConfirmModal, InlineField, InlineLabel, Input, useStyles2 } from '@grafana/ui';
+import {
+  Alert,
+  ConfirmModal,
+  Icon,
+  InlineField,
+  InlineLabel,
+  InlineSwitch,
+  Input,
+  TextArea,
+  Tooltip,
+  useStyles2,
+} from '@grafana/ui';
 
 import { ElasticsearchDataQuery, QueryType } from '../../dataquery.gen';
 import { useNextId } from '../../hooks/useNextId';
@@ -19,6 +29,7 @@ import { ElasticsearchProvider } from './ElasticsearchQueryContext';
 import { ElasticsearchQueryOptions } from './ElasticsearchQueryOptions';
 import { MetricAggregationsEditor } from './MetricAggregationsEditor';
 import { metricAggregationConfig } from './MetricAggregationsEditor/utils';
+import { setPreserveQueryDefault } from './preserveQueryPreference';
 import { QueryTypeSelector } from './QueryTypeSelector';
 import { changeAliasPattern, changeEditorTypeAndResetQuery, changeQuery } from './state';
 
@@ -74,10 +85,31 @@ export const QueryEditor = ({ query, onChange, onRunQuery, datasource, range }: 
 const getStyles = (theme: GrafanaTheme2) => ({
   root: css({
     display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    rowGap: theme.spacing(0.5),
   }),
   queryItem: css({
     flexGrow: 1,
     margin: theme.spacing(0, 0.5, 0.5, 0),
+  }),
+  preserveQueryInfoIcon: css({
+    color: theme.colors.text.secondary,
+    margin: theme.spacing(0, 1, 0.5, -0.5),
+    ':hover': {
+      color: theme.colors.text.primary,
+    },
+  }),
+  preserveQueryTooltipTitle: css({
+    fontWeight: theme.typography.fontWeightBold,
+    fontSize: theme.typography.h6.fontSize,
+    marginBottom: theme.spacing(0.5),
+  }),
+  queryTextArea: css({
+    resize: 'none',
+    overflow: 'hidden',
+    minHeight: theme.spacing(theme.components.height.md),
+    fontFamily: theme.typography.fontFamilyMonospace,
   }),
 });
 
@@ -85,14 +117,70 @@ interface Props {
   value: ElasticsearchDataQuery;
 }
 
-export const ElasticSearchQueryField = ({ value, onChange }: { value?: string; onChange: (v: string) => void }) => {
+export const ElasticSearchQueryField = ({
+  value,
+  onChange,
+  onRunQuery,
+}: {
+  value?: string;
+  onChange: (v: string) => void;
+  onRunQuery?: () => void;
+}) => {
   const styles = useStyles2(getStyles);
+  const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const adjustHeight = useCallback(() => {
+    const textArea = textAreaRef.current;
+    if (!textArea) {
+      return;
+    }
+    textArea.style.height = 'auto';
+    // scrollHeight excludes the element's border, but height is set on a
+    // border-box element, so add the border back in or the last line gets clipped.
+    const borderHeight = textArea.offsetHeight - textArea.clientHeight;
+    textArea.style.height = `${textArea.scrollHeight + borderHeight}px`;
+  }, []);
+
+  // Grow the textarea to fit its content so long queries word-wrap onto extra
+  // lines instead of overflowing/scrolling horizontally like a single-line input.
+  useLayoutEffect(() => {
+    adjustHeight();
+  }, [value, adjustHeight]);
+
+  // Wrap points also change when the available width changes (Explore split-pane
+  // drag, panel resize, sidebar toggle). Only react to width changes, not height
+  // changes, to avoid a feedback loop with the height updates above.
+  useEffect(() => {
+    const textArea = textAreaRef.current;
+    if (!textArea || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    let lastWidth: number | null = null;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width !== lastWidth) {
+        lastWidth = entry.contentRect.width;
+        adjustHeight();
+      }
+    });
+    observer.observe(textArea);
+    return () => observer.disconnect();
+  }, [adjustHeight]);
 
   return (
     <div className={styles.queryItem}>
-      <Input
+      <TextArea
+        ref={textAreaRef}
+        className={styles.queryTextArea}
+        rows={1}
         value={value ?? ''}
-        onChange={(e) => onChange(e.currentTarget.value)}
+        onChange={(e) => onChange(e.currentTarget.value.replace(/\n/g, ' '))}
+        onKeyDown={(e) => {
+          // Shift+Enter runs the query (as it did with the previous QueryField) instead of inserting a space.
+          if (e.key === 'Enter' && e.shiftKey && onRunQuery) {
+            e.preventDefault();
+            onRunQuery();
+          }
+        }}
         placeholder="Enter a lucene query"
       />
     </div>
@@ -107,6 +195,7 @@ const QueryEditorForm = ({
   const dispatch = useDispatch();
   const nextId = useNextId();
   const inputId = useId();
+  const preserveQueryId = useId();
   const styles = useStyles2(getStyles);
 
   const [switchModalOpen, setSwitchModalOpen] = useState(false);
@@ -123,12 +212,6 @@ const QueryEditorForm = ({
   const isTimeSeries = isTimeSeriesQuery(value);
 
   const isCodeEditor = value.editorType === 'code';
-
-  // Once the runtime package with the toggle has been published the any can be removed
-  const rawDSLFeatureEnabled = Boolean(config.featureToggles.elasticsearchRawDSLQuery);
-  const esqlFeatureEnabled = Boolean(config.featureToggles.elasticsearchESQLQuery);
-  const codeEditorFeatureEnabled = rawDSLFeatureEnabled || esqlFeatureEnabled;
-  const queryLanguageSelectorEnabled = rawDSLFeatureEnabled && esqlFeatureEnabled;
 
   const queryType: QueryType = value.queryType === 'esql' ? 'esql' : value.queryType === 'dsl' ? 'dsl' : 'lucene';
 
@@ -154,13 +237,13 @@ const QueryEditorForm = ({
       dispatch(
         changeEditorTypeAndResetQuery({
           editorType: pendingEditorType,
-          queryType: pendingEditorType === 'builder' ? 'lucene' : rawDSLFeatureEnabled ? 'dsl' : 'esql',
+          queryType: pendingEditorType === 'builder' ? 'lucene' : 'dsl',
         })
       );
     }
     setSwitchModalOpen(false);
     setPendingEditorType(null);
-  }, [dispatch, pendingEditorType, rawDSLFeatureEnabled]);
+  }, [dispatch, pendingEditorType]);
 
   const cancelEditorTypeChange = useCallback(() => {
     setSwitchModalOpen(false);
@@ -182,18 +265,45 @@ const QueryEditorForm = ({
         <div className={styles.queryItem}>
           <QueryTypeSelector />
         </div>
-        {codeEditorFeatureEnabled && (
-          <div style={{ marginLeft: 'auto' }}>
-            <EditorTypeSelector value={currentEditorType} onChange={onEditorTypeChange} />
-          </div>
-        )}
+
+        <InlineField transparent label="Preserve query" htmlFor={preserveQueryId}>
+          <InlineSwitch
+            id={preserveQueryId}
+            transparent
+            value={value.preserveQuery ?? false}
+            onChange={(e) => {
+              const preserveQuery = e.currentTarget.checked;
+              setPreserveQueryDefault(preserveQuery);
+              onChange({ ...value, preserveQuery });
+            }}
+          />
+        </InlineField>
+        <Tooltip
+          theme="info"
+          placement="bottom"
+          content={
+            <div>
+              <div className={styles.preserveQueryTooltipTitle}>Preserve query</div>
+              <div>
+                Keeps your Lucene query when you switch between Metrics, Logs, Raw Data, and Raw Document. When off,
+                switching to another type clears the query so each type starts fresh.
+              </div>
+            </div>
+          }
+        >
+          <Icon tabIndex={0} name="info-circle" size="sm" className={styles.preserveQueryInfoIcon} />
+        </Tooltip>
+
+        <div style={{ marginLeft: 'auto' }}>
+          <EditorTypeSelector value={currentEditorType} onChange={onEditorTypeChange} />
+        </div>
       </div>
 
-      {isCodeEditor && codeEditorFeatureEnabled && (
+      {isCodeEditor && (
         <CodeEditorSection
           value={value}
           queryType={queryType}
-          showQueryLanguageSelector={queryLanguageSelectorEnabled}
+          showQueryLanguageSelector={true}
           onRunQuery={onRunQuery}
           onFormatReady={onFormatReady}
         />
@@ -203,7 +313,11 @@ const QueryEditorForm = ({
         <>
           <div className={styles.root}>
             <InlineLabel width={17}>Lucene Query</InlineLabel>
-            <ElasticSearchQueryField onChange={(query) => dispatch(changeQuery(query))} value={value?.query} />
+            <ElasticSearchQueryField
+              onChange={(query) => dispatch(changeQuery(query))}
+              onRunQuery={onRunQuery}
+              value={value?.query}
+            />
 
             {isTimeSeries && (
               <InlineField
@@ -227,7 +341,7 @@ const QueryEditorForm = ({
         </>
       )}
       <ElasticsearchQueryOptions
-        onFormat={isCodeEditor && rawDSLFeatureEnabled ? handleFormat : undefined}
+        onFormat={isCodeEditor ? handleFormat : undefined}
         onChange={onChange}
         onRunQuery={onRunQuery}
       />

@@ -128,6 +128,18 @@ func (b *FilterQueryBuilder) AddQueryStringFilter(querystring string, analyseWil
 	return b
 }
 
+// AddRawFilter adds a raw Elasticsearch Query DSL clause as a filter. It is used to
+// carry the `query` part of a raw DSL query so that Grafana-supplied aggregations
+// continue to respect the user's query.
+func (b *FilterQueryBuilder) AddRawFilter(raw map[string]any) *FilterQueryBuilder {
+	if len(raw) == 0 {
+		return b
+	}
+
+	b.filters = append(b.filters, &RawFilter{Raw: raw})
+	return b
+}
+
 // AddTermFilter adds an exact-match term filter
 func (b *FilterQueryBuilder) AddTermFilter(field string, value any) *FilterQueryBuilder {
 	b.filters = append(b.filters, &TermFilter{Key: field, Value: value})

@@ -276,6 +276,78 @@ export const metricAggregationConfig: MetricsConfiguration = {
     hasMeta: false,
     defaults: {},
   },
+  sum_bucket: {
+    label: 'Sum Bucket',
+    impliedQueryType: 'metrics',
+    requiresField: true,
+    isPipelineAgg: false,
+    isSiblingPipelineAgg: true,
+    supportsMissing: false,
+    supportsMultipleBucketPaths: false,
+    hasSettings: true,
+    supportsInlineScript: false,
+    hasMeta: false,
+    defaults: {
+      settings: {
+        metric: 'max',
+        limit: '500',
+      },
+    },
+  },
+  max_bucket: {
+    label: 'Max Bucket',
+    impliedQueryType: 'metrics',
+    requiresField: true,
+    isPipelineAgg: false,
+    isSiblingPipelineAgg: true,
+    supportsMissing: false,
+    supportsMultipleBucketPaths: false,
+    hasSettings: true,
+    supportsInlineScript: false,
+    hasMeta: false,
+    defaults: {
+      settings: {
+        metric: 'max',
+        limit: '500',
+      },
+    },
+  },
+  min_bucket: {
+    label: 'Min Bucket',
+    impliedQueryType: 'metrics',
+    requiresField: true,
+    isPipelineAgg: false,
+    isSiblingPipelineAgg: true,
+    supportsMissing: false,
+    supportsMultipleBucketPaths: false,
+    hasSettings: true,
+    supportsInlineScript: false,
+    hasMeta: false,
+    defaults: {
+      settings: {
+        metric: 'max',
+        limit: '500',
+      },
+    },
+  },
+  avg_bucket: {
+    label: 'Average Bucket',
+    impliedQueryType: 'metrics',
+    requiresField: true,
+    isPipelineAgg: false,
+    isSiblingPipelineAgg: true,
+    supportsMissing: false,
+    supportsMultipleBucketPaths: false,
+    hasSettings: true,
+    supportsInlineScript: false,
+    hasMeta: false,
+    defaults: {
+      settings: {
+        metric: 'max',
+        limit: '500',
+      },
+    },
+  },
 };
 
 interface PipelineOption {

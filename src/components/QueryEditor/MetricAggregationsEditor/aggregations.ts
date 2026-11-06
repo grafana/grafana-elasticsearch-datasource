@@ -1,5 +1,6 @@
 import {
   BaseMetricAggregation,
+  BaseSiblingPipelineMetricAggregation,
   MetricAggregationType,
   MetricAggregationWithField,
   MetricAggregationWithInlineScript,
@@ -49,6 +50,10 @@ export const isPipelineAggregationWithMultipleBucketPaths = (
 ): metric is PipelineMetricAggregationWithMultipleBucketPaths =>
   metricAggregationConfig[metric.type].supportsMultipleBucketPaths;
 
+export const isSiblingPipelineAggregation = (
+  metric: BaseMetricAggregation | BaseSiblingPipelineMetricAggregation
+): metric is BaseSiblingPipelineMetricAggregation => !!metricAggregationConfig[metric.type].isSiblingPipelineAgg;
+
 export const isMetricAggregationWithMissingSupport = (
   metric: BaseMetricAggregation | MetricAggregationWithMissingSupport
 ): metric is MetricAggregationWithMissingSupport => metricAggregationConfig[metric.type].supportsMissing;
@@ -85,6 +90,10 @@ export const METRIC_AGGREGATION_TYPES: MetricAggregationType[] = [
   'bucket_script',
   'rate',
   'top_metrics',
+  'sum_bucket',
+  'max_bucket',
+  'min_bucket',
+  'avg_bucket',
 ];
 
 export const isMetricAggregationType = (s: MetricAggregationType | string): s is MetricAggregationType =>

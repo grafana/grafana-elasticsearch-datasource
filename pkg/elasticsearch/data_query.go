@@ -12,9 +12,9 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-plugin-sdk-go/config"
 
 	es "github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/client"
+	"github.com/grafana/grafana-elasticsearch-datasource/pkg/elasticsearch/featureflags"
 )
 
 const (
@@ -28,7 +28,14 @@ type elasticsearchDataQuery struct {
 	ctx                          context.Context
 	datasourceIndex              string
 	keepLabelsInResponse         bool
+	dataplaneEnabled             bool
 	aggregationParserDSLRawQuery AggregationParser
+}
+
+// isDataplaneEnabled evaluates the logs-dataplane GOFF flag; a var so tests
+// can stub the evaluation without an OFREP server.
+var isDataplaneEnabled = func(ctx context.Context) bool {
+	return featureflags.IsEnabled(ctx, featureflags.LogsDataplane)
 }
 
 var newElasticsearchDataQuery = func(ctx context.Context, client es.Client, req *backend.QueryDataRequest, logger log.Logger, datasourceIndex string) *elasticsearchDataQuery {
@@ -44,6 +51,7 @@ var newElasticsearchDataQuery = func(ctx context.Context, client es.Client, req 
 		// To maintain backward compatibility, it is necessary to keep labels in responses for alerting and expressions queries.
 		// Historically, these labels have been used in alerting rules and transformations.
 		keepLabelsInResponse: fromAlert || fromExpression,
+		dataplaneEnabled:     isDataplaneEnabled(ctx),
 
 		aggregationParserDSLRawQuery: NewAggregationParser(),
 	}
@@ -82,24 +90,13 @@ func (e *elasticsearchDataQuery) execute() (*backend.QueryDataResponse, error) {
 	}
 
 	// Execute ES|QL queries individually (each requires a separate HTTP call to /_query)
-	if len(esqlQueries) > 0 {
-		cfg := config.GrafanaConfigFromContext(e.ctx)
-		if !cfg.FeatureToggles().IsEnabled("elasticsearchESQLQuery") {
-			for _, q := range esqlQueries {
-				response.Responses[q.RefID] = backend.ErrorResponseWithErrorSource(
-					backend.DownstreamError(fmt.Errorf("ES|QL query feature is disabled. Enable the elasticsearchESQLQuery feature toggle to use this query type")),
-				)
-			}
-		} else {
-			for _, q := range esqlQueries {
-				esqlResponse, err := e.executeEsqlQuery(q)
-				if err != nil {
-					response.Responses[q.RefID] = backend.ErrorResponseWithErrorSource(err)
-					continue
-				}
-				response.Responses[q.RefID] = *esqlResponse
-			}
+	for _, q := range esqlQueries {
+		esqlResponse, err := e.executeEsqlQuery(q)
+		if err != nil {
+			response.Responses[q.RefID] = backend.ErrorResponseWithErrorSource(err)
+			continue
 		}
+		response.Responses[q.RefID] = *esqlResponse
 	}
 
 	// Execute regular queries as a batch via /_msearch
@@ -119,7 +116,10 @@ func (e *elasticsearchDataQuery) executeEsqlQuery(q *Query) (*backend.DataRespon
 		return nil, backend.DownstreamError(fmt.Errorf("ES|QL query is empty"))
 	}
 
-	query := e.resolveEsqlIndexPlaceholder(q.RawQuery, q.Index)
+	query, err := e.resolveEsqlIndexPlaceholder(q.RawQuery, q.Index)
+	if err != nil {
+		return nil, backend.DownstreamError(fmt.Errorf("failed to interpolate macros in ES|QL query: %w", err))
+	}
 	e.logger.Debug("Executing ES|QL query", "query", query, "refID", q.RefID)
 
 	esqlRes, err := e.client.ExecuteEsql(query)
@@ -132,7 +132,7 @@ func (e *elasticsearchDataQuery) executeEsqlQuery(q *Query) (*backend.DataRespon
 	configuredFields := e.client.GetConfiguredFields()
 
 	if isLogsQuery(q) {
-		return processEsqlLogsResponse(esqlRes, q, configuredFields)
+		return processEsqlLogsResponse(esqlRes, q, configuredFields, e.dataplaneEnabled)
 	} else if isRawDocumentQuery(q) {
 		return processEsqlRawDocumentResponse(esqlRes, q)
 	} else if isRawDataQuery(q) {
@@ -144,16 +144,16 @@ func (e *elasticsearchDataQuery) executeEsqlQuery(q *Query) (*backend.DataRespon
 	}
 }
 
-func (e *elasticsearchDataQuery) resolveEsqlIndexPlaceholder(query string, indexOverride string) string {
+func (e *elasticsearchDataQuery) resolveEsqlIndexPlaceholder(query string, indexOverride string) (string, error) {
 	idx := e.datasourceIndex
 	if indexOverride != "" {
 		idx = indexOverride
 	}
 	if idx == "" {
-		return query
+		return query, nil
 	}
 
-	return strings.ReplaceAll(query, "$__index", idx)
+	return interpolateEsqlQuery(query, idx)
 }
 
 func (e *elasticsearchDataQuery) executeRegularQueries(queries []*Query, start time.Time) (*backend.QueryDataResponse, error) {
@@ -207,5 +207,5 @@ func (e *elasticsearchDataQuery) executeRegularQueries(queries []*Query, start t
 		return response, nil
 	}
 
-	return parseResponse(e.ctx, res.Responses, queries, e.client.GetConfiguredFields(), e.keepLabelsInResponse, e.logger)
+	return parseResponse(e.ctx, res.Responses, queries, e.client.GetConfiguredFields(), e.keepLabelsInResponse, e.dataplaneEnabled, e.logger)
 }

@@ -2,7 +2,7 @@ import { uniqueId } from 'lodash';
 import * as React from 'react';
 import { useMemo } from 'react';
 
-import { InlineField, InlineSwitch, Input, Select } from '@grafana/ui';
+import { Combobox, InlineField, InlineSwitch, Input } from '@grafana/ui';
 
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
 import { movingAvgModelOptions } from '../../../../queryDef';
@@ -26,8 +26,8 @@ export const MovingAverageSettingsEditor = ({ metric }: Props) => {
   return (
     <>
       <InlineField label="Model" labelWidth={16}>
-        <Select
-          inputId={`${baseId}-model`}
+        <Combobox
+          id={`${baseId}-model`}
           onChange={(value) => dispatch(changeMetricSetting({ metric, settingName: 'model', newValue: value.value }))}
           options={movingAvgModelOptions}
           value={metric.settings?.model}
