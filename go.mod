@@ -3,7 +3,7 @@ module github.com/grafana/grafana-elasticsearch-datasource
 go 1.27.3
 
 require (
-	github.com/grafana/grafana-aws-sdk v1.5.6
+	github.com/grafana/grafana-aws-sdk v1.5.7
 	github.com/grafana/grafana-plugin-sdk-go v0.298.0
 	github.com/grafana/macropro v1.1.0
 	github.com/magefile/mage v1.17.2
@@ -15,7 +15,7 @@ require (
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/trace v1.47.0
 	golang.org/x/sync v0.24.0
-	google.golang.org/grpc v1.84.0
+	google.golang.org/grpc v1.85.0
 )
 
 require (
