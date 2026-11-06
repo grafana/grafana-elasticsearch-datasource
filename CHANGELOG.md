@@ -1,5 +1,12 @@
 # Changelog
 
+## [12.9.6](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.5...v12.9.6) (2026-11-06)
+
+
+### 🐛 Bug Fixes
+
+* **deps:** update dependency @elastic/esql to v4 ([3a22f96](https://github.com/grafana/grafana-elasticsearch-datasource/commit/3a22f96c00e0c88f1855292b970d2772d9033655))
+
 ## [12.9.5](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.4...v12.9.5) (2026-10-30)
 
 
