@@ -7,6 +7,8 @@ const { grafanaESModules, nodeModulesToTransform } = require('./.config/jest/uti
 module.exports = {
   // Jest configuration provided by Grafana scaffolding
   ...require('./.config/jest.config'),
-  // @grafana/plugin-ui ships @marcbachmann/cel-js as ESM, which jest must transform
-  transformIgnorePatterns: [nodeModulesToTransform([...grafanaESModules, '@marcbachmann/cel-js'])],
+  // ESM-only packages pulled in by @grafana/plugin-ui and @grafana/* 13.3, which jest must transform
+  transformIgnorePatterns: [
+    nodeModulesToTransform([...grafanaESModules, '@react-hookz/web', '@ver0/deep-equal', '@marcbachmann/cel-js']),
+  ],
 };
