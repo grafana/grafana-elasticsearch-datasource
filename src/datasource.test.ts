@@ -190,14 +190,21 @@ describe('ElasticDatasource', () => {
   });
 
   describe('query', () => {
-    it('should run applyTemplate variables when executing query', () => {
+    it('should run applyTemplate variables when executing query', async () => {
       const query = { ...createElasticQuery(), targets: [{ ...createElasticQuery().targets[0], query: '$varAlias' }] };
       const applyTemplateVariables = jest.spyOn(ds, 'applyTemplateVariables');
-      ds.query(query);
-      expect(applyTemplateVariables).toHaveBeenCalledWith(query.targets[0], {}, undefined);
-      expect(applyTemplateVariables).toHaveReturnedWith(
-        expect.objectContaining({ ...query.targets[0], query: 'resolvedVariable' })
-      );
+      setBackendSrv({
+        ...origBackendSrv,
+        fetch: jest
+          .fn()
+          .mockReturnValue(of(createResponse({ results: { A: { frames: [], refId: 'A', status: 200 } } }))),
+      });
+      await expect(ds.query(query)).toEmitValuesWith(() => {
+        expect(applyTemplateVariables).toHaveBeenCalledWith(query.targets[0], {}, undefined);
+        expect(applyTemplateVariables).toHaveReturnedWith(
+          expect.objectContaining({ ...query.targets[0], query: 'resolvedVariable' })
+        );
+      });
     });
 
     it('should enhance data frames with data links', async () => {

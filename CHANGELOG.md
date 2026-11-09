@@ -1,5 +1,19 @@
 # Changelog
 
+## [12.9.5](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.4...v12.9.5) (2026-10-30)
+
+
+### 🐛 Bug Fixes
+
+* gRPC deadlock that freezes the plugin connection under load ([#464](https://github.com/grafana/grafana-elasticsearch-datasource/issues/464)) ([8f4088d](https://github.com/grafana/grafana-elasticsearch-datasource/commit/8f4088d3ebb945fbcc04d2ceeca4f065b8b90f73))
+
+## [12.9.4](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.3...v12.9.4) (2026-10-29)
+
+
+### 🐛 Bug Fixes
+
+* **deps:** update backend dependencies ([#461](https://github.com/grafana/grafana-elasticsearch-datasource/issues/461)) ([37c1463](https://github.com/grafana/grafana-elasticsearch-datasource/commit/37c14634b9f020721c36136ed347d5d24b2ac16f))
+
 ## [12.9.3](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.2...v12.9.3) (2026-10-21)
 
 
