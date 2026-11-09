@@ -1,7 +1,6 @@
 import { css } from '@emotion/css';
 
-import { SelectableValue } from '@grafana/data';
-import { AsyncMultiSelect, InlineField, SegmentAsync, Select } from '@grafana/ui';
+import { Combobox, InlineField, MultiCombobox, SegmentAsync } from '@grafana/ui';
 import { TopMetrics } from '../../../../dataquery.gen';
 
 import { useFields } from '../../../../hooks/useFields';
@@ -14,8 +13,6 @@ interface Props {
   metric: TopMetrics;
 }
 
-const toMultiSelectValue = (value: string): SelectableValue<string> => ({ value, label: value });
-
 export const TopMetricsSettingsEditor = ({ metric }: Props) => {
   const dispatch = useDispatch();
   const getOrderByOptions = useFields(['number', 'date']);
@@ -24,24 +21,22 @@ export const TopMetricsSettingsEditor = ({ metric }: Props) => {
   return (
     <>
       <InlineField label="Metrics" labelWidth={16}>
-        <AsyncMultiSelect
-          onChange={(e) =>
+        <MultiCombobox
+          onChange={(selected) =>
             dispatch(
               changeMetricSetting({
                 metric,
                 settingName: 'metrics',
-                newValue: e.map((v) => v.value!),
+                newValue: selected.map((v) => v.value),
               })
             )
           }
-          loadOptions={getMetricsOptions}
-          value={metric.settings?.metrics?.map(toMultiSelectValue)}
-          closeMenuOnSelect={false}
-          defaultOptions
+          options={getMetricsOptions}
+          value={metric.settings?.metrics}
         />
       </InlineField>
       <InlineField label="Order" labelWidth={16}>
-        <Select
+        <Combobox
           onChange={(e) => dispatch(changeMetricSetting({ metric, settingName: 'order', newValue: e.value }))}
           options={orderOptions}
           value={metric.settings?.order}

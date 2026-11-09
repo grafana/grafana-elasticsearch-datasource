@@ -83,6 +83,48 @@ describe('ElasticQueryBuilder', () => {
     expect(firstLevel.terms.order._key).toBe('asc');
   });
 
+  it('with term agg and empty-string orderBy emits no order object', () => {
+    // An empty orderBy would serialise as "order": {"": "desc"}, which
+    // Elasticsearch rejects. The backend guards orderBy != "", so the
+    // frontend must match.
+    const query = builder.build({
+      refId: 'A',
+      metrics: [{ type: 'count', id: '1' }],
+      bucketAggs: [
+        {
+          type: 'terms',
+          field: '@host',
+          settings: { size: '5', order: 'desc', orderBy: '' },
+          id: '2',
+        },
+        { type: 'date_histogram', field: '@timestamp', id: '3' },
+      ],
+    });
+
+    expect(query.aggs['2'].terms.order).toBeUndefined();
+  });
+
+  it('with term agg and orderBy without an order direction defaults to desc', () => {
+    // An undefined direction would be dropped by JSON serialisation, leaving
+    // the empty "order": {} object Elasticsearch 9 rejects. The backend
+    // defaults to desc in this situation, so the frontend must match.
+    const query = builder.build({
+      refId: 'A',
+      metrics: [{ type: 'count', id: '1' }],
+      bucketAggs: [
+        {
+          type: 'terms',
+          field: '@host',
+          settings: { size: '5', orderBy: '_term' },
+          id: '2',
+        },
+        { type: 'date_histogram', field: '@timestamp', id: '3' },
+      ],
+    });
+
+    expect(query.aggs['2'].terms.order._key).toBe('desc');
+  });
+
   it('with term agg and order by metric agg', () => {
     const query = builder.build({
       refId: 'A',
@@ -411,6 +453,116 @@ describe('ElasticQueryBuilder', () => {
     expect(firstLevel.aggs['2'].top_metrics.metrics).toEqual([{ field: '@value' }]);
     expect(firstLevel.aggs['2'].top_metrics.sort).toEqual([{ '@timestamp': 'desc' }]);
     expect(firstLevel.aggs['2'].top_metrics.size).toBe(1);
+  });
+
+  it('with sum_bucket sibling aggregation', () => {
+    const query = builder.build({
+      refId: 'A',
+      metrics: [
+        {
+          id: '2',
+          type: 'sum_bucket',
+          field: 'storage_used',
+          settings: { metric: 'max', groupBy: 'host', limit: '500' },
+        },
+      ],
+      timeField: '@timestamp',
+      bucketAggs: [{ type: 'date_histogram', field: '@timestamp', id: '3' }],
+    });
+
+    const firstLevel = query.aggs['3'];
+    expect(firstLevel.aggs['2_groupby'].terms).toEqual({ field: 'host', size: 500 });
+    expect(firstLevel.aggs['2_groupby'].aggs['2_inner'].max).toEqual({ field: 'storage_used' });
+    expect(firstLevel.aggs['2'].sum_bucket.buckets_path).toBe('2_groupby>2_inner');
+  });
+
+  it('sibling aggregation applies defaults and clamps the limit', () => {
+    const query = builder.build({
+      refId: 'A',
+      metrics: [
+        {
+          id: '2',
+          type: 'max_bucket',
+          field: 'storage_used',
+          settings: { metric: 'cardinality', groupBy: 'host', limit: '999999' },
+        },
+      ],
+      timeField: '@timestamp',
+      bucketAggs: [{ type: 'date_histogram', field: '@timestamp', id: '3' }],
+    });
+
+    const firstLevel = query.aggs['3'];
+    // Unknown inner stats fall back to max: the value becomes an aggregation
+    // type key in the request body, so it must not pass through verbatim.
+    expect(firstLevel.aggs['2_groupby'].aggs['2_inner'].max).toEqual({ field: 'storage_used' });
+    expect(firstLevel.aggs['2_groupby'].terms.size).toBe(65535);
+  });
+
+  it('sibling aggregation without groupBy or field is not emitted', () => {
+    const query = builder.build({
+      refId: 'A',
+      metrics: [
+        { id: '2', type: 'sum_bucket', field: 'storage_used', settings: {} },
+        { id: '4', type: 'sum_bucket', settings: { groupBy: 'host' } },
+      ],
+      timeField: '@timestamp',
+      bucketAggs: [{ type: 'date_histogram', field: '@timestamp', id: '3' }],
+    });
+
+    expect(query.aggs['3'].aggs).toEqual({});
+  });
+
+  it('sibling aggregation with only groupBy applies true defaults', () => {
+    const query = builder.build({
+      refId: 'A',
+      metrics: [
+        {
+          id: '2',
+          type: 'sum_bucket',
+          field: 'storage_used',
+          settings: { groupBy: 'host' },
+        },
+      ],
+      timeField: '@timestamp',
+      bucketAggs: [{ type: 'date_histogram', field: '@timestamp', id: '3' }],
+    });
+
+    const firstLevel = query.aggs['3'];
+    expect(firstLevel.aggs['2_groupby'].terms).toEqual({ field: 'host', size: 500 });
+    expect(firstLevel.aggs['2_groupby'].aggs['2_inner'].max).toEqual({ field: 'storage_used' });
+    expect(firstLevel.aggs['2'].sum_bucket.buckets_path).toBe('2_groupby>2_inner');
+  });
+
+  it('with term agg and order by pointing at a sibling metric', () => {
+    const query = builder.build({
+      refId: 'A',
+      metrics: [
+        { type: 'count', id: '1' },
+        {
+          id: '5',
+          type: 'sum_bucket',
+          field: 'storage_used',
+          settings: { metric: 'max', groupBy: 'host', limit: '500' },
+        },
+      ],
+      bucketAggs: [
+        {
+          type: 'terms',
+          field: '@host',
+          settings: { size: '5', order: 'asc', orderBy: '5' },
+          id: '2',
+        },
+        { type: 'date_histogram', field: '@timestamp', id: '3' },
+      ],
+    });
+
+    const firstLevel = query.aggs['2'];
+
+    // Ordering by a sibling composite would emit an invalid nested aggregation,
+    // so the order key is dropped entirely (matching the backend's omitempty
+    // behaviour) and the sibling isn't nested directly inside the terms agg.
+    expect(firstLevel.terms.order).toBeUndefined();
+    expect(firstLevel.aggs?.['5']).toBeUndefined();
   });
 
   it('with derivative', () => {

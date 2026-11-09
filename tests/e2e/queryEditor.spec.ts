@@ -2,6 +2,7 @@ import { expect, test } from '@grafana/plugin-e2e';
 import { type Locator, type Page, type Response } from '@playwright/test';
 
 import { QueryType } from '../src/types';
+import { env, isQueryRequestUrl } from './testEnv';
 
 // QUERY_TYPE_LABELS from src/configuration/utils.ts cannot be imported here
 // because its import chain pulls in @grafana/ui which requires browser globals (window).
@@ -13,13 +14,12 @@ const QUERY_TYPE_LABELS: Array<{ value: QueryType; label: string }> = [
   { value: 'raw_document', label: 'Raw Document' },
 ];
 
-// Fixture data (tests/e2e/fixtures/*.ndjson) was generated with seed 42 for reproducibility.
-// It covers 2026-03-17T21:25:47Z – 2026-03-18T00:44:47Z UTC.
-// The window is kept tight (~4h) to stay under Elasticsearch's 65536-bucket limit,
-// which the Logs histogram query hits on wider ranges.
-// ISO strings are used so the Grafana Explore pane URL is timezone-unambiguous.
-const FIXTURE_FROM_ISO = '2026-03-17T21:00:00.000Z';
-const FIXTURE_TO_ISO = '2026-03-18T01:00:00.000Z';
+// Locally this is the fixture window (seed 42, 2026-03-17T21:25:47Z – 2026-03-18T00:44:47Z UTC);
+// on Cloud it is the last few hours of continuously generated data. Either way it is kept tight
+// so the Logs histogram query stays under Elasticsearch's 65536-bucket limit, and both ends are
+// ISO strings so the Grafana Explore pane URL is timezone-unambiguous.
+const FIXTURE_FROM_ISO = env.from;
+const FIXTURE_TO_ISO = env.to;
 
 // Grafana 13 migrated query editor row selectors from aria-label to data-testid
 // (grafana/grafana#121784). This helper matches both so tests work across versions
@@ -30,14 +30,27 @@ function getQueryEditorRow(page: Page, refId: string): Locator {
     .filter({ has: page.locator(`[data-testid="data-testid Query editor row title ${refId}"], [aria-label="Query editor row title ${refId}"]`) });
 }
 
-// All tests select the datasource explicitly since other test suites may change state.
-// The elasticsearch datasource is provisioned as the default, so it is always available.
+// The plugin's default Metrics query. Pinning it in the Explore URL gives every test the same
+// starting state.
+const DEFAULT_QUERY = {
+  query: '',
+  metrics: [{ id: '1', type: 'count' }],
+  bucketAggs: [{ id: '2', type: 'date_histogram', field: '@timestamp', settings: { interval: 'auto' } }],
+  timeField: '@timestamp',
+  editorType: 'builder',
+};
+
 test.describe('Query editor', () => {
-  test.beforeEach(async ({ explorePage }) => {
-    // explorePage.goto() is called by the fixture before this hook runs.
-    // elasticsearch is the default — datasource.set() confirms the selection without
-    // triggering a new query (Grafana treats it as a no-op when unchanged).
-    await explorePage.datasource.set('elasticsearch');
+  // Explore restores the account's last query, and on the shared Cloud instance that state
+  // outlives the run that wrote it. A mode radio can therefore already be selected when a test
+  // starts, so clicking it is a no-op and the editor never performs the transition being
+  // asserted on. Navigating with an explicit query pins the starting state instead, and skips
+  // the datasource picker — which reports no error when it fails to select.
+  //
+  // explorePage is requested so its own goto() runs first; the goto below then pins the pane.
+  test.beforeEach(async ({ explorePage, page }) => {
+    await page.goto(exploreUrl(env.defaultDatasourceUid, { queryOverrides: DEFAULT_QUERY }));
+    await expect(getQueryEditorRow(page, 'A').getByRole('radio', { name: 'Metrics' })).toBeChecked();
   });
 
   test.describe('rendering', () => {
@@ -152,7 +165,7 @@ test.describe('Query editor', () => {
 
       // Set up mock and waitForResponse before the mode switch that triggers the query
       await explorePage.mockQueryDataResponse({ results: { A: { frames: [] } } });
-      const responsePromise = page.waitForResponse((resp) => resp.url().includes('/api/ds/query'));
+      const responsePromise = page.waitForResponse((resp) => isQueryRequestUrl(resp.url()));
       await queryRow.getByRole('radio', { name: 'Metrics' }).click();
 
       const response = await responsePromise;
@@ -163,7 +176,7 @@ test.describe('Query editor', () => {
       const queryRow = getQueryEditorRow(page, 'A');
       // Set up mock and waitForResponse BEFORE the mode switch so the auto-query is caught.
       await explorePage.mockQueryDataResponse({ results: { A: { frames: [] } } });
-      const responsePromise = page.waitForResponse((resp) => resp.url().includes('/api/ds/query'));
+      const responsePromise = page.waitForResponse((resp) => isQueryRequestUrl(resp.url()));
       await queryRow.getByRole('radio', { name: 'Logs' }).click();
       const response = await responsePromise;
       await expect(response).toBeOK();
@@ -186,7 +199,12 @@ test.describe('Query editor', () => {
 // it after other awaits causes Playwright to lose the CDP body reference.
 function exploreUrl(
   datasourceUid: string,
-  options?: { luceneQuery?: string; metricsType?: 'logs' | 'raw_data' }
+  options?: {
+    luceneQuery?: string;
+    metricsType?: 'logs' | 'raw_data';
+    bucketAggs?: Array<Record<string, unknown>>;
+    queryOverrides?: Record<string, unknown>;
+  }
 ): string {
   const query: Record<string, unknown> = {
     refId: 'A',
@@ -198,6 +216,13 @@ function exploreUrl(
   if (options?.metricsType) {
     query.metrics = [{ id: '1', type: options.metricsType }];
   }
+  if (options?.bucketAggs) {
+    query.metrics = [{ id: '1', type: 'count' }];
+    query.bucketAggs = options.bucketAggs;
+  }
+  if (options?.queryOverrides) {
+    Object.assign(query, options.queryOverrides);
+  }
   const panes = JSON.stringify({
     explore: {
       datasource: datasourceUid,
@@ -208,16 +233,30 @@ function exploreUrl(
   return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
 }
 
-// Waits for the first /api/ds/query response where results.A.frames is an array.
-// Skips supplementary log-volume responses which use a different refId (no results.A).
-async function waitForMainQueryResponse(page: Page): Promise<{ response: Response; body: any }> {
+// Resolves on the first query response that is conclusive for refId A. Explore also emits
+// responses that are not: the supplementary log-volume query carries no results.A at all, and a
+// query Explore has superseded comes back with results.A holding neither frames nor an error.
+// Both are skipped, so a spec asserts on the answer to its own query.
+//
+// acceptError widens "conclusive" to include an error, and any non-ok response even without
+// results.A (a 5xx page, a `{"message"}` error), for tests that would rather fail their own
+// assertion on a bad response than time out waiting for a good one.
+async function waitForMainQueryResponse(
+  page: Page,
+  { acceptError = false }: { acceptError?: boolean } = {}
+): Promise<{ response: Response; body: any }> {
   let body: any;
   const response = await page.waitForResponse(async (r: Response) => {
-    if (!r.url().includes('/api/ds/query') || !r.ok()) {
+    if (!isQueryRequestUrl(r.url()) || (!r.ok() && !acceptError)) {
       return false;
     }
     const b = await r.json().catch(() => null);
-    if (!Array.isArray(b?.results?.A?.frames)) {
+    if (!r.ok()) {
+      body = b ?? {};
+      return true;
+    }
+    const result = b?.results?.A;
+    if (!result || !(Array.isArray(result.frames) || (acceptError && !!result.error))) {
       return false;
     }
     body = b;
@@ -230,19 +269,19 @@ test.describe('Query editor with fixture data', () => {
   // Serialize fixture-data tests so they don't compete for the shared ES instance.
   test.describe.configure({ mode: 'serial' });
 
-  test.describe('httplogs index', () => {
+  test.describe('logs index', () => {
     test('Metrics mode: count query returns results', async ({ page }) => {
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl('httplogs-e2e'));
+      await page.goto(exploreUrl(env.logsUid));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
       expect(body.results?.A?.frames?.length).toBeGreaterThan(0);
     });
 
-    test('Metrics mode: Lucene filter on method:GET returns results', async ({ page }) => {
+    test('Metrics mode: Lucene filter returns results', async ({ page }) => {
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl('httplogs-e2e', { luceneQuery: 'method:GET' }));
+      await page.goto(exploreUrl(env.logsUid, { luceneQuery: env.logs.luceneFilter }));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
@@ -254,51 +293,146 @@ test.describe('Query editor with fixture data', () => {
       // waitForMainQueryResponse() skips the supplementary (no results.A) and resolves
       // only when the main log-entries response arrives.
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl('httplogs-e2e', { metricsType: 'logs' }));
+      await page.goto(exploreUrl(env.logsUid, { metricsType: 'logs' }));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
       expect(body.results?.A?.frames?.length).toBeGreaterThan(0);
     });
 
-    test('Raw Data mode: returns documents with statusCode field', async ({ page }) => {
+    test('Metrics mode: high-cardinality terms with auto interval does not exceed max buckets', async ({ page }) => {
+      // One distinct term per document multiplied by the ~1,000+ time buckets a panel-width auto
+      // interval produces would need well over the Elasticsearch search.max_buckets
+      // default (65,535) and fail with "Trying to create too many buckets". The backend
+      // widens the auto interval to fit instead (#383).
+      // acceptError so a regression here fails the assertions below instead of timing out.
+      // Resolving on *any* results.A is what made this test flaky on every nightly run: it
+      // matched the inconclusive response Explore emits for a superseded query, whose frames and
+      // error are both undefined, and then passed on retry.
+      const responsePromise = waitForMainQueryResponse(page, { acceptError: true });
+      await page.goto(
+        exploreUrl(env.logsUid, {
+          bucketAggs: [
+            // order/orderBy match the query builder's defaults. Without them the
+            // backend serialises an empty terms "order" object which Elasticsearch
+            // rejects (a separate pre-existing bug, not what this test covers).
+            {
+              id: '2',
+              type: 'terms',
+              field: env.logs.highCardinalityField,
+              settings: { size: '0', order: 'desc', orderBy: '_term' },
+            },
+            { id: '3', type: 'date_histogram', field: '@timestamp', settings: { interval: 'auto' } },
+          ],
+        })
+      );
+      const { response, body } = await responsePromise;
+      expect(body.results?.A?.error).toBeUndefined();
+      expect(response.ok(), `HTTP ${response.status()}: ${JSON.stringify(body)}`).toBe(true);
+      expect(body.results?.A?.frames?.length).toBeGreaterThan(0);
+    });
+
+    test('Raw Data mode: returns documents with the expected field', async ({ page }) => {
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl('httplogs-e2e', { metricsType: 'raw_data' }));
+      await page.goto(exploreUrl(env.logsUid, { metricsType: 'raw_data' }));
       const { body } = await responsePromise;
       const frames: Array<{ schema?: { fields?: Array<{ name: string }> } }> = body.results?.A?.frames ?? [];
       expect(frames.length).toBeGreaterThan(0);
       const fieldNames = frames.flatMap((f) => (f.schema?.fields ?? []).map((field) => field.name));
-      expect(fieldNames).toContain('statusCode');
+      expect(fieldNames).toContain(env.logs.rawDataField);
     });
   });
 
-  test.describe('infra index', () => {
+  test.describe('metrics index', () => {
     test('Metrics mode: count query returns results', async ({ page }) => {
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl('infra-e2e'));
+      await page.goto(exploreUrl(env.metricsUid));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
       expect(body.results?.A?.frames?.length).toBeGreaterThan(0);
     });
 
-    test('Metrics mode: Lucene filter on role:web returns results', async ({ page }) => {
+    test('Metrics mode: Lucene filter on a tag field returns results', async ({ page }) => {
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl('infra-e2e', { luceneQuery: 'role:web' }));
+      await page.goto(exploreUrl(env.metricsUid, { luceneQuery: env.metrics.luceneFilter }));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
       expect(body.results?.A?.frames?.length).toBeGreaterThan(0);
     });
 
-    test('Raw Data mode: returns documents with host field', async ({ page }) => {
+    test('Raw Data mode: returns documents with the expected field', async ({ page }) => {
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl('infra-e2e', { metricsType: 'raw_data' }));
+      await page.goto(exploreUrl(env.metricsUid, { metricsType: 'raw_data' }));
       const { body } = await responsePromise;
       const frames: Array<{ schema?: { fields?: Array<{ name: string }> } }> = body.results?.A?.frames ?? [];
       expect(frames.length).toBeGreaterThan(0);
       const fieldNames = frames.flatMap((f) => (f.schema?.fields ?? []).map((field) => field.name));
-      expect(fieldNames).toContain('host');
+      expect(fieldNames).toContain(env.metrics.rawDataField);
+    });
+
+    test('Metrics mode: sum bucket composite aggregation returns summed per-host maxima', async ({ page }) => {
+      const responsePromise = waitForMainQueryResponse(page);
+      await page.goto(
+        exploreUrl(env.metricsUid, {
+          queryOverrides: {
+            metrics: [
+              {
+                id: '1',
+                type: 'sum_bucket',
+                field: env.metrics.numericField,
+                // host is dynamically mapped as text; terms aggregations need the keyword subfield.
+                settings: { metric: 'max', groupBy: env.metrics.groupByField, limit: '500' },
+              },
+            ],
+            bucketAggs: [{ id: '2', type: 'date_histogram', field: '@timestamp', settings: { interval: 'auto' } }],
+          },
+        })
+      );
+      const { response, body } = await responsePromise;
+      expect(response.ok()).toBe(true);
+      expect(body.results?.A?.error).toBeUndefined();
+      const frames = body.results?.A?.frames ?? [];
+      expect(frames.length).toBeGreaterThan(0);
+      const values: Array<number | null> = frames[0]?.data?.values?.[1] ?? [];
+      expect(values.some((v) => v !== null && v > 0)).toBe(true);
+    });
+
+    test('Metrics mode: sum bucket settings UI drives group by and returns results', async ({ page }) => {
+      // Pinned through the URL rather than the datasource picker and time-range control: the
+      // picker reports no error when a selection does not take, which turns a mis-set datasource
+      // into a timeout somewhere further down the test. The UI interactions below — which are
+      // what this test actually covers — are unaffected.
+      await page.goto(exploreUrl(env.metricsUid, { queryOverrides: DEFAULT_QUERY }));
+
+      const queryRow = getQueryEditorRow(page, 'A');
+      await expect(queryRow.getByRole('radio', { name: 'Metrics' })).toBeChecked();
+
+      // Switch the metric type from the default Count to Sum Bucket via the metric segment.
+      await queryRow.getByRole('button', { name: 'Count' }).click();
+      await page.getByRole('option', { name: 'Sum Bucket', exact: true }).click();
+
+      // Set the field the inner per-group metric is calculated on.
+      await queryRow.getByRole('button', { name: 'Select Field' }).click();
+      await page.getByRole('option', { name: env.metrics.numericField, exact: true }).click();
+
+      // Open the collapsed settings section, whose visible label is the row description.
+      await queryRow.getByRole('button', { name: /Group by: not set/i }).click();
+
+      // Set up the response wait before the action that fires the query we care about,
+      // so it can't resolve on an earlier (still-invalid, missing groupBy) request.
+      const responsePromise = waitForMainQueryResponse(page);
+
+      // The Group By segment is the only remaining "Select Field" placeholder once the
+      // metric field above has a value.
+      await queryRow.getByRole('button', { name: 'Select Field' }).click();
+      await page.getByRole('option', { name: env.metrics.groupByField, exact: true }).click();
+
+      const { response, body } = await responsePromise;
+      expect(response.ok()).toBe(true);
+      expect(body.results?.A?.error).toBeUndefined();
+      expect(body.results?.A?.frames?.length).toBeGreaterThan(0);
     });
   });
 });

@@ -19,6 +19,7 @@ import {
   isMetricAggregationWithSettings,
   isPipelineAggregation,
   isPipelineAggregationWithMultipleBucketPaths,
+  isSiblingPipelineAggregation,
 } from './aggregations';
 import { changeMetricField, changeMetricType } from './state/actions';
 import { getStyles } from './styles';
@@ -98,7 +99,16 @@ export const MetricEditor = ({ value }: Props) => {
         <SegmentAsync
           className={cx(styles.color, segmentStyles)}
           loadOptions={() => getTypeOptionsAsync(previousMetrics)}
-          onChange={(e) => dispatch(changeMetricType({ id: value.id, type: e.value!, previousType: value.type }))}
+          onChange={(e) =>
+            dispatch(
+              changeMetricType({
+                id: value.id,
+                type: e.value!,
+                previousType: value.type,
+                preserveQuery: query.preserveQuery ?? false,
+              })
+            )
+          }
           value={toOption(value)}
         />
 
@@ -116,7 +126,9 @@ export const MetricEditor = ({ value }: Props) => {
           <MetricPicker
             className={cx(styles.color, segmentStyles)}
             onChange={(e) => dispatch(changeMetricField({ id: value.id, field: e.value?.id! }))}
-            options={previousMetrics}
+            // Sibling composites (sum_bucket, max_bucket, ...) are hidden terms+pipeline pairs,
+            // not a metric a parent pipeline aggregation can apply to.
+            options={previousMetrics.filter((m) => !isSiblingPipelineAggregation(m))}
             value={value.field}
           />
         )}

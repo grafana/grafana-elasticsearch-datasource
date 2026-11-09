@@ -1,14 +1,13 @@
 import { uniqueId } from 'lodash';
 import React, { useMemo } from 'react';
 
-import { SelectableValue } from '@grafana/data';
-import { InlineField, Input, Select } from '@grafana/ui';
+import { Combobox, ComboboxOption, InlineField, Input } from '@grafana/ui';
 import { ExtendedStatMetaType, ExtendedStats, MetricAggregation, Percentiles, Terms } from '../../../../dataquery.gen';
 
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
 import { describeMetric } from '../../../../utils';
 import { useQuery } from '../../ElasticsearchQueryContext';
-import { isPipelineAggregation } from '../../MetricAggregationsEditor/aggregations';
+import { isPipelineAggregation, isSiblingPipelineAggregation } from '../../MetricAggregationsEditor/aggregations';
 import { changeBucketAggregationSetting } from '../state/actions';
 import { bucketAggregationConfig, orderByOptions, orderOptions } from '../utils';
 
@@ -34,8 +33,8 @@ export const TermsSettingsEditor = ({ bucketAgg }: Props) => {
   return (
     <>
       <InlineField label="Order" {...inlineFieldProps}>
-        <Select
-          inputId={`${baseId}-order`}
+        <Combobox
+          id={`${baseId}-order`}
           onChange={(e) =>
             dispatch(changeBucketAggregationSetting({ bucketAgg, settingName: 'order', newValue: e.value }))
           }
@@ -69,8 +68,8 @@ export const TermsSettingsEditor = ({ bucketAgg }: Props) => {
       </InlineField>
 
       <InlineField label="Order By" {...inlineFieldProps}>
-        <Select
-          inputId={`${baseId}-order_by`}
+        <Combobox
+          id={`${baseId}-order_by`}
           onChange={(e) =>
             dispatch(changeBucketAggregationSetting({ bucketAgg, settingName: 'orderBy', newValue: e.value }))
           }
@@ -95,7 +94,7 @@ export const TermsSettingsEditor = ({ bucketAgg }: Props) => {
 /**
  * This returns the valid options for each of the enabled extended stat
  */
-function createOrderByOptionsForExtendedStats(metric: ExtendedStats): SelectableValue<string> {
+function createOrderByOptionsForExtendedStats(metric: ExtendedStats): Array<ComboboxOption<string>> {
   if (!metric.meta) {
     return [];
   }
@@ -119,7 +118,7 @@ function createOrderByOptionsForExtendedStats(metric: ExtendedStats): Selectable
 /**
  * This returns the valid options for each of the percents listed in the percentile settings
  */
-function createOrderByOptionsForPercentiles(metric: Percentiles): Array<SelectableValue<string>> {
+function createOrderByOptionsForPercentiles(metric: Percentiles): Array<ComboboxOption<string>> {
   if (!metric.settings?.percents) {
     return [];
   }
@@ -136,14 +135,17 @@ function isValidOrderTarget(metric: MetricAggregation) {
     // top metrics can't be used for ordering
     metric.type !== 'top_metrics' &&
     // pipeline aggregations can't be used for ordering: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-bucket-terms-aggregation.html#search-aggregations-bucket-terms-aggregation-order
-    !isPipelineAggregation(metric)
+    !isPipelineAggregation(metric) &&
+    // sibling composites are hidden terms+pipeline pairs, not a metric that exists inside this
+    // terms bucket, so they can't be used for ordering either
+    !isSiblingPipelineAggregation(metric)
   );
 }
 
 /**
  * This creates all the valid order by options based on the metrics
  */
-export const createOrderByOptions = (metrics: MetricAggregation[] = []): Array<SelectableValue<string>> => {
+export const createOrderByOptions = (metrics: MetricAggregation[] = []): Array<ComboboxOption<string>> => {
   const metricOptions = metrics.filter(isValidOrderTarget).flatMap((metric) => {
     if (metric.type === 'extended_stats') {
       return createOrderByOptionsForExtendedStats(metric);

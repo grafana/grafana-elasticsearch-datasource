@@ -25,9 +25,22 @@ func newLogsResponseProcessor(logger log.Logger) *logsResponseProcessor {
 }
 
 // processLogsResponse processes logs query responses
-func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, target *Query, configuredFields es.ConfiguredFields, queryRes *backend.DataResponse) error {
+func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, target *Query, configuredFields es.ConfiguredFields, dataplaneEnabled bool, queryRes *backend.DataResponse) error {
 	propNames := make(map[string]bool)
 	docs := make([]map[string]interface{}, len(res.Hits.Hits))
+	// metadataKeys[i] records the keys in docs[i] that hit["fields"] returned
+	// and _source does not carry (runtime and doc-value-only fields). Only
+	// populated when the dataplane toggle is on; consumed by
+	// buildLogLinesCanonicalFields to tag those keys as "Metadata" in labelTypes.
+	var metadataKeys []map[string]struct{}
+	// rowIDs[i] is the canonical log-line id for hit i, <_index>#<_id>. It is
+	// kept apart from doc["id"] so that a document's own `id` attribute stays
+	// a label and cannot make two rows share an id.
+	var rowIDs []string
+	if dataplaneEnabled {
+		metadataKeys = make([]map[string]struct{}, len(res.Hits.Hits))
+		rowIDs = make([]string, len(res.Hits.Hits))
+	}
 	searchWords := make(map[string]bool)
 
 	for hitIdx, hit := range res.Hits.Hits {
@@ -63,15 +76,31 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 		if hit["fields"] != nil {
 			source, ok := hit["fields"].(map[string]interface{})
 			if ok {
+				var fieldsOrigin map[string]struct{}
+				if dataplaneEnabled {
+					fieldsOrigin = make(map[string]struct{}, len(source))
+				}
 				for k, v := range source {
 					doc[k] = unwrapFieldValue(v)
+					// A key that _source also carries is a document field the
+					// fields API merely echoed (every field is requested under
+					// "Include runtime fields"); only keys the document itself
+					// lacks are metadata.
+					if _, inSource := flattened[k]; dataplaneEnabled && !inSource {
+						fieldsOrigin[k] = struct{}{}
+					}
+				}
+				if dataplaneEnabled {
+					metadataKeys[hitIdx] = fieldsOrigin
 				}
 			}
 		}
 
-		// we are going to add an `id` field with the concatenation of `_id` and `_index`
-		_, ok := doc["id"]
-		if !ok {
+		if dataplaneEnabled {
+			rowIDs[hitIdx] = fmt.Sprintf("%v#%v", doc["_index"], doc["_id"])
+		} else if _, ok := doc["id"]; !ok {
+			// Legacy frames expose the same identity as an `id` column, but only
+			// when the document has no `id` of its own.
 			doc["id"] = fmt.Sprintf("%v#%v", doc["_index"], doc["_id"])
 		}
 
@@ -101,9 +130,17 @@ func (p *logsResponseProcessor) processLogsResponse(res *es.SearchResponse, targ
 	sortedPropNames := sortPropNames(propNames, configuredFields, true)
 	fields := processDocsToDataFrameFields(docs, sortedPropNames, configuredFields)
 
+	if dataplaneEnabled {
+		canonical := buildLogLinesCanonicalFields(docs, rowIDs, configuredFields, metadataKeys)
+		fields = prependLogLinesCanonicalFields(canonical, fields)
+	}
+
 	frames := data.Frames{}
 	frame := data.NewFrame("", fields...)
 	setPreferredVisType(frame, data.VisTypeLogs)
+	if dataplaneEnabled {
+		setLogLinesFrameMeta(frame)
+	}
 
 	var total int
 	if res.Hits.Total != nil {

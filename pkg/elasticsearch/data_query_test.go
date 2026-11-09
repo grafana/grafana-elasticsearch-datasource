@@ -280,6 +280,55 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, termsAgg.Order["_key"], "asc")
 		})
 
+		t.Run("With term agg and no order settings", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{
+						"type": "terms",
+						"field": "@host",
+						"id": "2",
+						"settings": { "size": "5" }
+					},
+					{ "type": "date_histogram", "field": "@timestamp", "id": "3" }
+				],
+				"metrics": [
+					{"type": "count", "id": "1" }
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			// The editor displays "Order by: Term value, Top" when the ordering
+			// options are missing, so the built query must match it rather than
+			// fall back to Elasticsearch's _count ordering.
+			termsAgg := sr.Aggs[0].Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, termsAgg.Order["_key"], "desc")
+		})
+
+		t.Run("With term agg and order but no orderBy", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{
+						"type": "terms",
+						"field": "@host",
+						"id": "2",
+						"settings": { "size": "5", "order": "asc" }
+					},
+					{ "type": "date_histogram", "field": "@timestamp", "id": "3" }
+				],
+				"metrics": [
+					{"type": "count", "id": "1" }
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			termsAgg := sr.Aggs[0].Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, termsAgg.Order["_key"], "asc")
+		})
+
 		t.Run("With term agg and valid min_doc_count (from frontend tests)", func(t *testing.T) {
 			c := newFakeClient()
 			_, err := executeElasticsearchDataQuery(c, `{
@@ -426,8 +475,10 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, rangeFilter.Format, es.DateFormatEpochMS)
 
 			require.Equal(t, sr.Size, defaultSize)
-			require.Equal(t, sr.Sort["@timestamp"], map[string]string{"order": "desc", "unmapped_type": "boolean"})
-			require.Equal(t, sr.Sort["_doc"], map[string]string{"order": "desc"})
+			require.Equal(t, []map[string]any{
+				{"@timestamp": map[string]string{"order": "desc", "unmapped_type": "boolean"}},
+				{"_doc": map[string]string{"order": "desc"}},
+			}, sr.Sort)
 			require.Equal(t, sr.CustomProps["script_fields"], map[string]any{})
 		})
 
@@ -447,8 +498,10 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, rangeFilter.Format, es.DateFormatEpochMS)
 
 			require.Equal(t, sr.Size, defaultSize)
-			require.Equal(t, sr.Sort["@timestamp"], map[string]string{"order": "desc", "unmapped_type": "boolean"})
-			require.Equal(t, sr.Sort["_doc"], map[string]string{"order": "desc"})
+			require.Equal(t, []map[string]any{
+				{"@timestamp": map[string]string{"order": "desc", "unmapped_type": "boolean"}},
+				{"_doc": map[string]string{"order": "desc"}},
+			}, sr.Sort)
 			require.Equal(t, sr.CustomProps["script_fields"], map[string]any{})
 		})
 
@@ -1077,6 +1130,204 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, plAgg.BucketPath, "3")
 		})
 
+		t.Run("With sum_bucket sibling aggregation", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{
+						"id": "2",
+						"type": "sum_bucket",
+						"field": "storage_used",
+						"settings": { "metric": "max", "groupBy": "host", "limit": "500" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			firstLevel := sr.Aggs[0]
+			require.Equal(t, firstLevel.Key, "4")
+			require.Equal(t, firstLevel.Aggregation.Type, "date_histogram")
+			require.Len(t, firstLevel.Aggregation.Aggs, 2)
+
+			groupByAgg := firstLevel.Aggregation.Aggs[0]
+			require.Equal(t, groupByAgg.Key, "2_groupby")
+			require.Equal(t, groupByAgg.Aggregation.Type, "terms")
+			termsAgg := groupByAgg.Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, termsAgg.Field, "host")
+			require.Equal(t, termsAgg.Size, 500)
+
+			require.Len(t, groupByAgg.Aggregation.Aggs, 1)
+			innerAgg := groupByAgg.Aggregation.Aggs[0]
+			require.Equal(t, innerAgg.Key, "2_inner")
+			require.Equal(t, innerAgg.Aggregation.Type, "max")
+			innerMetric := innerAgg.Aggregation.Aggregation.(*es.MetricAggregation)
+			require.Equal(t, innerMetric.Field, "storage_used")
+
+			siblingAgg := firstLevel.Aggregation.Aggs[1]
+			require.Equal(t, siblingAgg.Key, "2")
+			require.Equal(t, siblingAgg.Aggregation.Type, "sum_bucket")
+			plAgg := siblingAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			require.Equal(t, plAgg.BucketPath, "2_groupby>2_inner")
+		})
+
+		t.Run("With max_bucket defaults applied", func(t *testing.T) {
+			// No inner metric or limit set: inner stat defaults to max, limit to 500.
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{
+						"id": "2",
+						"type": "max_bucket",
+						"field": "storage_used",
+						"settings": { "groupBy": "host" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			firstLevel := sr.Aggs[0]
+			groupByAgg := firstLevel.Aggregation.Aggs[0]
+			termsAgg := groupByAgg.Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, termsAgg.Size, 500)
+			require.Equal(t, groupByAgg.Aggregation.Aggs[0].Aggregation.Type, "max")
+			require.Equal(t, firstLevel.Aggregation.Aggs[1].Aggregation.Type, "max_bucket")
+		})
+
+		t.Run("With sibling aggregation limit clamped to elasticsearch maximum", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{
+						"id": "2",
+						"type": "sum_bucket",
+						"field": "storage_used",
+						"settings": { "groupBy": "host", "limit": "999999" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+			termsAgg := sr.Aggs[0].Aggregation.Aggs[0].Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, termsAgg.Size, 65535)
+		})
+
+		t.Run("With sibling aggregation invalid inner stat falls back to max", func(t *testing.T) {
+			// The inner stat becomes an aggregation type key in the request body,
+			// so unknown values must not pass through verbatim.
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{
+						"id": "2",
+						"type": "sum_bucket",
+						"field": "storage_used",
+						"settings": { "metric": "cardinality", "groupBy": "host" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+			require.Equal(t, sr.Aggs[0].Aggregation.Aggs[0].Aggregation.Aggs[0].Aggregation.Type, "max")
+		})
+
+		t.Run("With sibling aggregation missing groupBy is not emitted", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{ "id": "2", "type": "sum_bucket", "field": "storage_used", "settings": {} }
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+			require.Len(t, sr.Aggs[0].Aggregation.Aggs, 0)
+		})
+
+		t.Run("With sibling aggregation missing field is not emitted", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{ "id": "2", "type": "sum_bucket", "settings": { "groupBy": "host" } }
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+			require.Len(t, sr.Aggs[0].Aggregation.Aggs, 0)
+		})
+
+		t.Run("With sibling aggregation limit of -5 clamps to the default of 500", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{
+						"id": "2",
+						"type": "sum_bucket",
+						"field": "storage_used",
+						"settings": { "groupBy": "host", "limit": "-5" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+			termsAgg := sr.Aggs[0].Aggregation.Aggs[0].Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Equal(t, 500, termsAgg.Size)
+		})
+
+		t.Run("With terms order pointing at a sibling metric, the sibling is not emitted as an order or a nested metric", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"bucketAggs": [
+					{
+						"type": "terms",
+						"field": "@host",
+						"id": "2",
+						"settings": { "size": "5", "order": "asc", "orderBy": "3" }
+					},
+					{ "type": "date_histogram", "field": "@timestamp", "id": "4" }
+				],
+				"metrics": [
+					{ "id": "1", "type": "count" },
+					{
+						"id": "3",
+						"type": "sum_bucket",
+						"field": "storage_used",
+						"settings": { "metric": "max", "groupBy": "host", "limit": "500" }
+					}
+				]
+			}`, from, to)
+			require.NoError(t, err)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			termsAgg := sr.Aggs[0].Aggregation.Aggregation.(*es.TermsAggregation)
+			require.Empty(t, termsAgg.Order, "order referencing a sibling metric must not be emitted")
+
+			for _, sub := range sr.Aggs[0].Aggregation.Aggs {
+				require.NotEqual(t, "3", sub.Key, "sibling metric must not be emitted as a nested metric of the terms agg")
+			}
+		})
+
 		t.Run("With derivative doc count", func(t *testing.T) {
 			// This test is with pipelineAgg and is passing. Same test without pipelineAgg is failing.
 			c := newFakeClient()
@@ -1403,8 +1654,10 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 			require.Equal(t, rangeFilter.Gte, fromMs)
 			require.Equal(t, rangeFilter.Format, es.DateFormatEpochMS)
 
-			require.Equal(t, sr.Sort["@timestamp"], map[string]string{"order": "desc", "unmapped_type": "boolean"})
-			require.Equal(t, sr.Sort["_doc"], map[string]string{"order": "desc"})
+			require.Equal(t, []map[string]any{
+				{"@timestamp": map[string]string{"order": "desc", "unmapped_type": "boolean"}},
+				{"_doc": map[string]string{"order": "desc"}},
+			}, sr.Sort)
 			require.Equal(t, sr.CustomProps["script_fields"], map[string]any{})
 
 			firstLevel := sr.Aggs[0]
@@ -1454,8 +1707,10 @@ func TestExecuteElasticsearchDataQuery(t *testing.T) {
 		}`, from, to)
 			require.NoError(t, err)
 			sr := c.multisearchRequests[0].Requests[0]
-			require.Equal(t, sr.Sort["@timestamp"], map[string]string{"order": "asc", "unmapped_type": "boolean"})
-			require.Equal(t, sr.Sort["_doc"], map[string]string{"order": "asc"})
+			require.Equal(t, []map[string]any{
+				{"@timestamp": map[string]string{"order": "asc", "unmapped_type": "boolean"}},
+				{"_doc": map[string]string{"order": "asc"}},
+			}, sr.Sort)
 
 			searchAfter := sr.CustomProps["search_after"].([]any)
 			firstSearchAfter, err := searchAfter[0].(json.Number).Int64()
@@ -1968,6 +2223,33 @@ func TestExecuteElasticsearchDataQuery_EdgeCases(t *testing.T) {
 				"bucket_script with no resolvable pipeline variables must not be emitted")
 		}
 	})
+
+	t.Run("bucket_script drops numeric references to deleted metrics but keeps resolved ones", func(t *testing.T) {
+		c := newFakeClient()
+		_, err := executeElasticsearchDataQuery(c, `{
+			"bucketAggs": [{ "type": "date_histogram", "field": "@timestamp", "id": "2" }],
+			"metrics": [
+				{ "id": "1", "type": "sum", "field": "@value" },
+				{
+					"id": "4",
+					"type": "bucket_script",
+					"pipelineVariables": [
+						{ "name": "var1", "pipelineAgg": "1" },
+						{ "name": "var2", "pipelineAgg": "999" }
+					],
+					"settings": { "script": "params.var1 * 2" }
+				}
+			]
+		}`, from, to)
+		require.NoError(t, err)
+
+		sr := c.multisearchRequests[0].Requests[0]
+		bucketScriptAgg := findSubAggByKey(t, sr.Aggs[0].Aggregation.Aggs, "4")
+		require.NotNil(t, bucketScriptAgg)
+		plAgg := bucketScriptAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+		require.Equal(t, map[string]any{"var1": "1"}, plAgg.BucketPath,
+			"numeric reference to a deleted metric must be dropped, resolved reference kept")
+	})
 }
 
 func newFakeClient() *fakeClient {
@@ -2218,5 +2500,91 @@ func TestRawDSLQuery(t *testing.T) {
 			require.Contains(t, string(body), `"term"`)
 			require.Contains(t, string(body), "tempo")
 		})
+
+		// A raw-DSL bucket_script references its sibling metrics by their aggregation names
+		// (the parser adopts the DSL agg name as the metric ID), not by numeric builder IDs.
+		// The rebuilt request must keep the bucket_script with its named buckets_path instead
+		// of silently dropping it because the references fail the numeric-ID check.
+		t.Run("DSL bucket_script with named buckets_path referencing a sibling metric is kept", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"refId": "A",
+				"queryType": "dsl",
+				"editorType": "code",
+				"metrics": [{ "type": "count", "id": "1" }],
+				"query": "{\"size\":0,\"aggs\":{\"per_min\":{\"date_histogram\":{\"field\":\"@timestamp\",\"fixed_interval\":\"1m\"},\"aggs\":{\"total_sales\":{\"sum\":{\"field\":\"price\"}},\"pct\":{\"bucket_script\":{\"buckets_path\":{\"total\":\"total_sales\"},\"script\":\"params.total * 2\"}}}}}}"
+			}`, from, to)
+			require.NoError(t, err)
+			require.Len(t, c.multisearchRequests, 1)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			require.Len(t, sr.Aggs, 1)
+			require.Equal(t, "per_min", sr.Aggs[0].Key)
+
+			bucketScriptAgg := findSubAggByKey(t, sr.Aggs[0].Aggregation.Aggs, "pct")
+			require.NotNil(t, bucketScriptAgg, "named-reference bucket_script must not be dropped from the request")
+			plAgg := bucketScriptAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			require.Equal(t, map[string]any{"total": "total_sales"}, plAgg.BucketPath)
+
+			// The serialised request must carry the named buckets_path through to Elasticsearch.
+			body, err := json.Marshal(sr)
+			require.NoError(t, err)
+			require.Contains(t, string(body), `"buckets_path":{"total":"total_sales"}`)
+		})
+
+		// Named references that do not match any sibling metric ID (nested paths, _count) are
+		// passed through verbatim so Elasticsearch validates them, rather than the plugin
+		// silently omitting the aggregation.
+		t.Run("DSL bucket_script with unresolved named buckets_path is passed through verbatim", func(t *testing.T) {
+			c := newFakeClient()
+			_, err := executeElasticsearchDataQuery(c, `{
+				"refId": "A",
+				"queryType": "dsl",
+				"editorType": "code",
+				"metrics": [{ "type": "count", "id": "1" }],
+				"query": "{\"size\":0,\"aggs\":{\"per_min\":{\"date_histogram\":{\"field\":\"@timestamp\",\"fixed_interval\":\"1m\"},\"aggs\":{\"pct\":{\"bucket_script\":{\"buckets_path\":{\"total\":\"other>total_sales\",\"c\":\"_count\"},\"script\":\"params.total / params.c\"}}}}}}"
+			}`, from, to)
+			require.NoError(t, err)
+			require.Len(t, c.multisearchRequests, 1)
+			sr := c.multisearchRequests[0].Requests[0]
+
+			require.Len(t, sr.Aggs, 1)
+			require.Equal(t, "per_min", sr.Aggs[0].Key)
+
+			bucketScriptAgg := findSubAggByKey(t, sr.Aggs[0].Aggregation.Aggs, "pct")
+			require.NotNil(t, bucketScriptAgg, "bucket_script with unresolved named references must not be dropped from the request")
+			plAgg := bucketScriptAgg.Aggregation.Aggregation.(*es.PipelineAggregation)
+			require.Equal(t, map[string]any{"total": "other>total_sales", "c": "_count"}, plAgg.BucketPath)
+		})
 	})
+}
+
+// findSubAggByKey returns the sub-aggregation with the given key, or nil when absent.
+// Raw-DSL aggregations are parsed from a JSON object, so sibling order is not deterministic.
+func findSubAggByKey(t *testing.T, aggs es.AggArray, key string) *es.Agg {
+	t.Helper()
+	for _, agg := range aggs {
+		if agg.Key == key {
+			return agg
+		}
+	}
+	return nil
+}
+
+func TestDataplaneFlagGatesQueryConstruction(t *testing.T) {
+	c := newFakeClient()
+	dataRequest := backend.QueryDataRequest{
+		Queries: []backend.DataQuery{
+			{JSON: json.RawMessage(`{}`), RefID: "A"},
+		},
+	}
+
+	original := isDataplaneEnabled
+	t.Cleanup(func() { isDataplaneEnabled = original })
+
+	for _, enabled := range []bool{true, false} {
+		isDataplaneEnabled = func(context.Context) bool { return enabled }
+		query := newElasticsearchDataQuery(context.Background(), c, &dataRequest, log.New(), "")
+		require.Equal(t, enabled, query.dataplaneEnabled)
+	}
 }

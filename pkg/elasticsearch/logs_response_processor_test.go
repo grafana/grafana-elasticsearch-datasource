@@ -36,7 +36,7 @@ func TestProcessLogsResponse_NonMapSourceDoesNotPanic(t *testing.T) {
 
 	var queryRes backend.DataResponse
 	require.NotPanics(t, func() {
-		err := p.processLogsResponse(res, target, es.ConfiguredFields{TimeField: "@timestamp"}, &queryRes)
+		err := p.processLogsResponse(res, target, es.ConfiguredFields{TimeField: "@timestamp"}, false, &queryRes)
 		require.NoError(t, err)
 	})
 	require.Len(t, queryRes.Frames, 1)

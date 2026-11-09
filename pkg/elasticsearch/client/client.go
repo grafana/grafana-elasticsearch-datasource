@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -36,7 +37,25 @@ type DatasourceInfo struct {
 	Interval                   string
 	MaxConcurrentShardRequests int64
 	IncludeFrozen              bool
-	ClusterInfo                ClusterInfo
+	// clusterInfo is read by concurrent query goroutines and re-detected by
+	// the health check when detection failed at instance creation, so access
+	// goes through ClusterInfo and SetClusterInfo.
+	clusterInfo atomic.Pointer[ClusterInfo]
+}
+
+// ClusterInfo returns the detected cluster information, or the zero value
+// when detection has not succeeded yet.
+func (ds *DatasourceInfo) ClusterInfo() ClusterInfo {
+	if ci := ds.clusterInfo.Load(); ci != nil {
+		return *ci
+	}
+	return ClusterInfo{}
+}
+
+// SetClusterInfo records the detected cluster information. It is safe to call
+// concurrently with ClusterInfo.
+func (ds *DatasourceInfo) SetClusterInfo(ci ClusterInfo) {
+	ds.clusterInfo.Store(&ci)
 }
 
 type ConfiguredFields struct {
@@ -208,7 +227,7 @@ func (c *baseClientImpl) getMultiSearchQueryParameters() string {
 	var qs []string
 	// if the build flavor is not serverless, we can use the max concurrent shard requests
 	// this is because serverless clusters do not support max concurrent shard requests
-	if !c.ds.ClusterInfo.IsServerless() && c.ds.MaxConcurrentShardRequests > 0 {
+	if !c.ds.ClusterInfo().IsServerless() && c.ds.MaxConcurrentShardRequests > 0 {
 		qs = append(qs, fmt.Sprintf("max_concurrent_shard_requests=%d", c.ds.MaxConcurrentShardRequests))
 	}
 
@@ -280,6 +299,9 @@ func (c *baseClientImpl) ExecuteEsql(query string) (*EsqlResponse, error) {
 
 	var esqlResponse EsqlResponse
 	dec := json.NewDecoder(clientRes.Body)
+	// The processor types each cell from the column metadata. long and
+	// unsigned_long values exceed float64 precision, so the digits are kept.
+	dec.UseNumber()
 	if err := dec.Decode(&esqlResponse); err != nil {
 		return nil, backend.DownstreamError(fmt.Errorf("failed to decode ES|QL response: %w", err))
 	}

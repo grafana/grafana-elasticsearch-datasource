@@ -18,7 +18,7 @@ func (e *elasticsearchDataQuery) processQuery(q *Query, ms *es.MultiSearchReques
 	}
 
 	defaultTimeField := e.client.GetConfiguredFields().TimeField
-	b := ms.Search(q.Interval, q.TimeRange)
+	b := ms.Search(clampAutoInterval(q, from, to), q.TimeRange)
 	if q.Index != "" {
 		b.SetIndex(q.Index)
 	}
@@ -151,31 +151,43 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 			continue
 		}
 
+		if isSiblingPipelineAgg(m.Type) {
+			addSiblingPipelineAgg(aggBuilder, m)
+			continue
+		}
+
 		if isPipelineAgg(m.Type) {
 			if isPipelineAggWithMultipleBucketPaths(m.Type) {
 				if len(m.PipelineVariables) > 0 {
 					bucketPaths := make(map[string]any, len(m.PipelineVariables))
 					for name, pipelineAgg := range m.PipelineVariables {
-						if _, err := strconv.Atoi(pipelineAgg); err == nil {
-							var appliedAgg *MetricAgg
-							for _, pipelineMetric := range q.Metrics {
-								if pipelineMetric.ID == pipelineAgg {
-									appliedAgg = pipelineMetric
-									break
-								}
+						var appliedAgg *MetricAgg
+						for _, pipelineMetric := range q.Metrics {
+							if pipelineMetric.ID == pipelineAgg {
+								appliedAgg = pipelineMetric
+								break
 							}
-							if appliedAgg != nil {
-								if appliedAgg.Type == countType {
-									bucketPaths[name] = "_count"
-								} else {
-									bucketPaths[name] = pipelineAgg
-								}
+						}
+						if appliedAgg != nil {
+							// The reference resolves to a sibling metric. This covers
+							// numeric builder-UI IDs and named raw-DSL aggregation IDs.
+							if appliedAgg.Type == countType {
+								bucketPaths[name] = "_count"
+							} else {
+								bucketPaths[name] = pipelineAgg
 							}
+						} else if _, err := strconv.Atoi(pipelineAgg); err != nil {
+							// A non-numeric reference that matches no sibling comes from a
+							// raw-DSL query (e.g. a nested path like "agg>metric" or
+							// "_count"): pass it through verbatim so Elasticsearch
+							// validates it. Numeric references that match no sibling are
+							// builder-UI pointers to deleted metrics and are dropped.
+							bucketPaths[name] = pipelineAgg
 						}
 					}
 
-					// Skip emitting the pipeline aggregation when none of the
-					// variables resolved to a real metric: an empty buckets_path
+					// Skip emitting the pipeline aggregation when no variable resolved
+					// to a real metric or a raw-DSL reference: an empty buckets_path
 					// would produce an invalid Elasticsearch query.
 					if len(bucketPaths) == 0 {
 						continue
@@ -217,6 +229,42 @@ func processTimeSeriesQuery(q *Query, b *es.SearchRequestBuilder, from, to int64
 			})
 		}
 	}
+}
+
+// addSiblingPipelineAgg emits the pair of aggregations behind a composite
+// metric such as Sum Bucket: a hidden terms aggregation grouping documents by
+// the groupBy field (with the inner stat nested inside), and the sibling
+// pipeline aggregation combining the per-group results. The hidden terms
+// aggregation is not part of the query model's bucket aggregations, so the
+// response parser never recurses into it.
+func addSiblingPipelineAgg(aggBuilder es.AggBuilder, m *MetricAgg) {
+	groupBy := m.Settings.Get("groupBy").MustString()
+	if groupBy == "" || m.Field == "" {
+		// An empty groupBy or field would produce an invalid Elasticsearch query.
+		return
+	}
+
+	innerStat := m.Settings.Get("metric").MustString()
+	if _, ok := validSiblingInnerStats[innerStat]; !ok {
+		innerStat = defaultSiblingInnerStat
+	}
+
+	limit := stringToIntWithDefaultValue(m.Settings.Get("limit").MustString(), defaultSiblingBucketLimit)
+	if limit < 1 {
+		limit = defaultSiblingBucketLimit
+	}
+	if limit > maxSiblingBucketLimit {
+		limit = maxSiblingBucketLimit
+	}
+
+	groupByID := m.ID + "_groupby"
+	innerID := m.ID + "_inner"
+
+	aggBuilder.Terms(groupByID, groupBy, func(a *es.TermsAggregation, b es.AggBuilder) {
+		a.Size = limit
+		b.Metric(innerID, innerStat, m.Field, nil)
+	})
+	aggBuilder.Pipeline(m.ID, m.Type, groupByID+">"+innerID, nil)
 }
 
 func applyBoolFilters(bf *BoolFilterSet, b *es.SearchRequestBuilder) {

@@ -17,16 +17,19 @@
     },
   "script_fields": {},
   "size": 500,
-  "sort": 
+  "sort": [
     {
       "testtime": {
         "order": "desc",
         "unmapped_type": "boolean"
-      },
+      }
+    },
+    {
       "_doc": {
         "order": "desc"
       }
-    },
+    }
+  ],
   "fields": 
     [ 
       {

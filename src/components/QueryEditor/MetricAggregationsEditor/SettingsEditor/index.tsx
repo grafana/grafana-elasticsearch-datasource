@@ -2,19 +2,24 @@ import { uniqueId } from 'lodash';
 import * as React from 'react';
 import { ComponentProps, useId, useMemo, useState } from 'react';
 
-import { InlineField, InlineSwitch, Input, Select } from '@grafana/ui';
+import { Combobox, InlineField, InlineSwitch, Input } from '@grafana/ui';
 import { ExtendedStat, MetricAggregation } from '../../../../dataquery.gen';
 
 import { useDispatch } from '../../../../hooks/useStatelessReducer';
 import { extendedStats } from '../../../../queryDef';
 import { SettingsEditorContainer } from '../../SettingsEditorContainer';
-import { isMetricAggregationWithInlineScript, isMetricAggregationWithMissingSupport } from '../aggregations';
+import {
+  isMetricAggregationWithInlineScript,
+  isMetricAggregationWithMissingSupport,
+  isSiblingPipelineAggregation,
+} from '../aggregations';
 import { changeMetricMeta, changeMetricSetting } from '../state/actions';
 import { metricAggregationConfig } from '../utils';
 
 import { BucketScriptSettingsEditor } from './BucketScriptSettingsEditor';
 import { MovingAverageSettingsEditor } from './MovingAverageSettingsEditor';
 import { SettingField } from './SettingField';
+import { SiblingBucketSettingsEditor } from './SiblingBucketSettingsEditor';
 import { TopMetricsSettingsEditor } from './TopMetricsSettingsEditor';
 import { useDescription } from './useDescription';
 
@@ -77,6 +82,8 @@ export const SettingsEditor = ({ metric, previousMetrics }: Props) => {
         <BucketScriptSettingsEditor value={metric} previousMetrics={previousMetrics} />
       )}
 
+      {isSiblingPipelineAggregation(metric) && <SiblingBucketSettingsEditor metric={metric} />}
+
       {metric.type === 'cardinality' && (
         <SettingField label="Precision Threshold" metric={metric} settingName="precision_threshold" />
       )}
@@ -124,7 +131,7 @@ export const SettingsEditor = ({ metric, previousMetrics }: Props) => {
       {metric.type === 'rate' && (
         <>
           <InlineField label="Unit" {...inlineFieldProps} data-testid="unit-select" htmlFor={unitFieldId}>
-            <Select
+            <Combobox
               id={unitFieldId}
               onChange={(e) => dispatch(changeMetricSetting({ metric, settingName: 'unit', newValue: e.value }))}
               options={rateAggUnitOptions}
@@ -133,7 +140,7 @@ export const SettingsEditor = ({ metric, previousMetrics }: Props) => {
           </InlineField>
 
           <InlineField label="Mode" {...inlineFieldProps} data-testid="mode-select" htmlFor={modeFieldId}>
-            <Select
+            <Combobox
               id={modeFieldId}
               onChange={(e) => dispatch(changeMetricSetting({ metric, settingName: 'mode', newValue: e.value }))}
               options={rateAggModeOptions}

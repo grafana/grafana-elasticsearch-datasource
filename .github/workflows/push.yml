@@ -1,20 +1,88 @@
-name: Plugins - CI
+# Description:
+# Thin caller for the shared datasource CI/CD pipeline in
+# grafana/data-sources-ci-workflows, which owns release-please and the prod publish.
+#
+# CI is called directly rather than through the shared workflow. A called workflow
+# prefixes its checks with the calling job's name, so routing CI through
+# datasource-cicd.yml reports every check as "CI/CD / CI / <job>" instead of
+# "CI / <job>". This repo's branch rulesets require the two-segment names, so the
+# deeper names would leave the required checks permanently unreported and block
+# every PR.
+#
+# The dev-catalog publish is also a direct cd-dev.yml call, so the
+# reusable-workflow chain stays within GitHub's 4-level nesting cap. It is gated on
+# the shared workflow's release_created output so a Release Please merge (which
+# cicd publishes to prod) does not also double-publish to the dev catalog.
+
+name: Plugins - CI/CD
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
+  push:
+    branches: [main]
 
 permissions: {}
+
+concurrency:
+  # Supersede an in-flight run on the same ref, except on main. A main run can be
+  # publishing to the dev catalog or cutting a release, so it must never be cancelled.
+  group: plugins-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   ci:
     name: CI
-    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v10.1.0
+    if: github.event_name == 'pull_request'
+    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v11.1.1
     permissions:
       contents: read
       id-token: write
     with:
-      plugin-version-suffix: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+      golangci-lint-version: '2.15.0'
+      # Ensure PR builds produce unique plugin versions.
+      plugin-version-suffix: ${{ github.event.pull_request.head.sha }}
       run-playwright: true
+      disable-gcs-upload: true
+
+  cicd:
+    name: CI/CD
+    # Release path only. On pull requests every job in the shared workflow is
+    # skipped, so CI above is the only pull-request path.
+    if: github.ref == 'refs/heads/main'
+    # Intentionally pinned to @main: data-sources-ci-workflows publishes no
+    # versioned tags for datasource-cicd.yml yet. Review periodically.
+    uses: grafana/data-sources-ci-workflows/.github/workflows/datasource-cicd.yml@main # zizmor: ignore[unpinned-uses]
+    # These are a ceiling for the called workflow, not a grant to each of its jobs.
+    # Every job there declares its own permissions, which cannot exceed this block.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      pull-requests: read
+    secrets: inherit
+    with:
+      golangci-lint-version: '2.15.0'
+
+  publish-dev:
+    name: Publish to Dev Catalog and Deploy
+    needs: cicd
+    # Publishes each main build to the internal dev Plugin Catalog and deploys it to the
+    # shared Cloud instance the nightly Cloud E2E lane runs against. Skipped when
+    # release-please cut a release, because cicd already published that version to prod.
+    if: github.ref == 'refs/heads/main' && needs.cicd.outputs.release_created != 'true'
+    # Intentionally pinned to @main: see the note on cicd above.
+    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@main # zizmor: ignore[unpinned-uses]
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+      pull-requests: read
+    with:
+      # Both inputs are required by cd-dev.yml. Keep Go aligned with go.mod
+      # and golangci-lint aligned with the explicit version in the ci job above.
+      go-version: '1.27.3'
+      golangci-lint-version: '2.15.0'
+      # The backend ships to dev0 per merge through the bundled pipeline
+      # (bundled-image.yml), so this job publishes the frontend to the dev catalog
+      # and does not also trigger the backend rollout.
+      deploy: false

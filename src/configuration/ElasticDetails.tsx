@@ -1,14 +1,14 @@
 import * as React from 'react';
 
-import type { DataSourceSettings, SelectableValue } from '@grafana/data';
+import type { DataSourceSettings } from '@grafana/data';
 import { ConfigDescriptionLink, ConfigSubSection } from '@grafana/plugin-ui';
-import { InlineField, Input, Select, InlineSwitch } from '@grafana/ui';
+import { Combobox, type ComboboxOption, InlineField, Input, InlineSwitch } from '@grafana/ui';
 
 import type { ElasticsearchOptions, Interval, QueryType } from '../types';
 
 import { QUERY_TYPE_SELECTOR_OPTIONS } from './utils';
 
-const indexPatternTypes: Array<SelectableValue<'none' | Interval>> = [
+const indexPatternTypes: Array<ComboboxOption<'none' | Interval> & { example?: string }> = [
   { label: 'No pattern', value: 'none' },
   { label: 'Hourly', value: 'Hourly', example: '[logstash-]YYYY.MM.DD.HH' },
   { label: 'Daily', value: 'Daily', example: '[logstash-]YYYY.MM.DD' },
@@ -41,6 +41,9 @@ export const ElasticDetails = ({ value, onChange }: Props) => {
       >
         <Input
           id="es_config_indexName"
+          // Deprecated `database` must stay as a read fallback for datasources
+          // saved before the index moved to jsonData.
+          // eslint-disable-next-line @typescript-eslint/no-deprecated
           value={value.jsonData.index ?? (value.database || '')}
           onChange={indexChangeHandler(value, onChange)}
           width={24}
@@ -55,11 +58,9 @@ export const ElasticDetails = ({ value, onChange }: Props) => {
         labelWidth={29}
         tooltip="If you're using a pattern for your index, select the type, or no pattern."
       >
-        <Select
-          inputId="es_config_indexPattern"
-          value={indexPatternTypes.find(
-            (pattern) => pattern.value === (value.jsonData.interval === undefined ? 'none' : value.jsonData.interval)
-          )}
+        <Combobox
+          id="es_config_indexPattern"
+          value={value.jsonData.interval === undefined ? 'none' : value.jsonData.interval}
           options={indexPatternTypes}
           onChange={intervalHandler(value, onChange)}
           width={24}
@@ -136,8 +137,8 @@ export const ElasticDetails = ({ value, onChange }: Props) => {
         labelWidth={29}
         tooltip="Default query mode to use for the data source. Defaults to 'Metrics'."
       >
-        <Select
-          inputId="es_config_defaultQueryMode"
+        <Combobox
+          id="es_config_defaultQueryMode"
           value={value.jsonData.defaultQueryMode}
           options={QUERY_TYPE_SELECTOR_OPTIONS}
           onChange={(selectedMode) => {
@@ -195,10 +196,10 @@ const jsonDataSwitchChangeHandler =
   };
 
 const intervalHandler =
-  (value: Props['value'], onChange: Props['onChange']) => (option: SelectableValue<Interval | 'none'>) => {
-    // If option value is undefined it will send its label instead so we have to convert made up value to undefined here.
+  (value: Props['value'], onChange: Props['onChange']) => (option: ComboboxOption<Interval | 'none'>) => {
     const newInterval = option.value === 'none' ? undefined : option.value;
 
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy configs store the index in `database`
     const currentIndex = value.jsonData.index ?? value.database;
     if (!currentIndex || currentIndex.length === 0 || currentIndex.startsWith('[logstash-]')) {
       let newDatabase = '';

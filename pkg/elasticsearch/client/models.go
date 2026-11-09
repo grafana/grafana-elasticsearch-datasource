@@ -15,7 +15,7 @@ type SearchRequest struct {
 	Index       string
 	Interval    time.Duration
 	Size        int
-	Sort        map[string]interface{}
+	Sort        []map[string]interface{}
 	Query       *Query
 	Aggs        AggArray
 	CustomProps map[string]interface{}
@@ -336,9 +336,11 @@ type FiltersAggregation struct {
 
 // TermsAggregation represents a terms aggregation
 type TermsAggregation struct {
-	Field       string                 `json:"field"`
-	Size        int                    `json:"size"`
-	Order       map[string]interface{} `json:"order"`
+	Field string `json:"field"`
+	Size  int    `json:"size"`
+	// Order is omitted when empty: Elasticsearch rejects an empty order object
+	// with "Must specify at least one field for [order]".
+	Order       map[string]interface{} `json:"order,omitempty"`
 	MinDocCount *int                   `json:"min_doc_count,omitempty"`
 	Missing     *string                `json:"missing,omitempty"`
 }

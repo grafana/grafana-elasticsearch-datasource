@@ -71,6 +71,39 @@ describe('ElasticsearchVariableUtils', () => {
 
       expect(result.query).toBe('');
     });
+
+    it('should route legacy {"find":"terms"} query through the legacy metricFindQuery path', () => {
+      // {"find":"terms"} resolves via metricFindQuery() -> getTerms() (grafana/grafana#120836),
+      // not a raw DSL conversion, so it needs no feature toggle and keeps the boolean fix (#106053).
+      const rawQuery = '{"find":"terms","field":"Platform.keyword"}';
+      const result = migrateVariableQuery(rawQuery);
+
+      expect(result.queryType).toBe('legacy_variable');
+      expect(result.query).toBe(rawQuery);
+      expect(result.metrics).toEqual([{ type: 'raw_document', id: '1' }]);
+    });
+
+    it('should preserve the raw {"find":"terms"} string verbatim (incl. query filter/size/order)', () => {
+      const rawQuery = '{"find":"terms","field":"env","query":"region:eu-*","size":100,"order":"desc"}';
+      const result = migrateVariableQuery(rawQuery);
+
+      // The original string is passed to metricFindQuery() untouched, so getTerms() receives the
+      // exact same payload it did before externalisation.
+      expect(result.queryType).toBe('legacy_variable');
+      expect(result.query).toBe(rawQuery);
+    });
+
+    it('should fall through to raw_document for unrecognised JSON', () => {
+      const result = migrateVariableQuery('{"someOtherKey":"value"}');
+
+      expect(result.metrics).toEqual([{ type: 'raw_document', id: '1' }]);
+    });
+
+    it('should fall through to raw_document for plain Lucene strings', () => {
+      const result = migrateVariableQuery('status:active AND region:eu-*');
+
+      expect(result.metrics).toEqual([{ type: 'raw_document', id: '1' }]);
+    });
   });
 
   describe('convertFieldsToVariableFields', () => {
