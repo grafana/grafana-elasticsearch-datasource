@@ -33,15 +33,15 @@ jobs:
   ci:
     name: CI
     if: github.event_name == 'pull_request'
-    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v11.1.1
+    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v12.1.1
     permissions:
       contents: read
       id-token: write
     with:
+      golangci-lint-version: '2.15.0'
       # Ensure PR builds produce unique plugin versions.
       plugin-version-suffix: ${{ github.event.pull_request.head.sha }}
       run-playwright: true
-      disable-gcs-upload: true
 
   cicd:
     name: CI/CD
@@ -59,6 +59,8 @@ jobs:
       attestations: write
       pull-requests: read
     secrets: inherit
+    with:
+      golangci-lint-version: '2.15.0'
 
   publish-dev:
     name: Publish to Dev Catalog and Deploy
@@ -75,10 +77,10 @@ jobs:
       id-token: write
       pull-requests: read
     with:
-      # Both inputs are required by cd-dev.yml. These values reproduce what ci.yml
-      # resolves today: go-version from go.mod, and the shared golangci-lint default.
-      go-version: '1.26.7'
-      golangci-lint-version: '2.12.2'
+      # Both inputs are required by cd-dev.yml. Keep Go aligned with go.mod
+      # and golangci-lint aligned with the explicit version in the ci job above.
+      go-version: '1.27.3'
+      golangci-lint-version: '2.15.0'
       # The backend ships to dev0 per merge through the bundled pipeline
       # (bundled-image.yml), so this job publishes the frontend to the dev catalog
       # and does not also trigger the backend rollout.

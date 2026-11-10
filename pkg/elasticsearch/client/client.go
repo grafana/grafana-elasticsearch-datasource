@@ -299,6 +299,9 @@ func (c *baseClientImpl) ExecuteEsql(query string) (*EsqlResponse, error) {
 
 	var esqlResponse EsqlResponse
 	dec := json.NewDecoder(clientRes.Body)
+	// The processor types each cell from the column metadata. long and
+	// unsigned_long values exceed float64 precision, so the digits are kept.
+	dec.UseNumber()
 	if err := dec.Decode(&esqlResponse); err != nil {
 		return nil, backend.DownstreamError(fmt.Errorf("failed to decode ES|QL response: %w", err))
 	}

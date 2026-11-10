@@ -3,6 +3,7 @@ package elasticsearch
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -52,12 +53,13 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 
 		for colIdx, col := range response.Columns {
 			if colIdx < len(row) && row[colIdx] != nil {
-				doc[col.Name] = row[colIdx]
+				value := esqlDocValue(row[colIdx])
+				doc[col.Name] = value
 				propNames[col.Name] = true
 
 				// Map configured log level field to "level"
 				if configuredFields.LogLevelField != "" && col.Name == configuredFields.LogLevelField {
-					doc["level"] = row[colIdx]
+					doc["level"] = value
 				}
 			}
 		}
@@ -105,6 +107,17 @@ func processEsqlLogsResponse(response *es.EsqlResponse, target *Query, configure
 	return &backend.DataResponse{
 		Frames: []*data.Frame{frame},
 	}, nil
+}
+
+// esqlDocValue returns the value a decoded _source document holds, so the
+// log builders shared with the DSL path get the float64 they expect.
+func esqlDocValue(value interface{}) interface{} {
+	n, ok := value.(json.Number)
+	if !ok {
+		return value
+	}
+	f, _ := n.Float64()
+	return f
 }
 
 // esqlRowID derives the canonical log-line id for an ES|QL row. A query that
@@ -164,7 +177,8 @@ func classifyEsqlColumns(columns []es.EsqlColumn) esqlColumnLayout {
 			if layout.timeColIdx == -1 {
 				layout.timeColIdx = i
 			}
-		case "long", "integer", "short", "byte", "double", "float", "half_float", "scaled_float":
+		case "long", "integer", "short", "byte", "unsigned_long", "counter_long", "counter_integer",
+			"double", "float", "half_float", "scaled_float", "counter_double":
 			if layout.valueColIdx == -1 {
 				layout.valueColIdx = i
 			}
@@ -242,7 +256,7 @@ func buildEsqlMultiSeriesFrames(response *es.EsqlResponse, layout esqlColumnLayo
 		for i, colIdx := range layout.breakdownColIdxs {
 			val := ""
 			if colIdx < len(row) && row[colIdx] != nil {
-				val = fmt.Sprintf("%v", row[colIdx])
+				val, _ = toString(row[colIdx])
 			}
 			labels[response.Columns[colIdx].Name] = val
 			keyParts[i] = val
@@ -405,7 +419,7 @@ func processEsqlColumnsToFields(response *es.EsqlResponse) []*data.Field {
 			field.Config = &data.FieldConfig{Filterable: &isFilterable}
 			fields[colIdx] = field
 
-		case "long", "integer", "short", "byte":
+		case "long", "integer", "short", "byte", "counter_long", "counter_integer":
 			// Handle integer columns
 			intVector := make([]*int64, len(response.Values))
 			for rowIdx, row := range response.Values {
@@ -419,7 +433,20 @@ func processEsqlColumnsToFields(response *es.EsqlResponse) []*data.Field {
 			field.Config = &data.FieldConfig{Filterable: &isFilterable}
 			fields[colIdx] = field
 
-		case "double", "float", "half_float", "scaled_float":
+		case "unsigned_long":
+			uintVector := make([]*uint64, len(response.Values))
+			for rowIdx, row := range response.Values {
+				if colIdx < len(row) && row[colIdx] != nil {
+					if v, ok := toUint64(row[colIdx]); ok {
+						uintVector[rowIdx] = &v
+					}
+				}
+			}
+			field := data.NewField(col.Name, nil, uintVector)
+			field.Config = &data.FieldConfig{Filterable: &isFilterable}
+			fields[colIdx] = field
+
+		case "double", "float", "half_float", "scaled_float", "counter_double":
 			// Handle float columns
 			floatVector := make([]*float64, len(response.Values))
 			for rowIdx, row := range response.Values {
@@ -491,6 +518,12 @@ func parseEsqlDateTime(value interface{}) (time.Time, bool) {
 			return t, true
 		}
 		return time.Time{}, false
+	case json.Number:
+		ms, err := strconv.ParseInt(v.String(), 10, 64)
+		if err != nil {
+			return time.Time{}, false
+		}
+		return time.UnixMilli(ms), true
 	case float64:
 		// Assume epoch milliseconds
 		return time.UnixMilli(int64(v)), true
@@ -505,6 +538,9 @@ func parseEsqlDateTime(value interface{}) (time.Time, bool) {
 // toInt64 converts a value to int64
 func toInt64(value interface{}) (int64, bool) {
 	switch v := value.(type) {
+	case json.Number:
+		i, err := strconv.ParseInt(v.String(), 10, 64)
+		return i, err == nil
 	case float64:
 		return int64(v), true
 	case int64:
@@ -516,9 +552,22 @@ func toInt64(value interface{}) (int64, bool) {
 	}
 }
 
+// toUint64 converts a value to uint64
+func toUint64(value interface{}) (uint64, bool) {
+	n, ok := value.(json.Number)
+	if !ok {
+		return 0, false
+	}
+	u, err := strconv.ParseUint(n.String(), 10, 64)
+	return u, err == nil
+}
+
 // toFloat64 converts a value to float64
 func toFloat64(value interface{}) (float64, bool) {
 	switch v := value.(type) {
+	case json.Number:
+		f, err := v.Float64()
+		return f, err == nil
 	case float64:
 		return v, true
 	case int64:
@@ -535,8 +584,15 @@ func toString(value interface{}) (string, bool) {
 	switch v := value.(type) {
 	case string:
 		return v, true
+	case json.Number:
+		// Elasticsearch writes integral doubles as 2.0. Labels keep the form 2.
+		if strings.ContainsAny(v.String(), ".eE") {
+			f, _ := v.Float64()
+			return strconv.FormatFloat(f, 'f', -1, 64), true
+		}
+		return v.String(), true
 	case float64:
-		return fmt.Sprintf("%v", v), true
+		return strconv.FormatFloat(v, 'f', -1, 64), true
 	case int64:
 		return fmt.Sprintf("%d", v), true
 	case bool:
