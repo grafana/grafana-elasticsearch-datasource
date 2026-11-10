@@ -74,6 +74,29 @@ test.describe('Query editor', () => {
         await expect(queryRow.getByText('Lucene Query', { exact: true })).toBeVisible();
       }
     });
+
+    test('renders Index selector field', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
+      await expect(queryRow.getByText('Index', { exact: true })).toBeVisible();
+    });
+
+    test('Index selector loads options when opened', async ({ page }) => {
+      const queryRow = getQueryEditorRow(page, 'A');
+
+      // Wait for the query editor to be fully loaded by checking for a known element
+      await expect(queryRow.getByRole('radio', { name: 'Metrics' })).toBeVisible();
+
+      // Find the index selector input by its placeholder text
+      const indexSelector = queryRow.getByPlaceholder('Leave empty to use data source index');
+      await expect(indexSelector).toBeVisible();
+
+      // Click to open the dropdown - this triggers the loadIndices call
+      await indexSelector.click();
+
+      // Wait for the dropdown menu to appear with options
+      // The default option should always be present
+      await expect(page.getByText('(Use datasource default index)')).toBeVisible();
+    });
   });
 
   test.describe('Metrics mode', () => {
