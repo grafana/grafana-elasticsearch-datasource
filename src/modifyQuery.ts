@@ -190,9 +190,9 @@ function toEsqlAdHocPredicate(filter: AdHocVariableFilter, logLevelField?: strin
 
   switch (filter.operator) {
     case '=':
-      return `${field} == ${esqlLiteral(rawValue)}`;
+      return `TO_STRING(${field}) == ${esqlString(rawValue)}`;
     case '!=':
-      return `${field} != ${esqlLiteral(rawValue)}`;
+      return `TO_STRING(${field}) != ${esqlString(rawValue)}`;
     case '<':
     case '>':
     case '<=':
@@ -208,9 +208,8 @@ function toEsqlAdHocPredicate(filter: AdHocVariableFilter, logLevelField?: strin
 }
 
 function esqlField(name: string): string {
-  if (/^[@A-Za-z_][@A-Za-z0-9_]*$/.test(name)) {
-    return name;
-  }
+  // Always backtick-quote. Unquoted ES|QL keywords (by, first, desc, …) make
+  // parseCommand throw and the caller then drops every filter in the set.
   return `\`${name.replace(/`/g, '``')}\``;
 }
 

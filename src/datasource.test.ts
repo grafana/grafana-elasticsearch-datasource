@@ -1917,7 +1917,7 @@ describe('ElasticDatasource', () => {
         [{ key: 'response_status', operator: '=', value: '504', condition: '' }]
       );
       expect(result.query).not.toContain('AND response_status:"504"');
-      expect(result.query).toMatch(/FROM access[\s\S]*WHERE response_status == 504[\s\S]*STATS/);
+      expect(result.query).toMatch(/FROM access[\s\S]*WHERE TO_STRING\(response_status\) == "504"[\s\S]*STATS/);
       expect(result.query).toContain('WHERE @timestamp >=');
     });
 
