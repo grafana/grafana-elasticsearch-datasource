@@ -1,5 +1,17 @@
 # Changelog
 
+## [12.9.7](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.6...v12.9.7) (2026-11-12)
+
+
+### 🐛 Bug Fixes
+
+* **security/unknown/:** update module golang.org/x/crypto to v0.59.0 [security] ([#499](https://github.com/grafana/grafana-elasticsearch-datasource/issues/499)) ([977c829](https://github.com/grafana/grafana-elasticsearch-datasource/commit/977c8294ccc9bec939781b55276a853a000da29e))
+
+
+### 🤖 Continuous Integration
+
+* let a bundled-image dispatch opt out of the per-merge frontend ([#451](https://github.com/grafana/grafana-elasticsearch-datasource/issues/451)) ([717b4e0](https://github.com/grafana/grafana-elasticsearch-datasource/commit/717b4e0b401fd1b76da76684f305eaada3f09a09))
+
 ## [12.9.6](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.5...v12.9.6) (2026-11-10)
 
 
