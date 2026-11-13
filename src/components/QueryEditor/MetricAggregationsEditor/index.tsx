@@ -2,12 +2,12 @@ import { Button } from '@grafana/ui';
 
 import { MetricAggregation } from '../../../dataquery.gen';
 import { useDispatch } from '../../../hooks/useStatelessReducer';
+import { impliedQueryType } from '../../../utils';
 import { useQuery } from '../ElasticsearchQueryContext';
 import { QueryEditorRow } from '../QueryEditorRow';
 
 import { MetricEditor } from './MetricEditor';
 import { addMetric, removeMetric, toggleMetricVisibility } from './state/actions';
-import { metricAggregationConfig } from './utils';
 import React from 'react';
 
 interface Props {
@@ -33,7 +33,7 @@ export const MetricAggregationsEditor = ({ nextId }: Props) => {
             >
               <MetricEditor value={metric} />
 
-              {metricAggregationConfig[metric.type].impliedQueryType === 'metrics' && index === 0 && (
+              {impliedQueryType(metric.type) === 'metrics' && index === 0 && (
                 <Button
                   variant="secondary"
                   fill="text"
