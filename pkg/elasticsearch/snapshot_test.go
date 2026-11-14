@@ -20,9 +20,9 @@ import (
 // - the elastic-request json
 // - the dataframe result
 
-// If you need to adjust the snapshots, go to Line 172 and change
-// `experimental.CheckGoldenJSONResponse(t, "testdata_response", goldenFileName, &dataResCopy, false)` to `experimental.CheckGoldenJSONResponse(t, "testdata_response", goldenFileName, &dataResCopy, true)`
-// then run the test once to generate the new snapshots.
+// If you need to adjust the snapshots, change the last argument of
+// `experimental.CheckGoldenJSONResponse` in checkResponseSnapshot from false to true
+// and run the test once to generate the new snapshots.
 
 // a regex that matches the request-snapshot-filenames, and extracts the name of the test
 var requestRe = regexp.MustCompile(`^(.*)\.request\.line\d+\.json$`)
@@ -140,6 +140,8 @@ func TestResponseSnapshots(t *testing.T) {
 		{name: "metric top_metrics test", path: "metric_top_metrics"},
 		{name: "metric extended_stats test", path: "metric_extended_stats"},
 		{name: "metric sibling bucket test", path: "metric_sibling"},
+		{name: "metric terms table test", path: "metric_terms_table"},
+		{name: "metric date histogram then terms test", path: "metric_date_terms_long"},
 		{name: "raw data test", path: "raw_data"},
 		{name: "logs test", path: "logs"},
 	}
@@ -148,34 +150,42 @@ func TestResponseSnapshots(t *testing.T) {
 
 	for _, test := range tt {
 		t.Run(test.name, func(t *testing.T) {
-			responseFileName := filepath.Join("testdata_response", test.path+".response.json")
-			responseBytes, err := os.ReadFile(filepath.Clean(responseFileName))
-			require.NoError(t, err)
-
-			queriesFileName := filepath.Join("testdata_response", test.path+".queries.json")
-			queriesBytes, err := os.ReadFile(filepath.Clean(queriesFileName))
-			require.NoError(t, err)
-
-			result, err := queryDataTest(queriesBytes, responseBytes)
-			require.NoError(t, err)
-
-			// first we need to test that the number of items in `result.response.Responses`,
-			// is exactly the same as the count of our response snapshot files
-			// (this is so that we avoid situations where we provide more snapshot-files than
-			// what is returned)
-
-			expectedResponseCount := snapshotCount[test.path]
-			require.True(t, expectedResponseCount > 0, "response snapshots not found")
-
-			require.Len(t, result.response.Responses, expectedResponseCount)
-
-			for refId, dataRes := range result.response.Responses {
-				goldenFileName := fmt.Sprintf("%v.%v.golden", test.path, strings.ToLower(refId))
-				// we make a copy of the variable to avoid this linter-warning:
-				// "G601: Implicit memory aliasing in for loop."
-				dataResCopy := dataRes
-				experimental.CheckGoldenJSONResponse(t, "testdata_response", goldenFileName, &dataResCopy, false)
-			}
+			checkResponseSnapshot(t, test.path, "golden", snapshotCount[test.path])
 		})
+		if strings.HasPrefix(test.path, "metric_") {
+			t.Run(test.name+" (metrics dataplane)", func(t *testing.T) {
+				stubMetricsDataplane(t, true)
+				checkResponseSnapshot(t, test.path, "dataplane.golden", snapshotCount[test.path])
+			})
+		}
+	}
+}
+
+func checkResponseSnapshot(t *testing.T, path string, goldenSuffix string, expectedResponseCount int) {
+	t.Helper()
+	responseFileName := filepath.Join("testdata_response", path+".response.json")
+	responseBytes, err := os.ReadFile(filepath.Clean(responseFileName))
+	require.NoError(t, err)
+
+	queriesFileName := filepath.Join("testdata_response", path+".queries.json")
+	queriesBytes, err := os.ReadFile(filepath.Clean(queriesFileName))
+	require.NoError(t, err)
+
+	result, err := queryDataTest(queriesBytes, responseBytes)
+	require.NoError(t, err)
+
+	// first we need to test that the number of items in `result.response.Responses`,
+	// is exactly the same as the count of our response snapshot files
+	// (this is so that we avoid situations where we provide more snapshot-files than
+	// what is returned)
+	require.True(t, expectedResponseCount > 0, "response snapshots not found")
+	require.Len(t, result.response.Responses, expectedResponseCount)
+
+	for refId, dataRes := range result.response.Responses {
+		goldenFileName := fmt.Sprintf("%v.%v.%v", path, strings.ToLower(refId), goldenSuffix)
+		// we make a copy of the variable to avoid this linter-warning:
+		// "G601: Implicit memory aliasing in for loop."
+		dataResCopy := dataRes
+		experimental.CheckGoldenJSONResponse(t, "testdata_response", goldenFileName, &dataResCopy, false)
 	}
 }

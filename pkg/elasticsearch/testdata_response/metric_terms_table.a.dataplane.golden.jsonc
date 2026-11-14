@@ -1,0 +1,83 @@
+//  🌟 This was machine generated.  Do not edit. 🌟
+//  
+//  Frame[0] {
+//      "type": "numeric-long",
+//      "typeVersion": [
+//          0,
+//          1
+//      ]
+//  }
+//  Name: 
+//  Dimensions: 3 Fields by 2 Rows
+//  +-----------------+------------------+------------------+
+//  | Name: status    | Name: Count      | Name: Average    |
+//  | Labels:         | Labels:          | Labels:          |
+//  | Type: []*string | Type: []*float64 | Type: []*float64 |
+//  +-----------------+------------------+------------------+
+//  | 200             | 5                | 1200.5           |
+//  | 404             | 2                | 512              |
+//  +-----------------+------------------+------------------+
+//  
+//  
+//  🌟 This was machine generated.  Do not edit. 🌟
+{
+  "status": 200,
+  "frames": [
+    {
+      "schema": {
+        "meta": {
+          "type": "numeric-long",
+          "typeVersion": [
+            0,
+            1
+          ]
+        },
+        "fields": [
+          {
+            "name": "status",
+            "type": "string",
+            "typeInfo": {
+              "frame": "string",
+              "nullable": true
+            },
+            "config": {
+              "filterable": true
+            }
+          },
+          {
+            "name": "Count",
+            "type": "number",
+            "typeInfo": {
+              "frame": "float64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "Average",
+            "type": "number",
+            "typeInfo": {
+              "frame": "float64",
+              "nullable": true
+            }
+          }
+        ]
+      },
+      "data": {
+        "values": [
+          [
+            "200",
+            "404"
+          ],
+          [
+            5,
+            2
+          ],
+          [
+            1200.5,
+            512
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -29,6 +29,7 @@ type elasticsearchDataQuery struct {
 	datasourceIndex              string
 	keepLabelsInResponse         bool
 	dataplaneEnabled             bool
+	metricsDataplaneEnabled      bool
 	aggregationParserDSLRawQuery AggregationParser
 }
 
@@ -36,6 +37,12 @@ type elasticsearchDataQuery struct {
 // can stub the evaluation without an OFREP server.
 var isDataplaneEnabled = func(ctx context.Context) bool {
 	return featureflags.IsEnabled(ctx, featureflags.LogsDataplane)
+}
+
+// isMetricsDataplaneEnabled evaluates the metrics-dataplane GOFF flag; a var
+// so tests can stub the evaluation without an OFREP server.
+var isMetricsDataplaneEnabled = func(ctx context.Context) bool {
+	return featureflags.IsEnabled(ctx, featureflags.MetricsDataplane)
 }
 
 var newElasticsearchDataQuery = func(ctx context.Context, client es.Client, req *backend.QueryDataRequest, logger log.Logger, datasourceIndex string) *elasticsearchDataQuery {
@@ -50,8 +57,9 @@ var newElasticsearchDataQuery = func(ctx context.Context, client es.Client, req 
 		datasourceIndex: datasourceIndex,
 		// To maintain backward compatibility, it is necessary to keep labels in responses for alerting and expressions queries.
 		// Historically, these labels have been used in alerting rules and transformations.
-		keepLabelsInResponse: fromAlert || fromExpression,
-		dataplaneEnabled:     isDataplaneEnabled(ctx),
+		keepLabelsInResponse:    fromAlert || fromExpression,
+		dataplaneEnabled:        isDataplaneEnabled(ctx),
+		metricsDataplaneEnabled: isMetricsDataplaneEnabled(ctx),
 
 		aggregationParserDSLRawQuery: NewAggregationParser(),
 	}
@@ -140,7 +148,7 @@ func (e *elasticsearchDataQuery) executeEsqlQuery(q *Query) (*backend.DataRespon
 	} else {
 		// Metrics queries should return time series frames so they are compatible
 		// with the same frontend flows as regular/raw DSL metrics queries.
-		return processEsqlMetricsResponse(esqlRes, q)
+		return processEsqlMetricsResponse(esqlRes, q, e.metricsDataplaneEnabled)
 	}
 }
 
@@ -207,5 +215,5 @@ func (e *elasticsearchDataQuery) executeRegularQueries(queries []*Query, start t
 		return response, nil
 	}
 
-	return parseResponse(e.ctx, res.Responses, queries, e.client.GetConfiguredFields(), e.keepLabelsInResponse, e.dataplaneEnabled, e.logger)
+	return parseResponse(e.ctx, res.Responses, queries, e.client.GetConfiguredFields(), e.keepLabelsInResponse, e.dataplaneEnabled, e.metricsDataplaneEnabled, e.logger)
 }
