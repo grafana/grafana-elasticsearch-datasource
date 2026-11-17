@@ -17,7 +17,6 @@ import { changeMetricMeta, changeMetricSetting } from '../state/actions';
 import { metricAggregationConfig } from '../utils';
 
 import { BucketScriptSettingsEditor } from './BucketScriptSettingsEditor';
-import { MovingAverageSettingsEditor } from './MovingAverageSettingsEditor';
 import { SettingField } from './SettingField';
 import { SiblingBucketSettingsEditor } from './SiblingBucketSettingsEditor';
 import { TopMetricsSettingsEditor } from './TopMetricsSettingsEditor';
@@ -65,8 +64,6 @@ export const SettingsEditor = ({ metric, previousMetrics }: Props) => {
       {metric.type === 'serial_diff' && <SettingField label="Lag" metric={metric} settingName="lag" placeholder="1" />}
 
       {metric.type === 'cumulative_sum' && <SettingField label="Format" metric={metric} settingName="format" />}
-
-      {metric.type === 'moving_avg' && <MovingAverageSettingsEditor metric={metric} />}
 
       {metric.type === 'moving_fn' && (
         <>

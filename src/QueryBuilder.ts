@@ -1,9 +1,9 @@
 import { InternalTimeZones } from '@grafana/data';
 
 import {
+  isMetricAggregationType,
   isMetricAggregationWithField,
   isMetricAggregationWithSettings,
-  isMovingAverageWithModelSettings,
   isPipelineAggregation,
   isPipelineAggregationWithMultipleBucketPaths,
   isSiblingPipelineAggregation,
@@ -293,6 +293,13 @@ export class ElasticQueryBuilder {
         continue;
       }
 
+      // Saved queries can carry aggregation types that no longer exist
+      // (moving_avg was removed in Elasticsearch 8.0). Skip them before any
+      // type-specific handling below performs an unguarded config lookup.
+      if (!isMetricAggregationType(metric.type)) {
+        continue;
+      }
+
       if (isSiblingPipelineAggregation(metric)) {
         // Composite sibling aggregation: hidden terms agg grouping by
         // settings.groupBy with the inner stat nested inside, plus the
@@ -371,27 +378,6 @@ export class ElasticQueryBuilder {
         // however some fields are required to be numeric.
         // Users might have already created some of those with before, where the values were numbers.
         switch (metric.type) {
-          case 'moving_avg':
-            metricAgg = {
-              ...metricAgg,
-              ...(metricAgg?.window !== undefined && { window: this.toNumber(metricAgg.window) }),
-              ...(metricAgg?.predict !== undefined && { predict: this.toNumber(metricAgg.predict) }),
-              ...(isMovingAverageWithModelSettings(metric) && {
-                settings: {
-                  ...metricAgg.settings,
-                  ...Object.fromEntries(
-                    Object.entries(metricAgg.settings || {})
-                      // Only format properties that are required to be numbers
-                      .filter(([settingName]) => ['alpha', 'beta', 'gamma', 'period'].includes(settingName))
-                      // omitting undefined
-                      .filter(([_, stringValue]) => stringValue !== undefined)
-                      .map(([_, stringValue]) => [_, this.toNumber(stringValue)])
-                  ),
-                },
-              }),
-            };
-            break;
-
           case 'serial_diff':
             metricAgg = {
               ...metricAgg,

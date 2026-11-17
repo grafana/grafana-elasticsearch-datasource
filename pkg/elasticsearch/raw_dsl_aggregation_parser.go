@@ -437,7 +437,6 @@ func newPipelineParser() *pipelineParser {
 	return &pipelineParser{
 		extractor: &fieldExtractor{},
 		types: map[string]bool{
-			"moving_avg":     true,
 			"moving_fn":      true,
 			"derivative":     true,
 			"cumulative_sum": true,
