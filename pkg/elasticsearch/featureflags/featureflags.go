@@ -11,12 +11,13 @@
 // The OFREP endpoint, its cache TTL and the targeting attributes come from the
 // host's OpenFeature advertisement in each request's Grafana configuration.
 // Where the host advertises no endpoint the plugin can use (Grafana before
-// 13.3, a features-service endpoint, which needs Grafana's own credentials, or
-// a static endpoint), the plugin falls back to the GOFF relay proxy or
-// GF_PLUGIN_ELASTICSEARCH_OFREP_URL and derives the tenant itself.
+// 13.3, or a provider type other than ofrep), the plugin falls back to the
+// GOFF relay proxy or GF_PLUGIN_ELASTICSEARCH_OFREP_URL and derives the tenant
+// itself.
 //
 // Evaluation fails closed: with no previous answer, any transport or
 // evaluation error yields false. A failed refresh keeps the previous answer.
+// An error result expires after the TTL or one minute, whichever is shorter.
 // Results are cached per flag, endpoint and tenant, so a query pays at most one
 // OFREP round trip per flag, endpoint, tenant, and TTL window. That round trip
 // runs on the query path, bounded by dialTimeout for name resolution and
@@ -179,15 +180,9 @@ func advertisedEndpoint(ctx context.Context, logger log.Logger) (config.OpenFeat
 		}
 		return of, false
 	}
-	switch of.ProviderType {
-	// Plugins have no credentials for a features-service endpoint.
-	case "features-service":
-		return of, false
-	// Grafana logs two errors for each evaluation of a flag that its static provider does not define.
-	case "static":
-		return of, false
-	}
-	return of, true
+	// Plugins have no credentials for features-service, Grafana logs two errors for each evaluation of a flag
+	// that its static provider does not define, and a type newer than the plugin can need credentials too.
+	return of, of.ProviderType == "ofrep"
 }
 
 func (c *Client) cached(key string) (cacheEntry, bool) {
@@ -198,7 +193,7 @@ func (c *Client) cached(key string) (cacheEntry, bool) {
 }
 
 // evaluate runs one OFREP request per key at a time and caches its answer for the target's TTL.
-// A failed request keeps the previous answer, or false when there is none.
+// A failed request keeps the previous answer, or false when there is none, for at most defaultCacheTTL.
 func (c *Client) evaluate(ctx context.Context, key, flag string, t target) cacheEntry {
 	v, _, _ := c.group.Do(key, func() (any, error) {
 		previous, fresh := c.cached(key)
@@ -216,6 +211,7 @@ func (c *Client) evaluate(ctx context.Context, key, flag string, t target) cache
 		requestDurationSeconds.WithLabelValues(flag).Observe(time.Since(start).Seconds())
 
 		entry := cacheEntry{value: detail.Value}
+		ttl := t.ttl
 		outcome := outcomeMiss
 		if detail.Reason == openfeature.ErrorReason {
 			outcome = outcomeError
@@ -225,8 +221,9 @@ func (c *Client) evaluate(ctx context.Context, key, flag string, t target) cache
 			}
 			logFailure("Feature flag evaluation failed", "flag", flag, "error", detail.ResolutionError.Error())
 			entry.value = previous.value
+			ttl = min(ttl, defaultCacheTTL)
 		}
-		entry.expires = time.Now().Add(t.ttl)
+		entry.expires = time.Now().Add(ttl)
 		evaluationsTotal.WithLabelValues(flag, outcome).Inc()
 
 		c.cacheMu.Lock()

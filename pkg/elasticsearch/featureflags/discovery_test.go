@@ -76,6 +76,7 @@ func TestUnusableAdvertisementUsesFallback(t *testing.T) {
 	}{
 		{name: "features-service endpoint", providerType: "features-service"},
 		{name: "static endpoint", providerType: "static"},
+		{name: "provider type unknown to the plugin", providerType: "a-newer-type"},
 		{name: "URL without a provider type", providerType: ""},
 		{name: "malformed cache TTL", providerType: "ofrep", extra: map[string]string{config.OpenFeatureCacheTTL: "soon"}},
 	}
@@ -180,6 +181,32 @@ func TestAdvertisedCacheTTL(t *testing.T) {
 		c.IsEnabled(ctx, LogsDataplane)
 		return advertised.requests.Load() == 2
 	}, 3*time.Second, 50*time.Millisecond)
+}
+
+func TestHostTTLAppliesToAnswersOnly(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+		body   map[string]any
+		want   time.Duration
+	}{
+		{name: "an answer is cached for the host TTL", status: http.StatusOK, body: enabledResponse(LogsDataplane), want: time.Hour},
+		{name: "a failure is cached for at most the default TTL", status: http.StatusInternalServerError, body: map[string]any{"errorDetails": "boom"}, want: defaultCacheTTL},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := newRecordingServer(t, tt.status, tt.body)
+			ctx := discoveryContext(context.Background(), srv.URL, "ofrep", "stacks-1", map[string]string{config.OpenFeatureCacheTTL: "3600"})
+			c := NewClient("http://fallback.invalid")
+
+			start := time.Now()
+			c.IsEnabled(ctx, LogsDataplane)
+			entry, fresh := c.cached(cacheKey(LogsDataplane, c.target(ctx)))
+			require.True(t, fresh)
+			require.WithinDuration(t, start.Add(tt.want), entry.expires, time.Second)
+		})
+	}
 }
 
 func TestFailedRefreshKeepsPreviousAnswer(t *testing.T) {
