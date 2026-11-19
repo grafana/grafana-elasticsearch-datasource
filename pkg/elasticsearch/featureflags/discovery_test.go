@@ -209,30 +209,44 @@ func TestHostTTLAppliesToAnswersOnly(t *testing.T) {
 	}
 }
 
-func TestFailedRefreshKeepsPreviousAnswer(t *testing.T) {
-	var requests atomic.Int64
-	var failing atomic.Bool
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests.Add(1)
-		w.Header().Set("Content-Type", "application/json")
-		if failing.Load() {
-			w.WriteHeader(http.StatusInternalServerError)
-			_ = json.NewEncoder(w).Encode(map[string]any{"errorDetails": "boom"})
-			return
-		}
-		_ = json.NewEncoder(w).Encode(enabledResponse(LogsDataplane))
-	}))
-	t.Cleanup(srv.Close)
-	ctx := discoveryContext(context.Background(), srv.URL, "ofrep", "stacks-1", map[string]string{config.OpenFeatureCacheTTL: "1"})
-	c := NewClient("http://fallback.invalid")
+func TestFailedRefresh(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+		body   map[string]any
+		want   bool
+	}{
+		{name: "a server error keeps the previous answer", status: http.StatusInternalServerError, body: map[string]any{"errorDetails": "boom"}, want: true},
+		{name: "a removed flag turns off", status: http.StatusNotFound, body: map[string]any{"key": LogsDataplane, "errorCode": "FLAG_NOT_FOUND"}, want: false},
+	}
 
-	require.True(t, c.IsEnabled(ctx, LogsDataplane))
-	failing.Store(true)
-	require.Eventually(t, func() bool {
-		c.IsEnabled(ctx, LogsDataplane)
-		return requests.Load() == 2
-	}, 3*time.Second, 50*time.Millisecond)
-	require.True(t, c.IsEnabled(ctx, LogsDataplane), "a failed refresh must not replace the last answer with off")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var requests atomic.Int64
+			var failing atomic.Bool
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				w.Header().Set("Content-Type", "application/json")
+				if failing.Load() {
+					w.WriteHeader(tt.status)
+					_ = json.NewEncoder(w).Encode(tt.body)
+					return
+				}
+				_ = json.NewEncoder(w).Encode(enabledResponse(LogsDataplane))
+			}))
+			t.Cleanup(srv.Close)
+			ctx := discoveryContext(context.Background(), srv.URL, "ofrep", "stacks-1", map[string]string{config.OpenFeatureCacheTTL: "1"})
+			c := NewClient("http://fallback.invalid")
+
+			require.True(t, c.IsEnabled(ctx, LogsDataplane))
+			failing.Store(true)
+			require.Eventually(t, func() bool {
+				c.IsEnabled(ctx, LogsDataplane)
+				return requests.Load() == 2
+			}, 3*time.Second, 50*time.Millisecond)
+			require.Equal(t, tt.want, c.IsEnabled(ctx, LogsDataplane))
+		})
+	}
 }
 
 func TestEvaluateReusesEntryCachedByAnotherCaller(t *testing.T) {

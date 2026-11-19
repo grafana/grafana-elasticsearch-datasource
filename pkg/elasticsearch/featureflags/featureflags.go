@@ -16,7 +16,9 @@
 // itself.
 //
 // Evaluation fails closed: with no previous answer, any transport or
-// evaluation error yields false. A failed refresh keeps the previous answer.
+// evaluation error yields false. A failed refresh keeps the previous answer
+// only for a GENERAL error (transport errors and HTTP 401, 403, 429 and 5xx),
+// so a flag removed from the endpoint turns off at the next refresh.
 // An error result expires after the TTL or one minute, whichever is shorter.
 // Results are cached per flag, endpoint and tenant, so a query pays at most one
 // OFREP round trip per flag, endpoint, tenant, and TTL window. That round trip
@@ -193,7 +195,7 @@ func (c *Client) cached(key string) (cacheEntry, bool) {
 }
 
 // evaluate runs one OFREP request per key at a time and caches its answer for the target's TTL.
-// A failed request keeps the previous answer, or false when there is none, for at most defaultCacheTTL.
+// A failed request caches false, or the previous answer after a GENERAL error, for at most defaultCacheTTL.
 func (c *Client) evaluate(ctx context.Context, key, flag string, t target) cacheEntry {
 	v, _, _ := c.group.Do(key, func() (any, error) {
 		previous, fresh := c.cached(key)
@@ -220,7 +222,9 @@ func (c *Client) evaluate(ctx context.Context, key, flag string, t target) cache
 				logFailure = c.logger.FromContext(ctx).Debug
 			}
 			logFailure("Feature flag evaluation failed", "flag", flag, "error", detail.ResolutionError.Error())
-			entry.value = previous.value
+			if detail.ResolutionDetail().ErrorCode == openfeature.GeneralCode {
+				entry.value = previous.value
+			}
 			ttl = min(ttl, defaultCacheTTL)
 		}
 		entry.expires = time.Now().Add(ttl)
