@@ -1,32 +1,34 @@
-// Package featureflags evaluates Grafana Cloud feature flags over the
-// OpenFeature Remote Evaluation Protocol (OFREP) against the GOFF
-// (go-feature-flag) relay proxy operated alongside hosted Grafana.
+// Package featureflags evaluates feature flags over the OpenFeature Remote
+// Evaluation Protocol (OFREP).
 //
 // Grafana instance feature toggles (GF_INSTANCE_FEATURE_TOGGLES_ENABLE) are a
-// separate system: a flag defined only in GOFF never appears there, so plugin
-// backends evaluate GOFF flags over OFREP directly. Flag definitions are
-// managed centrally in Grafana Cloud's feature-flag configuration and roll
-// out wave by wave. A flag must exist (disabled) in every wave before code
-// evaluating it ships: an undefined flag turns every evaluation into an
-// error result, cached and logged once per flag, tenant, and TTL window, and
-// no environment can turn the flag on until the definition exists.
+// separate system: a flag defined only in Grafana Cloud's feature-flag
+// configuration never appears there, so plugin backends evaluate those flags
+// over OFREP directly. A flag must exist (disabled) in every wave before code
+// evaluating it ships: an undefined flag turns every evaluation into an error
+// result, cached and logged once per flag, tenant, and TTL window.
 //
-// Evaluation fails closed: any transport or evaluation error yields false, so
-// environments with no reachable GOFF service (OSS, self-managed, local
-// development) keep flagged behavior off until the flag's in-code default
-// flips. Self-managed installs can opt in by pointing ofrepURLEnvVar at any
-// OFREP server, including the host Grafana's own OFREP endpoint with the flag
-// defined in its [feature_toggles] section. Failures are logged as warnings
-// when the URL was configured or the request carries a Grafana Cloud identity,
-// and at debug level where neither holds and no service is expected. Results
-// are cached per flag and
-// tenant for cacheTTL, so a query pays at most one OFREP round trip per flag,
-// tenant, and TTL window. That round trip runs on the query path, bounded by
-// dialTimeout for name resolution and connect and by requestTimeout overall.
+// The OFREP endpoint, its cache TTL and the targeting attributes come from the
+// host's OpenFeature advertisement in each request's Grafana configuration.
+// Where the host advertises no endpoint the plugin can use (Grafana before
+// 13.3, or a provider type other than ofrep), the plugin falls back to the
+// GOFF relay proxy or GF_PLUGIN_ELASTICSEARCH_OFREP_URL and derives the tenant
+// itself.
+//
+// Evaluation fails closed: with no previous answer, any transport or
+// evaluation error yields false. A failed refresh keeps the previous answer
+// only for a GENERAL error (transport errors and HTTP 401, 403, 429 and 5xx),
+// so a flag removed from the endpoint turns off at the next refresh.
+// An error result expires after the TTL or one minute, whichever is shorter.
+// Results are cached per flag, endpoint and tenant, so a query pays at most one
+// OFREP round trip per flag, endpoint, tenant, and TTL window. That round trip
+// runs on the query path, bounded by dialTimeout for name resolution and
+// connect and by requestTimeout overall.
 package featureflags
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
@@ -35,6 +37,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/config"
 	"github.com/open-feature/go-sdk-contrib/providers/ofrep"
@@ -52,8 +55,8 @@ const (
 	// host does not resolve and evaluations fail closed.
 	defaultOFREPURL = "http://go-feature-flag.hosted-grafana.svc.cluster.local"
 
-	// ofrepURLEnvVar overrides the OFREP base URL for local development and
-	// end-to-end tests.
+	// ofrepURLEnvVar overrides the fallback OFREP base URL for local
+	// development and end-to-end tests on hosts that advertise no endpoint.
 	ofrepURLEnvVar = "GF_PLUGIN_ELASTICSEARCH_OFREP_URL"
 
 	// requestTimeout matches the timeout other in-cluster services use against
@@ -67,34 +70,33 @@ const (
 	// query of every TTL window.
 	dialTimeout = time.Second
 
-	// cacheTTL matches the interval at which the relay proxy reloads flag
-	// definitions, so a flag flip is picked up within about a minute. Errors
-	// are cached for the same period so an unreachable service costs one
-	// failed request per flag, tenant, and TTL window rather than one per query.
-	cacheTTL = time.Minute
+	// defaultCacheTTL matches the interval at which the relay proxy reloads
+	// flag definitions. It applies when the host gives no caching advice.
+	defaultCacheTTL = time.Minute
 
 	// tenantIDMetadataKey is the gRPC metadata key carrying the tenant
 	// identifier on multi-tenant requests (the bare numeric stack id), the
-	// same key the plugin SDK's tenant middleware reads. The SDK keeps its
-	// getter internal and no request field carries the tenant yet, so this
-	// read is a bridge. Replace it with the host-asserted evaluation context
-	// from the SDK's OpenFeature discovery config (grafana-plugin-sdk-go#1618,
-	// tracked in #317) once that ships. If the key changes, targeting falls
-	// back to the app URL slug or the flag's default rule.
+	// same key the plugin SDK's tenant middleware reads. It identifies the
+	// tenant only on requests whose host advertises no usable endpoint.
 	tenantIDMetadataKey = "tenantID"
 )
 
-// Client evaluates boolean feature flags over OFREP, caching results per flag
-// and targeting key. The zero value is not usable; construct with NewClient.
+// Client evaluates boolean feature flags over OFREP, caching results per flag,
+// endpoint and targeting key. The zero value is not usable; construct with NewClient.
 type Client struct {
-	provider openfeature.FeatureProvider
-	logger   log.Logger
-	// explicitURL records that the OFREP URL was named by a caller or an
+	logger log.Logger
+	// fallbackURL serves requests whose host advertises no usable endpoint.
+	fallbackURL string
+	// explicitURL records that fallbackURL was named by a caller or an
 	// operator rather than defaulted, so a failure to reach it is noteworthy.
 	explicitURL bool
 	group       singleflight.Group
-	mu          sync.RWMutex
-	cache       map[string]cacheEntry
+
+	providersMu sync.Mutex
+	providers   map[string]openfeature.FeatureProvider
+
+	cacheMu sync.RWMutex
+	cache   map[string]cacheEntry
 }
 
 type cacheEntry struct {
@@ -102,21 +104,28 @@ type cacheEntry struct {
 	expires time.Time
 }
 
-// NewClient returns a Client evaluating flags against the OFREP service at
-// baseURL. A caller that names a URL expects it to answer, so evaluation
-// failures are logged as warnings.
-func NewClient(baseURL string) *Client {
+type target struct {
+	url     string
+	ttl     time.Duration
+	evalCtx openfeature.FlattenedContext
+	// routine marks failures that are expected, so they log at debug level.
+	routine bool
+}
+
+// NewClient returns a Client that evaluates flags against the endpoint the
+// host advertises, or against fallbackURL when the host advertises none. A
+// caller that names a URL expects it to answer, so failures against it are
+// logged as warnings.
+func NewClient(fallbackURL string) *Client {
 	return &Client{
-		provider:    ofrep.NewProvider(baseURL, ofrep.WithClient(newHTTPClient())),
 		logger:      log.DefaultLogger,
+		fallbackURL: fallbackURL,
 		explicitURL: true,
+		providers:   map[string]openfeature.FeatureProvider{},
 		cache:       map[string]cacheEntry{},
 	}
 }
 
-// newHTTPClient is the default transport with a short dial timeout. The
-// provider ignores WithTimeout once a client is supplied, so the overall
-// bound is set here too.
 func newHTTPClient() *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.DialContext = (&net.Dialer{Timeout: dialTimeout}).DialContext
@@ -132,63 +141,145 @@ func newDefaultClient() *Client {
 	return c
 }
 
-// IsEnabled evaluates flag against the process-wide default client, resolving
-// the OFREP base URL from GF_PLUGIN_ELASTICSEARCH_OFREP_URL or falling back
-// to the in-cluster GOFF service. It returns false on any error.
+// IsEnabled evaluates flag against the process-wide default client. It returns false on any error.
 func IsEnabled(ctx context.Context, flag string) bool {
 	return defaultClient().IsEnabled(ctx, flag)
 }
 
-// IsEnabled evaluates flag with targeting attributes derived from ctx,
-// returning false on any error. Results, including failures, are cached for
-// cacheTTL per flag and targeting key, with concurrent lookups for the same
-// key collapsed into one request. The OFREP request does not inherit ctx's
-// cancellation, because its result is shared with every caller in the window.
+// IsEnabled evaluates flag for the tenant of ctx, returning false on any error
+// when no previous answer exists. Concurrent lookups for the same flag,
+// endpoint and tenant are collapsed into one request, which does not inherit
+// ctx's cancellation because its result is shared with every caller in the window.
 func (c *Client) IsEnabled(ctx context.Context, flag string) bool {
-	evalCtx := evaluationContext(ctx)
-	key := cacheKey(flag, evalCtx)
-
-	c.mu.RLock()
-	entry, ok := c.cache[key]
-	c.mu.RUnlock()
-	if ok && time.Now().Before(entry.expires) {
+	t := c.target(ctx)
+	key := cacheKey(flag, t)
+	if entry, fresh := c.cached(key); fresh {
 		evaluationsTotal.WithLabelValues(flag, outcomeHit).Inc()
 		return entry.value
 	}
+	return c.evaluate(ctx, key, flag, t).value
+}
 
-	value, _, _ := c.group.Do(key, func() (any, error) {
+// target uses the host's advertised endpoint when the plugin can use it, else the fallback URL.
+func (c *Client) target(ctx context.Context) target {
+	if of, ok := advertisedEndpoint(ctx, c.logger); ok {
+		return target{url: of.URL, ttl: cacheTTL(of), evalCtx: advertisedEvaluationContext(ctx, of.ContextAttrs)}
+	}
+	evalCtx := evaluationContext(ctx)
+	return target{
+		url:     c.fallbackURL,
+		ttl:     defaultCacheTTL,
+		evalCtx: evalCtx,
+		routine: routineFailure(c.explicitURL, evalCtx),
+	}
+}
+
+func advertisedEndpoint(ctx context.Context, logger log.Logger) (config.OpenFeatureConfig, bool) {
+	of, err := config.GrafanaConfigFromContext(ctx).OpenFeature()
+	if err != nil {
+		if !errors.Is(err, config.ErrOpenFeatureNotConfigured) {
+			logger.FromContext(ctx).Debug("Invalid OpenFeature configuration from the host", "error", err)
+		}
+		return of, false
+	}
+	// Plugins have no credentials for features-service, Grafana logs two errors for each evaluation of a flag
+	// that its static provider does not define, and a type newer than the plugin can need credentials too.
+	return of, of.ProviderType == "ofrep"
+}
+
+func (c *Client) cached(key string) (cacheEntry, bool) {
+	c.cacheMu.RLock()
+	defer c.cacheMu.RUnlock()
+	entry, ok := c.cache[key]
+	return entry, ok && time.Now().Before(entry.expires)
+}
+
+// evaluate runs one OFREP request per key at a time and caches its answer for the target's TTL.
+// A failed request caches false, or the previous answer after a GENERAL error, for at most defaultCacheTTL.
+func (c *Client) evaluate(ctx context.Context, key, flag string, t target) cacheEntry {
+	v, _, _ := c.group.Do(key, func() (any, error) {
+		previous, fresh := c.cached(key)
+		if fresh {
+			evaluationsTotal.WithLabelValues(flag, outcomeHit).Inc()
+			return previous, nil
+		}
+
 		// A query canceled mid-evaluation must not cache a spurious failure
 		// for the tenant's whole TTL window, so the request runs detached from
-		// the caller's cancellation. The provider's request timeout still
-		// bounds it.
+		// the caller's cancellation. The request timeout still bounds it.
 		detached := context.WithoutCancel(ctx)
 		start := time.Now()
-		detail := c.provider.BooleanEvaluation(detached, flag, false, evalCtx)
+		detail := c.provider(t.url).BooleanEvaluation(detached, flag, false, t.evalCtx)
 		requestDurationSeconds.WithLabelValues(flag).Observe(time.Since(start).Seconds())
+
+		entry := cacheEntry{value: detail.Value}
+		ttl := t.ttl
 		outcome := outcomeMiss
 		if detail.Reason == openfeature.ErrorReason {
 			outcome = outcomeError
 			logFailure := c.logger.FromContext(ctx).Warn
-			if routineFailure(c.explicitURL, evalCtx) {
+			if t.routine {
 				logFailure = c.logger.FromContext(ctx).Debug
 			}
-			logFailure("Feature flag evaluation failed, defaulting to off",
-				"flag", flag, "error", detail.ResolutionError.Error())
+			logFailure("Feature flag evaluation failed", "flag", flag, "error", detail.ResolutionError.Error())
+			if detail.ResolutionDetail().ErrorCode == openfeature.GeneralCode {
+				entry.value = previous.value
+			}
+			ttl = min(ttl, defaultCacheTTL)
 		}
+		entry.expires = time.Now().Add(ttl)
 		evaluationsTotal.WithLabelValues(flag, outcome).Inc()
-		c.mu.Lock()
-		c.cache[key] = cacheEntry{value: detail.Value, expires: time.Now().Add(cacheTTL)}
-		c.mu.Unlock()
-		return detail.Value, nil
+
+		c.cacheMu.Lock()
+		c.cache[key] = entry
+		c.cacheMu.Unlock()
+		return entry, nil
 	})
-	return value.(bool)
+	return v.(cacheEntry)
 }
 
-// evaluationContext builds the OFREP targeting attributes available to the
-// plugin backend. Multi-tenant requests carry the tenant identifier in gRPC
-// metadata; single-tenant cloud instances are identified by the stack slug in
-// the Grafana app URL. Elsewhere (OSS, self-managed) no attributes exist and
-// only a flag's default rule can match.
+func (c *Client) provider(endpoint string) openfeature.FeatureProvider {
+	c.providersMu.Lock()
+	defer c.providersMu.Unlock()
+	p, ok := c.providers[endpoint]
+	if !ok {
+		// The provider ignores WithTimeout once a client is supplied, so the client carries the bound.
+		p = ofrep.NewProvider(endpoint, ofrep.WithClient(newHTTPClient()))
+		c.providers[endpoint] = p
+	}
+	return p
+}
+
+// advertisedEvaluationContext targets the request's namespace and adds the host's attributes, which win on a name clash.
+func advertisedEvaluationContext(ctx context.Context, hostAttrs map[string]string) openfeature.FlattenedContext {
+	namespace := backend.PluginConfigFromContext(ctx).Namespace
+	if namespace == "" {
+		namespace = hostAttrs["namespace"]
+	}
+
+	evalCtx := make(openfeature.FlattenedContext, len(hostAttrs)+2)
+	if namespace != "" {
+		evalCtx[openfeature.TargetingKey] = namespace
+		evalCtx["namespace"] = namespace
+	}
+	for k, v := range hostAttrs {
+		evalCtx[k] = v
+	}
+	return evalCtx
+}
+
+func cacheTTL(of config.OpenFeatureConfig) time.Duration {
+	if of.CacheTTL > 0 {
+		return of.CacheTTL
+	}
+	return defaultCacheTTL
+}
+
+// evaluationContext builds the OFREP targeting attributes for a request whose
+// host advertises no usable endpoint. Multi-tenant requests carry the tenant
+// identifier in gRPC metadata; single-tenant cloud instances are identified by
+// the stack slug in the Grafana app URL. Elsewhere (OSS, self-managed) no
+// attributes exist and only a flag's default rule can match.
 func evaluationContext(ctx context.Context) openfeature.FlattenedContext {
 	evalCtx := openfeature.FlattenedContext{}
 
@@ -270,22 +361,22 @@ func slugFromAppURL(appURL string) string {
 	return ""
 }
 
-// routineFailure reports whether an evaluation failure is expected rather
-// than noteworthy: nobody configured the OFREP URL and the request carries no
-// Grafana Cloud identity, so no OFREP service is expected to exist (OSS,
-// self-managed, local development). Warning there would repeat once per TTL
-// window for the life of the process.
+// routineFailure reports whether an evaluation failure against the fallback
+// URL is expected rather than noteworthy: nobody configured the OFREP URL and
+// the request carries no Grafana Cloud identity, so no OFREP service is
+// expected to exist (OSS, self-managed, local development). Warning there
+// would repeat once per TTL window for the life of the process.
 func routineFailure(explicitURL bool, evalCtx openfeature.FlattenedContext) bool {
 	_, cloud := evalCtx[openfeature.TargetingKey]
 	return !explicitURL && !cloud
 }
 
-func cacheKey(flag string, evalCtx openfeature.FlattenedContext) string {
-	targetingKey, _ := evalCtx[openfeature.TargetingKey].(string)
-	return flag + "|" + targetingKey
+func cacheKey(flag string, t target) string {
+	targetingKey, _ := t.evalCtx[openfeature.TargetingKey].(string)
+	return flag + "|" + t.url + "|" + targetingKey
 }
 
-// resolveBaseURL returns the OFREP base URL and whether an operator set it.
+// resolveBaseURL returns the fallback OFREP base URL and whether an operator set it.
 func resolveBaseURL() (baseURL string, explicit bool) {
 	if fromEnv := os.Getenv(ofrepURLEnvVar); fromEnv != "" {
 		return fromEnv, true
