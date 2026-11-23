@@ -1,0 +1,22 @@
+{
+  "took": 3,
+  "responses": [
+    {
+      "took": 2,
+      "timed_out": false,
+      "_shards": { "total": 1, "successful": 1, "skipped": 0, "failed": 0 },
+      "hits": { "total": { "value": 7, "relation": "eq" }, "max_score": null, "hits": [] },
+      "aggregations": {
+        "2": {
+          "doc_count_error_upper_bound": 0,
+          "sum_other_doc_count": 0,
+          "buckets": [
+            { "key": 200, "doc_count": 5, "3": { "value": 1200.5 } },
+            { "key": 404, "doc_count": 2, "3": { "value": 512 } }
+          ]
+        }
+      },
+      "status": 200
+    }
+  ]
+}
