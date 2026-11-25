@@ -1,0 +1,560 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/dsconfig/refs/tags/dsconfig/v0.0.13/dsconfig/schema.json",
+  "schemaVersion": "v1",
+  "pluginType": "elasticsearch",
+  "pluginName": "Elasticsearch",
+  "docURL": "https://grafana.com/docs/grafana/latest/datasources/elasticsearch/",
+  "baseFields": [
+    {
+      "from": "plugin_sdk_settings",
+      "exclude": [
+        "plugin_sdk_settings.access",
+        "plugin_sdk_settings.withCredentials"
+      ],
+      "patch": {
+        "plugin_sdk_settings.url": {
+          "placeholder": "http://localhost:9200"
+        },
+        "plugin_sdk_settings.sigV4Auth": {
+          "description": "Sign requests with AWS SigV4. The editor only offers it when the Grafana instance enables SigV4 auth; provisioning can set it regardless."
+        }
+      }
+    }
+  ],
+  "fields": [
+    {
+      "id": "virtual_authMethod",
+      "key": "authMethod",
+      "label": "Authentication method",
+      "description": "Choose an authentication method to access the data source.",
+      "valueType": "string",
+      "kind": "virtual",
+      "defaultValue": "NoAuth",
+      "validations": [
+        {
+          "type": "allowedValues",
+          "values": ["BasicAuth", "OAuthForward", "NoAuth", "custom-api-key", "custom-sigv4"]
+        }
+      ],
+      "ui": {
+        "component": "select",
+        "options": [
+          { "label": "Basic authentication", "value": "BasicAuth" },
+          { "label": "Forward OAuth Identity", "value": "OAuthForward" },
+          { "label": "No Authentication", "value": "NoAuth" },
+          { "label": "API Key", "value": "custom-api-key" },
+          { "label": "SigV4 auth", "value": "custom-sigv4" }
+        ]
+      },
+      "storage": {
+        "type": "computed",
+        "read": "jsonData.apiKeyAuth == true ? 'custom-api-key' : (jsonData.sigV4Auth == true ? 'custom-sigv4' : (root.basicAuth == true ? 'BasicAuth' : (jsonData.oauthPassThru == true ? 'OAuthForward' : 'NoAuth')))"
+      },
+      "effects": [
+        {
+          "when": "value == 'BasicAuth'",
+          "set": {
+            "plugin_sdk_settings.basicAuth": true,
+            "plugin_sdk_settings.oauthPassThru": false,
+            "jsonData_apiKeyAuth": false,
+            "plugin_sdk_settings.sigV4Auth": false
+          }
+        },
+        {
+          "when": "value == 'OAuthForward'",
+          "set": {
+            "plugin_sdk_settings.basicAuth": false,
+            "plugin_sdk_settings.oauthPassThru": true,
+            "jsonData_apiKeyAuth": false,
+            "plugin_sdk_settings.sigV4Auth": false
+          }
+        },
+        {
+          "when": "value == 'NoAuth'",
+          "set": {
+            "plugin_sdk_settings.basicAuth": false,
+            "plugin_sdk_settings.oauthPassThru": false,
+            "jsonData_apiKeyAuth": false,
+            "plugin_sdk_settings.sigV4Auth": false
+          }
+        },
+        {
+          "when": "value == 'custom-api-key'",
+          "set": {
+            "plugin_sdk_settings.basicAuth": false,
+            "plugin_sdk_settings.oauthPassThru": false,
+            "jsonData_apiKeyAuth": true,
+            "plugin_sdk_settings.sigV4Auth": false
+          }
+        },
+        {
+          "when": "value == 'custom-sigv4'",
+          "set": {
+            "plugin_sdk_settings.basicAuth": false,
+            "plugin_sdk_settings.oauthPassThru": false,
+            "jsonData_apiKeyAuth": false,
+            "plugin_sdk_settings.sigV4Auth": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "jsonData_apiKeyAuth",
+      "key": "apiKeyAuth",
+      "label": "API Key authentication",
+      "description": "Send the API key as an `Authorization: ApiKey` header. Set by the authentication method selector.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "role": "auth.discriminator",
+      "defaultValue": false,
+      "tags": ["managed-by:virtual_authMethod"]
+    },
+    {
+      "id": "secureJsonData_apiKey",
+      "key": "apiKey",
+      "label": "API Key",
+      "description": "Base64-encoded Elasticsearch API key.",
+      "valueType": "string",
+      "target": "secureJsonData",
+      "role": "auth.apiKey.value",
+      "dependsOn": "jsonData_apiKeyAuth == true",
+      "requiredWhen": "jsonData_apiKeyAuth == true",
+      "ui": {
+        "component": "input",
+        "placeholder": "Enter your API key"
+      }
+    },
+    {
+      "id": "jsonData_sigV4AuthType",
+      "key": "sigV4AuthType",
+      "label": "Authentication Provider",
+      "description": "Which AWS credentials chain to use.",
+      "valueType": "string",
+      "target": "jsonData",
+      "dependsOn": "plugin_sdk_settings.sigV4Auth == true",
+      "validations": [
+        {
+          "type": "allowedValues",
+          "values": ["default", "keys", "credentials", "ec2_iam_role", "grafana_assume_role"]
+        }
+      ],
+      "ui": {
+        "component": "select",
+        "options": [
+          { "label": "AWS SDK Default", "value": "default" },
+          { "label": "Access & secret key", "value": "keys" },
+          { "label": "Credentials file", "value": "credentials" },
+          { "label": "Workspace IAM Role", "value": "ec2_iam_role" },
+          { "label": "Grafana Assume Role", "value": "grafana_assume_role" }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_sigV4Profile",
+      "key": "sigV4Profile",
+      "label": "Credentials Profile Name",
+      "description": "Profile name in the AWS credentials file. Leave blank for the default.",
+      "valueType": "string",
+      "target": "jsonData",
+      "dependsOn": "jsonData_sigV4AuthType == 'credentials'",
+      "ui": {
+        "component": "input",
+        "placeholder": "default"
+      }
+    },
+    {
+      "id": "secureJsonData_sigV4AccessKey",
+      "key": "sigV4AccessKey",
+      "label": "Access Key ID",
+      "valueType": "string",
+      "target": "secureJsonData",
+      "role": "auth.aws.accessKeyId",
+      "dependsOn": "jsonData_sigV4AuthType == 'keys'",
+      "requiredWhen": "jsonData_sigV4AuthType == 'keys'",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "secureJsonData_sigV4SecretKey",
+      "key": "sigV4SecretKey",
+      "label": "Secret Access Key",
+      "valueType": "string",
+      "target": "secureJsonData",
+      "role": "auth.aws.secretAccessKey",
+      "dependsOn": "jsonData_sigV4AuthType == 'keys'",
+      "requiredWhen": "jsonData_sigV4AuthType == 'keys'",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_sigV4AssumeRoleArn",
+      "key": "sigV4AssumeRoleArn",
+      "label": "Assume Role ARN",
+      "description": "Optional. Role to assume with the selected authentication provider.",
+      "valueType": "string",
+      "target": "jsonData",
+      "dependsOn": "plugin_sdk_settings.sigV4Auth == true",
+      "validations": [
+        {
+          "type": "pattern",
+          "pattern": "^(arn:aws[a-zA-Z-]*:iam::[0-9]{12}:role/.+)?$",
+          "message": "When set, must be a valid IAM role ARN, e.g. arn:aws:iam::123456789012:role/MyRole"
+        }
+      ],
+      "ui": {
+        "component": "input",
+        "placeholder": "arn:aws:iam:*"
+      }
+    },
+    {
+      "id": "jsonData_sigV4ExternalId",
+      "key": "sigV4ExternalId",
+      "label": "External ID",
+      "description": "External ID required by the assumed role's trust policy, if any.",
+      "valueType": "string",
+      "target": "jsonData",
+      "dependsOn": "jsonData_sigV4AuthType != 'grafana_assume_role'",
+      "ui": {
+        "component": "input",
+        "placeholder": "External ID"
+      }
+    },
+    {
+      "id": "jsonData_sigV4Region",
+      "key": "sigV4Region",
+      "label": "Default Region",
+      "description": "AWS region used to sign requests, such as `us-east-1`.",
+      "valueType": "string",
+      "target": "jsonData",
+      "dependsOn": "plugin_sdk_settings.sigV4Auth == true",
+      "ui": {
+        "component": "input",
+        "placeholder": "us-east-1"
+      }
+    },
+    {
+      "id": "jsonData_enableSecureSocksProxy",
+      "key": "enableSecureSocksProxy",
+      "label": "Secure Socks Proxy",
+      "description": "Route requests through Grafana's Secure Socks Proxy (Private Data source Connect). The editor only shows it when the Grafana instance enables the proxy.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "root_database",
+      "key": "database",
+      "label": "Database (legacy)",
+      "description": "Legacy index name. The backend falls back to it when `index` is empty; the editor clears it when `index` is edited.",
+      "valueType": "string",
+      "target": "root",
+      "tags": ["legacy"]
+    },
+    {
+      "id": "jsonData_index",
+      "key": "index",
+      "label": "Index name",
+      "description": "Name of your Elasticsearch index. You can use a time pattern, such as YYYY.MM.DD, or a wildcard for the index name.",
+      "valueType": "string",
+      "target": "jsonData",
+      "required": true,
+      "ui": {
+        "component": "input",
+        "placeholder": "es-index-name"
+      }
+    },
+    {
+      "id": "jsonData_interval",
+      "key": "interval",
+      "label": "Pattern",
+      "description": "Time pattern of the index. Omit for no pattern.",
+      "valueType": "string",
+      "target": "jsonData",
+      "validations": [
+        {
+          "type": "allowedValues",
+          "values": ["Hourly", "Daily", "Weekly", "Monthly", "Yearly"]
+        }
+      ],
+      "ui": {
+        "component": "select",
+        "options": [
+          { "label": "Hourly", "value": "Hourly" },
+          { "label": "Daily", "value": "Daily" },
+          { "label": "Weekly", "value": "Weekly" },
+          { "label": "Monthly", "value": "Monthly" },
+          { "label": "Yearly", "value": "Yearly" }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_timeField",
+      "key": "timeField",
+      "label": "Time field name",
+      "description": "Name of your time field.",
+      "valueType": "string",
+      "target": "jsonData",
+      "required": true,
+      "defaultValue": "@timestamp",
+      "ui": {
+        "component": "input",
+        "placeholder": "@timestamp"
+      }
+    },
+    {
+      "id": "jsonData_maxConcurrentShardRequests",
+      "key": "maxConcurrentShardRequests",
+      "label": "Max concurrent Shard Requests",
+      "description": "Maximum number of concurrent shards a search request can hit per node. Non-positive values fall back to the default.",
+      "valueType": "number",
+      "target": "jsonData",
+      "defaultValue": 5,
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_timeInterval",
+      "key": "timeInterval",
+      "label": "Min time interval",
+      "description": "Lower limit for the auto group-by time interval. Set it to the write frequency, for example 1m.",
+      "valueType": "string",
+      "target": "jsonData",
+      "tags": ["frontend-only"],
+      "validations": [
+        {
+          "type": "pattern",
+          "pattern": "^\\d+(ms|[Mwdhmsy])$"
+        }
+      ],
+      "ui": {
+        "component": "input",
+        "placeholder": "10s"
+      }
+    },
+    {
+      "id": "jsonData_includeFrozen",
+      "key": "includeFrozen",
+      "label": "Include Frozen Indices",
+      "description": "Include frozen indices in searches.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_defaultQueryMode",
+      "key": "defaultQueryMode",
+      "label": "Default query mode",
+      "description": "Query mode new queries start in.",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "metrics",
+      "tags": ["frontend-only"],
+      "validations": [
+        {
+          "type": "allowedValues",
+          "values": ["metrics", "logs", "raw_data", "raw_document"]
+        }
+      ],
+      "ui": {
+        "component": "select",
+        "options": [
+          { "label": "Metrics", "value": "metrics" },
+          { "label": "Logs", "value": "logs" },
+          { "label": "Raw Data", "value": "raw_data" },
+          { "label": "Raw Document", "value": "raw_document" }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_logMessageField",
+      "key": "logMessageField",
+      "label": "Message field name",
+      "description": "Field used for log messages.",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input",
+        "placeholder": "_source"
+      }
+    },
+    {
+      "id": "jsonData_logLevelField",
+      "key": "logLevelField",
+      "label": "Level field name",
+      "description": "Field that holds the level of each log message.",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_dataLinks",
+      "key": "dataLinks",
+      "label": "Data links",
+      "description": "Links added to matching fields in log row details.",
+      "valueType": "array",
+      "target": "jsonData",
+      "tags": ["frontend-only"],
+      "item": {
+        "valueType": "object",
+        "fields": [
+          {
+            "id": "jsonData_dataLinks.item.field",
+            "key": "field",
+            "label": "Field",
+            "description": "Exact field name or a regex that matches it.",
+            "valueType": "string",
+            "isItemField": true,
+            "required": true,
+            "ui": { "component": "input" }
+          },
+          {
+            "id": "jsonData_dataLinks.item.url",
+            "key": "url",
+            "label": "URL/Query",
+            "description": "External URL, or a query when `datasourceUid` is set.",
+            "valueType": "string",
+            "isItemField": true,
+            "ui": {
+              "component": "input",
+              "placeholder": "http://example.com/${__value.raw}"
+            }
+          },
+          {
+            "id": "jsonData_dataLinks.item.urlDisplayLabel",
+            "key": "urlDisplayLabel",
+            "label": "URL Label",
+            "description": "Overrides the link button label.",
+            "valueType": "string",
+            "isItemField": true,
+            "ui": { "component": "input" }
+          },
+          {
+            "id": "jsonData_dataLinks.item.datasourceUid",
+            "key": "datasourceUid",
+            "label": "Internal link",
+            "description": "UID of the data source the link opens. Makes it an internal link.",
+            "valueType": "string",
+            "isItemField": true,
+            "ui": { "component": "input" }
+          }
+        ]
+      }
+    }
+  ],
+  "groups": [
+    {
+      "id": "connection",
+      "title": "Connection",
+      "order": 1,
+      "fieldRefs": ["plugin_sdk_settings.url"]
+    },
+    {
+      "id": "authentication",
+      "title": "Authentication",
+      "order": 2,
+      "fieldRefs": [
+        "virtual_authMethod",
+        "plugin_sdk_settings.basicAuthUser",
+        "plugin_sdk_settings.basicAuthPassword",
+        "secureJsonData_apiKey",
+        "jsonData_sigV4AuthType",
+        "jsonData_sigV4Profile",
+        "secureJsonData_sigV4AccessKey",
+        "secureJsonData_sigV4SecretKey",
+        "jsonData_sigV4AssumeRoleArn",
+        "jsonData_sigV4ExternalId",
+        "jsonData_sigV4Region"
+      ]
+    },
+    {
+      "id": "tls-settings",
+      "title": "TLS settings",
+      "order": 3,
+      "optional": true,
+      "fieldRefs": [
+        "plugin_sdk_settings.tlsAuthWithCACert",
+        "plugin_sdk_settings.tlsCACert",
+        "plugin_sdk_settings.tlsAuth",
+        "plugin_sdk_settings.serverName",
+        "plugin_sdk_settings.tlsClientCert",
+        "plugin_sdk_settings.tlsClientKey",
+        "plugin_sdk_settings.tlsSkipVerify"
+      ]
+    },
+    {
+      "id": "additional-http",
+      "title": "Additional settings",
+      "order": 4,
+      "optional": true,
+      "fieldRefs": [
+        "plugin_sdk_settings.keepCookies",
+        "plugin_sdk_settings.timeout",
+        "plugin_sdk_settings.httpHeaders",
+        "jsonData_enableSecureSocksProxy"
+      ]
+    },
+    {
+      "id": "elasticsearch-details",
+      "title": "Elasticsearch details",
+      "order": 5,
+      "fieldRefs": [
+        "jsonData_index",
+        "root_database",
+        "jsonData_interval",
+        "jsonData_timeField",
+        "jsonData_maxConcurrentShardRequests",
+        "jsonData_timeInterval",
+        "jsonData_includeFrozen",
+        "jsonData_defaultQueryMode"
+      ]
+    },
+    {
+      "id": "logs",
+      "title": "Logs",
+      "order": 6,
+      "optional": true,
+      "fieldRefs": ["jsonData_logMessageField", "jsonData_logLevelField"]
+    },
+    {
+      "id": "data-links",
+      "title": "Data links",
+      "order": 7,
+      "optional": true,
+      "fieldRefs": ["jsonData_dataLinks"]
+    }
+  ],
+  "relationships": [
+    {
+      "type": "pair",
+      "fields": ["jsonData_apiKeyAuth", "secureJsonData_apiKey"],
+      "description": "Enabling `apiKeyAuth` requires the key in `apiKey`."
+    },
+    {
+      "type": "pair",
+      "fields": ["secureJsonData_sigV4AccessKey", "secureJsonData_sigV4SecretKey"],
+      "description": "AWS access key pair, supplied together when `sigV4AuthType` is `keys`."
+    },
+    {
+      "type": "group",
+      "fields": ["jsonData_sigV4AssumeRoleArn", "jsonData_sigV4ExternalId"],
+      "description": "The external ID only applies when a role ARN is set."
+    }
+  ],
+  "instructions": [
+    {
+      "msg": "Supports one authentication method at a time, chosen by `authMethod`: `BasicAuth` (`basicAuth`, `basicAuthUser`, `basicAuthPassword`), `OAuthForward` (`oauthPassThru`), `NoAuth`, `custom-api-key` (`apiKeyAuth`, `apiKey`) or `custom-sigv4` (`sigV4Auth` plus the `sigV4*` fields). The editor writes all four flags on every selection so only one is true.",
+      "tags": ["llm", "auth"]
+    }
+  ]
+}

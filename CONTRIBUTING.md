@@ -54,6 +54,14 @@ This project adheres to the [Grafana Code of Conduct](https://github.com/grafana
    mage -v
    ```
 
+2. Run backend tests:
+
+   ```shell
+   go test ./pkg/...
+   ```
+
+If you touched data source settings, run `go generate ./pkg/schema/...` and commit the regenerated `.gen.json` artifacts.
+
 ## Local development environment
 
 `npm run server` starts a single-node Elasticsearch instance and a Grafana instance with the plugin pre-provisioned:
@@ -98,6 +106,34 @@ Quarantined tests are excluded from the Cloud gating run (`npm run e2e:cloud` an
 Re-promote a test by removing `{ tag: '@quarantine' }` once the underlying issue is fixed.
 
 See the [test-signal taxonomy](https://github.com/grafana/data-sources/blob/main/docs/testing/test-signal-taxonomy.md) for the full quarantine policy.
+
+## Data Source Configuration Schema
+
+`pkg/schema/dsconfig.json` describes the data source's `root`, `jsonData` and `secureJsonData` settings in a machine-readable form. It is the single source of truth for the configuration surface, consumed by provisioning tooling, docs and automation. The format is defined in [dsconfig](https://github.com/grafana/dsconfig/tree/main/dsconfig): see the [README](https://github.com/grafana/dsconfig/blob/main/dsconfig/README.md), [`schema.md`](https://github.com/grafana/dsconfig/blob/main/dsconfig/schema.md) and [`schema.json`](https://github.com/grafana/dsconfig/blob/main/dsconfig/schema.json).
+
+The `$schema` URL in `dsconfig.json` is pinned to a tag. It must always match the `github.com/grafana/dsconfig/dsconfig` version in `go.mod`; bump them together.
+
+### Layout
+
+| File | Purpose |
+| --- | --- |
+| `pkg/schema/dsconfig.json` | The schema. Edit this. |
+| `pkg/schema/dsconfig_test.go` | Conformance wiring and `SecureKeys`. |
+| `pkg/schema/models/settings.go` | Test-only model of the `jsonData` keys. The backend parses `jsonData` into a map and does not use it. |
+| `pkg/schema/*.gen.json` | Generated. Never hand-edit. The build copies them into `dist/schema/`. |
+
+### Adding a new settings option
+
+1. Declare the field in `dsconfig.json` under `fields` and add its id to `groups[].fieldRefs`. Ids follow `<target>_<key>`.
+2. Add a struct field in `pkg/schema/models/settings.go` with a json tag equal to the schema `key`. Parity is enforced in both directions. Secrets are the exception: add the key to `SecureKeys` in `dsconfig_test.go` instead.
+3. Run `go generate ./pkg/schema/...` and commit the regenerated files.
+4. Run `go test ./pkg/schema/...`.
+
+### When the conformance suite fails
+
+- `SchemaArtifactInSync`: the `*.gen.json` files are stale. Run `go generate ./pkg/schema/...`.
+- `JSONDataMatchesStruct` / `JSONDataTypesMatchStruct`: a `jsonData` key or its type differs between `dsconfig.json` and `models.DatasourceSettings`. Fix whichever side is wrong.
+- `SecureValuesMatchLoadSettings`: `SecureKeys` and the schema's `secureJsonData` fields differ. Update `SecureKeys`.
 
 ## Release
 
