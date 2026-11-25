@@ -1,0 +1,259 @@
+{
+  "targetApiVersion": "v0alpha1",
+  "settings": {
+    "spec": {
+      "type": "object",
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "basicAuth": {
+          "description": "Enable HTTP Basic authentication. When enabled, the SDK populates `httpclient.Options.BasicAuth` from `basicAuthUser` / `secureJsonData.basicAuthPassword`.",
+          "type": "boolean",
+          "default": false
+        },
+        "basicAuthUser": {
+          "type": "string",
+          "x-dsconfig-depends-on": "plugin_sdk_settings.basicAuth == true",
+          "x-dsconfig-required-when": "plugin_sdk_settings.basicAuth == true"
+        },
+        "database": {
+          "description": "Legacy index name. The backend falls back to it when `index` is empty; the editor clears it when `index` is edited.",
+          "type": "string"
+        },
+        "jsonData": {
+          "type": "object",
+          "required": [
+            "timeField"
+          ],
+          "properties": {
+            "apiKeyAuth": {
+              "description": "Send the API key as an `Authorization: ApiKey` header. Set by the authentication method selector.",
+              "type": "boolean",
+              "default": false
+            },
+            "dataLinks": {
+              "description": "Links added to matching fields in log row details.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "datasourceUid": {
+                    "description": "UID of the data source the link opens. Makes it an internal link.",
+                    "type": "string"
+                  },
+                  "field": {
+                    "description": "Exact field name or a regex that matches it.",
+                    "type": "string"
+                  },
+                  "url": {
+                    "description": "External URL, or a query when `datasourceUid` is set.",
+                    "type": "string"
+                  },
+                  "urlDisplayLabel": {
+                    "description": "Overrides the link button label.",
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "defaultQueryMode": {
+              "description": "Query mode new queries start in.",
+              "type": "string",
+              "default": "metrics",
+              "enum": [
+                "metrics",
+                "logs",
+                "raw_data",
+                "raw_document"
+              ]
+            },
+            "enableSecureSocksProxy": {
+              "description": "Route requests through Grafana's Secure Socks Proxy (Private Data source Connect). The editor only shows it when the Grafana instance enables the proxy.",
+              "type": "boolean",
+              "default": false
+            },
+            "httpHeaders": {
+              "description": "Additional HTTP headers sent with every request. Forwarded to the SDK as `httpclient.Options.Header`.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9-]*$"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              },
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+            },
+            "includeFrozen": {
+              "description": "Include frozen indices in searches.",
+              "type": "boolean",
+              "default": false
+            },
+            "index": {
+              "description": "Name of your Elasticsearch index. You can use a time pattern, such as YYYY.MM.DD, or a wildcard for the index name. The editor requires it; the backend falls back to the legacy root `database` when it is empty.",
+              "type": "string"
+            },
+            "interval": {
+              "description": "Time pattern of the index. Omit for no pattern.",
+              "type": "string",
+              "enum": [
+                "Hourly",
+                "Daily",
+                "Weekly",
+                "Monthly",
+                "Yearly"
+              ]
+            },
+            "keepCookies": {
+              "description": "Cookies, by name, that the Grafana proxy should forward to the datasource. The Grafana proxy strips all cookies by default.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access == 'proxy'"
+            },
+            "logLevelField": {
+              "description": "Field that holds the level of each log message.",
+              "type": "string"
+            },
+            "logMessageField": {
+              "description": "Field used for log messages.",
+              "type": "string"
+            },
+            "maxConcurrentShardRequests": {
+              "description": "Maximum number of concurrent shards a search request can hit per node. Non-positive values fall back to the default. Provision it as a number; the editor saves it as a numeric string, and the backend accepts both.",
+              "type": "number",
+              "default": 5
+            },
+            "oauthPassThru": {
+              "description": "Forward the signed-in user's upstream OAuth identity (access token) to the datasource.",
+              "type": "boolean",
+              "default": false,
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+            },
+            "serverName": {
+              "description": "Server name used for TLS SNI / certificate verification. Forwarded to the SDK as `TLSOptions.ServerName`.",
+              "type": "string",
+              "x-dsconfig-depends-on": "plugin_sdk_settings.tlsAuth == true"
+            },
+            "sigV4AssumeRoleArn": {
+              "description": "Optional. Role to assume with the selected authentication provider.",
+              "type": "string",
+              "pattern": "^(arn:aws[a-zA-Z-]*:iam::[0-9]{12}:role/.+)?$",
+              "x-dsconfig-depends-on": "plugin_sdk_settings.sigV4Auth == true"
+            },
+            "sigV4Auth": {
+              "description": "Sign requests with AWS SigV4. The editor only offers it when the Grafana instance enables SigV4 auth; provisioning can set it regardless.",
+              "type": "boolean",
+              "default": false
+            },
+            "sigV4AuthType": {
+              "description": "Which AWS credentials chain to use.",
+              "type": "string",
+              "enum": [
+                "default",
+                "keys",
+                "credentials",
+                "ec2_iam_role",
+                "grafana_assume_role"
+              ],
+              "x-dsconfig-depends-on": "plugin_sdk_settings.sigV4Auth == true"
+            },
+            "sigV4ExternalId": {
+              "description": "External ID required by the assumed role's trust policy, if any.",
+              "type": "string",
+              "x-dsconfig-depends-on": "jsonData_sigV4AuthType != 'grafana_assume_role'"
+            },
+            "sigV4Profile": {
+              "description": "Profile name in the AWS credentials file. Leave blank for the default.",
+              "type": "string",
+              "x-dsconfig-depends-on": "jsonData_sigV4AuthType == 'credentials'"
+            },
+            "sigV4Region": {
+              "description": "AWS region used to sign requests, such as `us-east-1`. Required when SigV4 is enabled: the signer uses this value directly, so a blank region produces an invalid signature.",
+              "type": "string",
+              "x-dsconfig-depends-on": "plugin_sdk_settings.sigV4Auth == true",
+              "x-dsconfig-required-when": "plugin_sdk_settings.sigV4Auth == true"
+            },
+            "timeField": {
+              "description": "Name of your time field.",
+              "type": "string",
+              "default": "@timestamp"
+            },
+            "timeInterval": {
+              "description": "Lower limit for the auto group-by time interval. Set it to the write frequency, for example 1m.",
+              "type": "string",
+              "pattern": "^\\d+(ms|[Mwdhmsy])$"
+            },
+            "timeout": {
+              "description": "HTTP request timeout in seconds. Maps to `TimeoutOptions.Timeout` in the plugin SDK HTTP client.",
+              "type": "number",
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+            },
+            "tlsAuth": {
+              "description": "Validate using TLS client authentication, in which the server authenticates the client",
+              "type": "boolean",
+              "default": false,
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+            },
+            "tlsAuthWithCACert": {
+              "description": "Add your own Certificate Authority (CA) certificate on top of one generated by the certificate authorities for additional security measures",
+              "type": "boolean",
+              "default": false,
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access == 'proxy'"
+            },
+            "tlsSkipVerify": {
+              "description": "Skipping TLS certificate validation is not recommended unless absolutely necessary or for testing",
+              "type": "boolean",
+              "default": false,
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+            }
+          }
+        },
+        "url": {
+          "description": "Complete HTTP URL of the datasource (e.g. https://your-server:8080).",
+          "type": "string"
+        }
+      }
+    },
+    "secureValues": [
+      {
+        "key": "basicAuthPassword"
+      },
+      {
+        "key": "tlsCACert",
+        "description": "Your self-signed certificate"
+      },
+      {
+        "key": "tlsClientCert",
+        "description": "PEM-encoded client certificate used for mTLS. Forwarded to the SDK as `TLSOptions.ClientCertificate`."
+      },
+      {
+        "key": "tlsClientKey",
+        "description": "PEM-encoded private key paired with `tlsClientCert`. Forwarded to the SDK as `TLSOptions.ClientKey`."
+      },
+      {
+        "key": "apiKey",
+        "description": "Base64-encoded Elasticsearch API key."
+      },
+      {
+        "key": "sigV4AccessKey"
+      },
+      {
+        "key": "sigV4SecretKey"
+      }
+    ]
+  }
+}
