@@ -48,7 +48,7 @@
       },
       "storage": {
         "type": "computed",
-        "read": "jsonData.apiKeyAuth == true ? 'custom-api-key' : (jsonData.sigV4Auth == true ? 'custom-sigv4' : (root.basicAuth == true ? 'BasicAuth' : (jsonData.oauthPassThru == true ? 'OAuthForward' : 'NoAuth')))"
+        "read": "jsonData.sigV4Auth == true ? 'custom-sigv4' : (jsonData.apiKeyAuth == true ? 'custom-api-key' : (root.basicAuth == true ? 'BasicAuth' : (jsonData.oauthPassThru == true ? 'OAuthForward' : 'NoAuth')))"
       },
       "effects": [
         {
@@ -259,10 +259,9 @@
       "id": "jsonData_index",
       "key": "index",
       "label": "Index name",
-      "description": "Name of your Elasticsearch index. You can use a time pattern, such as YYYY.MM.DD, or a wildcard for the index name.",
+      "description": "Name of your Elasticsearch index. You can use a time pattern, such as YYYY.MM.DD, or a wildcard for the index name. The editor requires it; the backend falls back to the legacy root `database` when it is empty.",
       "valueType": "string",
       "target": "jsonData",
-      "required": true,
       "ui": {
         "component": "input",
         "placeholder": "es-index-name"
@@ -310,7 +309,7 @@
       "id": "jsonData_maxConcurrentShardRequests",
       "key": "maxConcurrentShardRequests",
       "label": "Max concurrent Shard Requests",
-      "description": "Maximum number of concurrent shards a search request can hit per node. Non-positive values fall back to the default.",
+      "description": "Maximum number of concurrent shards a search request can hit per node. Non-positive values fall back to the default. Provision it as a number; the editor saves it as a numeric string, and the backend accepts both.",
       "valueType": "number",
       "target": "jsonData",
       "defaultValue": 5,

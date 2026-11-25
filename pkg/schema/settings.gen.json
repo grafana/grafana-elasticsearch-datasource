@@ -22,7 +22,6 @@
       "jsonData": {
         "type": "object",
         "required": [
-          "index",
           "timeField"
         ],
         "properties": {
@@ -101,7 +100,7 @@
             "default": false
           },
           "index": {
-            "description": "Name of your Elasticsearch index. You can use a time pattern, such as YYYY.MM.DD, or a wildcard for the index name.",
+            "description": "Name of your Elasticsearch index. You can use a time pattern, such as YYYY.MM.DD, or a wildcard for the index name. The editor requires it; the backend falls back to the legacy root `database` when it is empty.",
             "type": "string"
           },
           "interval": {
@@ -132,7 +131,7 @@
             "type": "string"
           },
           "maxConcurrentShardRequests": {
-            "description": "Maximum number of concurrent shards a search request can hit per node. Non-positive values fall back to the default.",
+            "description": "Maximum number of concurrent shards a search request can hit per node. Non-positive values fall back to the default. Provision it as a number; the editor saves it as a numeric string, and the backend accepts both.",
             "type": "number",
             "default": 5
           },
