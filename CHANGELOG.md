@@ -1,5 +1,12 @@
 # Changelog
 
+## [12.10.0](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.7...v12.10.0) (2026-11-25)
+
+
+### 🎉 Features
+
+* **elasticsearch:** evaluate feature flags against the host's OpenFeature endpoint ([#505](https://github.com/grafana/grafana-elasticsearch-datasource/issues/505)) ([2d8ba9c](https://github.com/grafana/grafana-elasticsearch-datasource/commit/2d8ba9c8f95de5482d0d9af27d7bb0daffd53368))
+
 ## [12.9.7](https://github.com/grafana/grafana-elasticsearch-datasource/compare/v12.9.6...v12.9.7) (2026-11-18)
 
 
