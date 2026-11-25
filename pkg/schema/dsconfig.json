@@ -225,10 +225,11 @@
       "id": "jsonData_sigV4Region",
       "key": "sigV4Region",
       "label": "Default Region",
-      "description": "AWS region used to sign requests, such as `us-east-1`.",
+      "description": "AWS region used to sign requests, such as `us-east-1`. Required when SigV4 is enabled: the signer uses this value directly, so a blank region produces an invalid signature.",
       "valueType": "string",
       "target": "jsonData",
       "dependsOn": "plugin_sdk_settings.sigV4Auth == true",
+      "requiredWhen": "plugin_sdk_settings.sigV4Auth == true",
       "ui": {
         "component": "input",
         "placeholder": "us-east-1"
