@@ -27,6 +27,6 @@ jobs:
         id: node-version
         run: echo "value=$(tr -d '[:space:]' < .nvmrc)" >> "$GITHUB_OUTPUT"
 
-      - uses: grafana/plugin-actions/bundle-size@6b3176d6bd4b6885b6433410aeb42de2f76d8a09 # bundle-size/v1.0.2
+      - uses: grafana/plugin-actions/bundle-size@dfa9631cf7a2077d75d1d374935813156a770419 # bundle-size/v1.1.2
         with:
           node-version: ${{ steps.node-version.outputs.value }}
