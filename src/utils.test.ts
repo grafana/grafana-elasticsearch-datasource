@@ -1,5 +1,16 @@
-import { ElasticsearchDataQuery } from './dataquery.gen';
-import { flattenObject, isTimeSeriesQuery, removeEmpty } from './utils';
+import { SemVer } from 'semver';
+
+import { ElasticsearchDataQuery, MetricAggregation } from './dataquery.gen';
+import { describeMetric, flattenObject, isSupportedVersion, isTimeSeriesQuery, removeEmpty } from './utils';
+
+describe('describeMetric', () => {
+  it('falls back to "<type> (removed)" for a metric type no longer in metricAggregationConfig', () => {
+    // Saved queries can carry a metric type removed from MetricAggregationType (e.g. moving_avg).
+    const metric = { id: '1', type: 'moving_avg' } as unknown as MetricAggregation;
+
+    expect(describeMetric(metric)).toBe('moving_avg (removed)');
+  });
+});
 
 describe('removeEmpty', () => {
   it('Should remove all empty', () => {
@@ -113,5 +124,17 @@ describe('flattenObject', () => {
     };
 
     expect(flattenObject(nestedObject)).toEqual(nestedObject);
+  });
+});
+
+describe('isSupportedVersion', () => {
+  it.each([
+    ['8.0.0', true],
+    ['9.3.1', true],
+    ['8.14.0-SNAPSHOT', true],
+    ['7.17.0', false],
+    ['7.16.0', false],
+  ])('returns %s support = %s', (version, expected) => {
+    expect(isSupportedVersion(new SemVer(version))).toBe(expected);
   });
 });
